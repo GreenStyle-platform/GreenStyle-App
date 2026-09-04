@@ -56,4 +56,7 @@ dependencies {
     // DI
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
+
+     //Timber
+      implementation(libs.timber)
 }

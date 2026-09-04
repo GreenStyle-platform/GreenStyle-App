@@ -1,6 +1,9 @@
 plugins {
     alias(libs.plugins.android.library)
     alias(libs.plugins.kotlin.android)
+    alias(libs.plugins.hilt)
+    alias(libs.plugins.ksp)
+    alias(libs.plugins.kotlin.serialization)
 }
 
     android {
@@ -13,8 +16,11 @@ plugins {
       testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
         compileOptions {
-            sourceCompatibility = JavaVersion.VERSION_11
-            targetCompatibility = JavaVersion.VERSION_11
+            sourceCompatibility = JavaVersion.VERSION_17
+            targetCompatibility = JavaVersion.VERSION_17
+        }
+        kotlinOptions {
+            jvmTarget = "17"
         }
     }
 
@@ -25,4 +31,18 @@ plugins {
       testImplementation(libs.junit)
       androidTestImplementation(libs.androidx.espresso.core)
       androidTestImplementation(libs.androidx.junit)
+
+       //Timber
+      implementation(libs.timber)
+
+      //DI
+      implementation(libs.hilt.android)
+      ksp(libs.hilt.compiler)
+
+      //Retrofit
+      implementation(libs.retrofit)
+      implementation(libs.retrofit.converter.kotlinx.serialization)
+      implementation(libs.okhttp)
+      //Kotlinx serialization
+      implementation(libs.kotlinx.serialization.json)
   }

@@ -3,30 +3,26 @@ package com.vie.mit.green.navigation
 import androidx.navigation.NavOptionsBuilder
 import com.vie.mit.common.navigation.AppNavigator
 import com.vie.mit.common.navigation.NavigationEvent
-import kotlinx.coroutines.channels.BufferOverflow
-import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.flow.SharedFlow
-import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.channels.ReceiveChannel
 import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
 class NavigationManager @Inject constructor() : AppNavigator {
-    private val _navigationEvents = MutableSharedFlow<NavigationEvent>(
-        extraBufferCapacity = 1,
-        onBufferOverflow = BufferOverflow.DROP_OLDEST
-    )
-    override val navigationEvents: SharedFlow<NavigationEvent> = _navigationEvents.asSharedFlow()
+    private val _navigationChannel = Channel<NavigationEvent>(capacity = Channel.BUFFERED)
+    override val navigationChannel: ReceiveChannel<NavigationEvent> = _navigationChannel
 
-    override suspend fun navigateTo(route: Any, builder: NavOptionsBuilder.() -> Unit) {
-        _navigationEvents.emit(NavigationEvent.NavigateTo(route, builder))
+    override fun navigateTo(route: Any, builder: NavOptionsBuilder.() -> Unit) {
+        _navigationChannel.trySend(NavigationEvent.NavigateTo(route, builder))
     }
 
-    override suspend fun navigateUp() {
-        _navigationEvents.emit(NavigationEvent.NavigateUp)
+    override fun navigateUp() {
+        _navigationChannel.trySend(NavigationEvent.NavigateUp)
     }
 
-    override suspend fun popBackStack(route: Any?, inclusive: Boolean) {
-        _navigationEvents.emit(NavigationEvent.PopBackStack(route, inclusive))
+    override fun popBackStack(route: Any?, inclusive: Boolean) {
+        _navigationChannel.trySend(NavigationEvent.PopBackStack(route, inclusive))
     }
 }
+
