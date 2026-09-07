@@ -10,3 +10,9 @@ object Splash
 
 @Serializable
 object Login
+
+@Serializable
+object ForgotPassword
+
+@Serializable
+object SignUp

@@ -3,10 +3,10 @@ package com.vie.mit.common.ui.theme
 import androidx.compose.ui.graphics.Color
 
 // Light Theme - Green Mobility
-val md_theme_light_primary = Color(0xFF006E0A)
+val md_theme_light_primary = Color(0xFF2BB32A) //0xFF006E0A
 val md_theme_light_onPrimary = Color(0xFFFFFFFF)
 val md_theme_light_primaryContainer = Color(0xFFD4F4D2)
-val md_theme_light_onPrimaryContainer = Color(0xFF0A3D0B)
+val md_theme_light_onPrimaryContainer = Color(0xFF006E0A)
 val md_theme_light_secondary = Color(0xFF526254)
 val md_theme_light_onSecondary = Color(0xFFFFFFFF)
 val md_theme_light_secondaryContainer = Color(0xFFD2E5D2)
@@ -21,7 +21,7 @@ val md_theme_light_onError = Color(0xFFFFFFFF)
 val md_theme_light_onErrorContainer = Color(0xFF93000A)
 val md_theme_light_background = Color(0xFFFAF9F6)
 val md_theme_light_onBackground = Color(0xFF1A1C1A)
-val md_theme_light_surface = Color(0xFFFAF9F6)
+val md_theme_light_surface = Color(0xFFFFFFFF)
 val md_theme_light_onSurface = Color(0xFF1A1C1A)
 val md_theme_light_surfaceVariant = Color(0xFFE2E3DF)
 val md_theme_light_onSurfaceVariant = Color(0xFF3E4A39)
@@ -31,16 +31,20 @@ val md_theme_light_inverseOnSurface = Color(0xFFF1F1ED)
 val md_theme_light_inverseSurface = Color(0xFF2F312F)
 val md_theme_light_inversePrimary = Color(0xFF5EE153)
 val md_theme_light_surfaceTint = Color(0xFF006E0A)
-val md_theme_light_scrim = Color(0xFF000000)
+val md_theme_light_scrim = Color(0x66000000)
 
 // New Surface Roles
-val md_theme_light_surfaceDim = Color(0xFFDADAD7)
+val md_theme_light_surfaceDim = Color(0xFFF6F6F6)
 val md_theme_light_surfaceBright = Color(0xFFFAF9F6)
 val md_theme_light_surfaceContainerLowest = Color(0xFFFFFFFF)
 val md_theme_light_surfaceContainerLow = Color(0xFFF7FAF7)
 val md_theme_light_surfaceContainer = Color(0xFFEEEEEA)
 val md_theme_light_surfaceContainerHigh = Color(0xFFE8E8E5)
 val md_theme_light_surfaceContainerHighest = Color(0xFFE2E3DF)
+val md_theme_light_primary_text = Color(0xFF1A1A1A)
+val md_theme_light_secondary_text = Color(0xFF6C7278)
+val md_theme_light_disabled_text= Color(0xFF6C7278)
+val md_theme_light_primary_button_background = Color(0xFF006E0A)
 
 // Fixed Colors
 val md_theme_light_primaryFixed = Color(0xFF7BFE6C)
@@ -89,5 +93,4 @@ val md_theme_dark_inverseSurface = Color(0xFFE1E3DE)
 val md_theme_dark_inversePrimary = Color(0xFF006D3B)
 val md_theme_dark_surfaceTint = Color(0xFF7DD99A)
 val md_theme_dark_scrim = Color(0xFF000000)
-
 val seed = Color(0xFF006D3B)

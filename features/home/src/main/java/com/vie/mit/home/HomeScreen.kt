@@ -15,7 +15,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -26,6 +25,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.vie.mit.common.ui.theme.AppTheme
 
 data class RideItem(
     val id: Int,
@@ -48,8 +48,8 @@ fun HomeScreen(viewModel: HomeViewModel) {
             TopAppBar(
                 title = { Text("🌿 Trang Chủ GreenApp", fontWeight = FontWeight.Bold) },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer,
-                    titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                    containerColor = AppTheme.colors.primaryContainer,
+                    titleContentColor = AppTheme.colors.onPrimaryContainer
                 )
             )
         }
@@ -64,7 +64,7 @@ fun HomeScreen(viewModel: HomeViewModel) {
                 text = "Các chuyến đi gần bạn:",
                 fontSize = 18.sp,
                 fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onSurface
+                color = AppTheme.colors.onSurface
             )
             Spacer(modifier = Modifier.height(12.dp))
 
@@ -78,7 +78,7 @@ fun HomeScreen(viewModel: HomeViewModel) {
                             .clickable { viewModel.onRideSelected(ride.id) },
                         shape = RoundedCornerShape(16.dp),
                         colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceVariant
+                            containerColor = AppTheme.colors.surfaceVariant
                         ),
                         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
                     ) {
@@ -92,26 +92,26 @@ fun HomeScreen(viewModel: HomeViewModel) {
                                     text = ride.title,
                                     fontWeight = FontWeight.Bold,
                                     fontSize = 16.sp,
-                                    color = MaterialTheme.colorScheme.primary
+                                    color = AppTheme.colors.primary
                                 )
                                 Text(
                                     text = ride.price,
                                     fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.error
+                                    color = AppTheme.colors.error
                                 )
                             }
                             Spacer(modifier = Modifier.height(6.dp))
                             Text(
                                 text = "Lộ trình: ${ride.destination}",
                                 fontSize = 14.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                color = AppTheme.colors.onSurfaceVariant
                             )
                             Spacer(modifier = Modifier.height(8.dp))
                             Text(
                                 text = "👉 Nhấn để xem chi tiết (#${ride.id})",
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Medium,
-                                color = MaterialTheme.colorScheme.secondary
+                                color = AppTheme.colors.secondary
                             )
                         }
                     }

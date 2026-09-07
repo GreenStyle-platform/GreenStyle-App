@@ -15,7 +15,8 @@ data class AppDimens(
     // General Padding
     val paddingExtraSmall: Dp = 2.dp,
     val paddingSmall: Dp = 4.dp,
-    val paddingMedium: Dp = 8.dp,
+    val paddingNormal:Dp = 8.dp,
+    val paddingMedium: Dp = 12.dp,
     val paddingLarge: Dp = 16.dp,
     val paddingExtraLarge: Dp = 24.dp,
 

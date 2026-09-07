@@ -8,16 +8,28 @@ import javax.inject.Inject
 class AuthGraphNavigator @Inject constructor(
     private val appNavigator: AppNavigator
 ) : AuthNavigation {
-    override fun navigateToLogin() {
+    override fun navigateToLoginFromSplash() {
         appNavigator.navigateTo(Login) {
             popUpTo(Splash) { inclusive = true }
         }
     }
 
-    override fun navigateToHome() {
+    override fun navigateToHomeFromSplash() {
         appNavigator.navigateTo(MainGraph) {
             popUpTo(AuthGraph) { inclusive = true }
         }
+    }
+
+    override fun navigateToForgotPasswordFromLogin() {
+        appNavigator.navigateTo(ForgotPassword)
+    }
+
+    override fun navigateToSignUpFromLogin() {
+        appNavigator.navigateTo(SignUp)
+    }
+
+    override fun navigateBack() {
+        appNavigator.navigateUp()
     }
 }
 
