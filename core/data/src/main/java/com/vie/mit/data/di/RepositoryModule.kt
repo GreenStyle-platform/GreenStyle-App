@@ -1,7 +1,7 @@
 package com.vie.mit.data.di
 
-import com.vie.mit.data.repository.AuthRepository
-import com.vie.mit.data.repository.AuthRepositoryImpl
+import com.vie.mit.data.repository.auth.AuthRepository
+import com.vie.mit.data.repository.auth.AuthRepositoryImpl
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn

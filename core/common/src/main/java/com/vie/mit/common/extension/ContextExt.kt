@@ -27,7 +27,9 @@ fun Context.showToast(@StringRes resId: Int, duration: Int = Toast.LENGTH_SHORT)
  * Check if the app has a specific permission
  */
 fun Context.hasPermission(permission: String): Boolean {
-    return ContextCompat.checkSelfPermission(this, permission) == PackageManager.PERMISSION_GRANTED
+    return ContextCompat.checkSelfPermission(
+        this, permission
+    ) == PackageManager.PERMISSION_GRANTED
 }
 
 fun Context.openAppSettings() {
@@ -39,4 +41,6 @@ fun Context.openAppSettings() {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         })
 }
+
+
 

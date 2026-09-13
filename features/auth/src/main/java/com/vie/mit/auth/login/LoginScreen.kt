@@ -15,11 +15,13 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.FocusManager
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
@@ -31,18 +33,30 @@ import com.vie.mit.auth.R
 import com.vie.mit.auth.components.AuthBackground
 import com.vie.mit.auth.components.GoogleLoginButton
 import com.vie.mit.common.extension.addFocusCleaner
+import com.vie.mit.common.extension.showToast
 import com.vie.mit.common.ui.button.DebounceButton
+import com.vie.mit.common.ui.button.LoadingButton
 import com.vie.mit.common.ui.text.TextClickable
 import com.vie.mit.common.ui.textfield.OutlineTextFieldGre
 import com.vie.mit.common.ui.textfield.PasswordOutlineTextFieldGre
 import com.vie.mit.common.ui.theme.AppTheme
 import com.vie.mit.common.ui.theme.GreenTheme
+import kotlinx.coroutines.flow.collectLatest
 
 @Composable
 fun LoginScreen(
     viewModel: LoginViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+
+    LaunchedEffect(Unit) {
+        viewModel.event.collectLatest { event ->
+            when (event) {
+                is LoginEvent.ShowToast -> context.showToast(event.messageId)
+            }
+        }
+    }
 
     LoginContent(
         uiState = uiState,
@@ -240,17 +254,17 @@ fun LoginActions(
     onLoginClick: () -> Unit, onSignUpClick: () -> Unit
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
-        DebounceButton(
+        LoadingButton(
             onClick = onLoginClick,
             modifier = Modifier.fillMaxWidth(),
-            contentPadding = PaddingValues(vertical = 8.dp)
-        ) {
-            Text(
+            contentPadding = PaddingValues(vertical = 8.dp),
+            content = {
+                Text(
                 text = "Login",
                 style = AppTheme.typography.titleMedium,
                 color = AppTheme.colors.onPrimary
-            )
-        }
+            )}
+        )
         Row(
             modifier = Modifier
                 .fillMaxWidth()

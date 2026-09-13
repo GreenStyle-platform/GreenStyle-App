@@ -1,4 +1,4 @@
-package com.vie.mit.data.repository
+package com.vie.mit.data.repository.auth
 
 import com.vie.mit.data.local.datastore.Preferences
 import com.vie.mit.data.local.datastore.PreferencesKeys
@@ -22,8 +22,9 @@ class AuthRepositoryImpl @Inject constructor(
 
     override suspend fun login(email: String, password: String): Result<LoginResponse> =
         handleApiCall {
-            Timber.tag("login").d("123 $email - $password")
-            val response = authApi.login(LoginRequest(email, password))
+            Timber.d("PhucTH: 123 $email - $password")
+            val response: LoginResponse = authApi.login(LoginRequest(email, password))
+            Timber.d("PhucTH $response.toString()")
             preferences.saveUserToken(response.token)
             response
         }

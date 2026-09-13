@@ -20,6 +20,12 @@ class AuthGraphNavigator @Inject constructor(
         }
     }
 
+    override fun navigateToHomeFromLogin() {
+        appNavigator.navigateTo(MainGraph) {
+            popUpTo(AuthGraph) { inclusive = true }
+        }
+    }
+
     override fun navigateToForgotPasswordFromLogin() {
         appNavigator.navigateTo(ForgotPassword)
     }

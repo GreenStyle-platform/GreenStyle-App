@@ -3,10 +3,14 @@ package com.vie.mit.auth.login
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.vie.mit.auth.AuthNavigation
-import com.vie.mit.data.repository.AuthRepository
+import com.vie.mit.auth.R
+import com.vie.mit.data.repository.auth.AuthRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -20,6 +24,9 @@ class LoginViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(LoginUiState())
     val uiState: StateFlow<LoginUiState> = _uiState.asStateFlow()
 
+    private val _event = MutableSharedFlow<LoginEvent>()
+    val event: SharedFlow<LoginEvent> = _event.asSharedFlow()
+
     fun onEmailChanged(email: String) {
         _uiState.update { it.copy(email = email, errorMessage = null) }
     }
@@ -30,6 +37,7 @@ class LoginViewModel @Inject constructor(
 
     fun login() {
         val currentState = _uiState.value
+        if (uiState.value.isLoading) return
         if (currentState.email.isBlank() || currentState.password.isBlank()) {
             _uiState.update { it.copy(errorMessage = "Email and password cannot be empty") }
             return
@@ -44,7 +52,7 @@ class LoginViewModel @Inject constructor(
             result.onSuccess {
                 onLoginSuccess()
             }.onFailure { error ->
-                Timber.d("Login Exception: error")
+                Timber.e("PhucTH: Login Exception: ${error.message}")
                 _uiState.update { it.copy(errorMessage = error.message ?: "Login failed") }
             }
         }
@@ -59,6 +67,9 @@ class LoginViewModel @Inject constructor(
     }
 
     fun onLoginSuccess() {
-        authNavigation.navigateToHomeFromSplash()
+        authNavigation.navigateToHomeFromLogin()
+        viewModelScope.launch {
+            _event.emit(LoginEvent.ShowToast(R.string.login_success))
+        }
     }
 }

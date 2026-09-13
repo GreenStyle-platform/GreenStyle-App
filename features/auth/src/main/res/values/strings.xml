@@ -12,4 +12,5 @@
     <string name="password">Password</string>
     <string name="create_account">Create Account</string>
     <string name="enter_your_details_to_create_account">Enter your details to create account</string>
+    <string name="login_success">Login Success</string>
 </resources>

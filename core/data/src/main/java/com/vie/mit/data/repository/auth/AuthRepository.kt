@@ -1,4 +1,4 @@
-package com.vie.mit.data.repository
+package com.vie.mit.data.repository.auth
 
 import com.vie.mit.data.network.model.login.LoginResponse
 import kotlinx.coroutines.flow.Flow

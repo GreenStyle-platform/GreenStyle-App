@@ -3,7 +3,7 @@ package com.vie.mit.auth.splash
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.vie.mit.auth.AuthNavigation
-import com.vie.mit.data.repository.AuthRepository
+import com.vie.mit.data.repository.auth.AuthRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
@@ -14,8 +14,7 @@ import kotlin.time.Duration.Companion.seconds
 
 @HiltViewModel
 class SplashViewModel @Inject constructor(
-    private val authNavigation: AuthNavigation,
-    private val authRepository: AuthRepository
+    private val authNavigation: AuthNavigation, private val authRepository: AuthRepository
 ) : ViewModel() {
     init {
         checkLoggedIn()
