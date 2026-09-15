@@ -9,7 +9,7 @@ import androidx.navigation.compose.rememberNavController
 import com.vie.mit.common.container.BaseActivity
 import com.vie.mit.common.navigation.AppNavigator
 import com.vie.mit.common.navigation.NavigationEvent
-import com.vie.mit.common.ui.theme.GreenTheme
+import com.vie.mit.common.theme.GreenTheme
 import com.vie.mit.green.navigation.AppNavHost
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject

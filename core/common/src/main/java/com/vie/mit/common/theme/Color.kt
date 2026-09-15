@@ -1,11 +1,11 @@
-package com.vie.mit.common.ui.theme
+package com.vie.mit.common.theme
 
 import androidx.compose.ui.graphics.Color
 
 // Light Theme - Green Mobility
 val md_theme_light_primary = Color(0xFF2BB32A) //0xFF006E0A
 val md_theme_light_onPrimary = Color(0xFFFFFFFF)
-val md_theme_light_primaryContainer = Color(0xFFD4F4D2)
+val md_theme_light_primaryContainer = Color(0xFFFFFFFF)
 val md_theme_light_onPrimaryContainer = Color(0xFF006E0A)
 val md_theme_light_secondary = Color(0xFF526254)
 val md_theme_light_onSecondary = Color(0xFFFFFFFF)
@@ -19,7 +19,7 @@ val md_theme_light_error = Color(0xFFBA1A1A)
 val md_theme_light_errorContainer = Color(0xFFFFDAD6)
 val md_theme_light_onError = Color(0xFFFFFFFF)
 val md_theme_light_onErrorContainer = Color(0xFF93000A)
-val md_theme_light_background = Color(0xFFFAF9F6)
+val md_theme_light_background = Color(0xFFFFFFFF)
 val md_theme_light_onBackground = Color(0xFF1A1C1A)
 val md_theme_light_surface = Color(0xFFFFFFFF)
 val md_theme_light_onSurface = Color(0xFF1A1C1A)
@@ -43,7 +43,7 @@ val md_theme_light_surfaceContainerHigh = Color(0xFFE8E8E5)
 val md_theme_light_surfaceContainerHighest = Color(0xFFE2E3DF)
 val md_theme_light_primary_text = Color(0xFF1A1A1A)
 val md_theme_light_secondary_text = Color(0xFF6C7278)
-val md_theme_light_disabled_text= Color(0xFF6C7278)
+val md_theme_light_disabled_text = Color(0xFF6C7278)
 val md_theme_light_primary_button_background = Color(0xFF006E0A)
 
 // Fixed Colors

@@ -22,8 +22,8 @@ import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import com.vie.mit.common.ui.theme.AppTheme
-import com.vie.mit.common.ui.theme.GreenTheme
+import com.vie.mit.common.theme.AppTheme
+import com.vie.mit.common.theme.GreenTheme
 
 /**
  * A search text field composable for the GreenApp.
@@ -75,8 +75,7 @@ fun SearchTextFieldGre(
                         .size(24.dp)
                         .clickable {
                             onValueChange("")
-                        }
-                )
+                        })
             }
         },
         singleLine = true,
@@ -100,9 +99,7 @@ fun SearchTextFieldGre(
             onSearch = {
                 onSearch(value)
                 keyboardController?.hide()
-            }
-        )
-    )
+            }))
 }
 
 @Preview(showBackground = true)

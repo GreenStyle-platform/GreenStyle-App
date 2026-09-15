@@ -19,9 +19,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import com.vie.mit.common.theme.AppTheme
+import com.vie.mit.common.theme.GreenTheme
 import com.vie.mit.common.ui.button.DebounceButton
-import com.vie.mit.common.ui.theme.AppTheme
-import com.vie.mit.common.ui.theme.GreenTheme
 
 @Composable
 fun NoticeDialog(
@@ -32,8 +32,7 @@ fun NoticeDialog(
     onDismiss: () -> Unit
 ) {
     Dialog(
-        onDismissRequest = onDismiss,
-        properties = DialogProperties(
+        onDismissRequest = onDismiss, properties = DialogProperties(
             usePlatformDefaultWidth = false
         )
     ) {
@@ -41,8 +40,7 @@ fun NoticeDialog(
             modifier = Modifier
                 .fillMaxSize()
                 .background(AppTheme.colors.scrim)
-                .padding(AppTheme.dimens.screenPaddingLarge),
-            contentAlignment = Alignment.Center
+                .padding(AppTheme.dimens.screenPaddingLarge), contentAlignment = Alignment.Center
         ) {
             NoticeDialogContent(
                 modifier = modifier,
@@ -63,8 +61,7 @@ private fun NoticeDialogPreview() {
             title = "Thông báo",
             message = "Đây là nội dung thông báo quan trọng mà bạn cần phải chú ý.",
             buttonText = "Đóng",
-            onDismiss = {}
-        )
+            onDismiss = {})
     }
 }
 
@@ -102,12 +99,10 @@ fun NoticeDialogContent(
             )
             Spacer(modifier = Modifier.height(AppTheme.dimens.spacingExtraLarge))
             DebounceButton(
-                modifier = Modifier.fillMaxWidth(),
-                onClick = onDismiss
+                modifier = Modifier.fillMaxWidth(), onClick = onDismiss
             ) {
                 Text(
-                    text = buttonText,
-                    style = AppTheme.typography.labelLarge
+                    text = buttonText, style = AppTheme.typography.labelLarge
                 )
             }
         }
@@ -122,15 +117,13 @@ private fun NoticeDialogContentPreview() {
             modifier = Modifier
                 .fillMaxSize()
                 .background(AppTheme.colors.scrim)
-                .padding(AppTheme.dimens.screenPaddingLarge),
-            contentAlignment = Alignment.Center
+                .padding(AppTheme.dimens.screenPaddingLarge), contentAlignment = Alignment.Center
         ) {
             NoticeDialogContent(
                 title = "Thông báo",
                 message = "Đây là nội dung thông báo quan trọng mà bạn cần phải chú ý.",
                 buttonText = "Đóng",
-                onDismiss = {}
-            )
+                onDismiss = {})
         }
     }
 }

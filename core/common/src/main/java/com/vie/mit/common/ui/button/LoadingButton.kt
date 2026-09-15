@@ -17,7 +17,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.unit.dp
-import com.vie.mit.common.ui.theme.AppTheme
+import com.vie.mit.common.theme.AppTheme
 
 @Composable
 fun LoadingButton(

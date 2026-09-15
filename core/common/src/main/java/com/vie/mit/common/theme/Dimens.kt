@@ -1,4 +1,4 @@
-package com.vie.mit.common.ui.theme
+package com.vie.mit.common.theme
 
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.staticCompositionLocalOf

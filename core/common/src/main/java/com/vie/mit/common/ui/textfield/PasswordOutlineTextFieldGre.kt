@@ -23,7 +23,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import com.vie.mit.common.ui.theme.GreenTheme
+import com.vie.mit.common.theme.GreenTheme
 
 /**
  * A reusable Password OutlinedTextField for the app with a title label on top and a visibility toggle.
@@ -41,10 +41,10 @@ import com.vie.mit.common.ui.theme.GreenTheme
  */
 @Composable
 fun PasswordOutlineTextFieldGre(
+    modifier: Modifier = Modifier,
     value: String = "",
     onValueChange: (String) -> Unit,
     title: String = "",
-    modifier: Modifier = Modifier,
     placeholder: String? = null,
     isError: Boolean = false,
     errorMessage: String? = null,
@@ -66,10 +66,8 @@ fun PasswordOutlineTextFieldGre(
         keyboardOptions = keyboardOptions.copy(imeAction = imeAction),
         keyboardActions = keyboardActions,
         trailingIcon = {
-            val image = if (passwordVisible)
-                Icons.Filled.Visibility
+            val image = if (passwordVisible) Icons.Filled.Visibility
             else Icons.Filled.VisibilityOff
-
             val description = if (passwordVisible) "Ẩn mật khẩu" else "Hiện mật khẩu"
 
             IconButton(onClick = { passwordVisible = !passwordVisible }) {

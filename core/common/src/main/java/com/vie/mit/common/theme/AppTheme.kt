@@ -1,4 +1,4 @@
-package com.vie.mit.common.ui.theme
+package com.vie.mit.common.theme
 
 import android.app.Activity
 import android.os.Build

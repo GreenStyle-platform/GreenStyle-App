@@ -25,13 +25,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.vie.mit.common.ui.theme.AppTheme
+import com.vie.mit.common.theme.AppTheme
 
 data class RideItem(
-    val id: Int,
-    val title: String,
-    val destination: String,
-    val price: String
+    val id: Int, val title: String, val destination: String, val price: String
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -52,8 +49,7 @@ fun HomeScreen(viewModel: HomeViewModel) {
                     titleContentColor = AppTheme.colors.onPrimaryContainer
                 )
             )
-        }
-    ) { paddingValues ->
+        }) { paddingValues ->
         Column(
             modifier = Modifier
                 .fillMaxSize()

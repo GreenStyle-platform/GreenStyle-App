@@ -1,4 +1,4 @@
-package com.vie.mit.common.ui.theme
+package com.vie.mit.common.theme
 
 import androidx.compose.material3.Typography
 import androidx.compose.ui.text.TextStyle

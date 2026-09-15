@@ -1,4 +1,4 @@
-package com.vie.mit.common.ui.theme
+package com.vie.mit.common.theme
 
 import androidx.compose.material3.ColorScheme
 import androidx.compose.runtime.Immutable
@@ -48,15 +48,14 @@ data class AppColors(
     //PhucTH
     val primaryText:Color,
     val secondaryText:Color,
-    val disabledText:Color,
+    val disabledColor:Color,
 
     val primaryButtonBackground:Color
 
     )
 
 fun lightAppColors(): AppColors = AppColors(
-    primaryContainer = md_theme_light_primaryContainer,
-    onPrimaryContainer = md_theme_light_onPrimaryContainer,
+
     inversePrimary = md_theme_light_inversePrimary,
     //secondary: Màu để phân biệt với primary kiểu
     secondary = md_theme_light_secondary,
@@ -67,8 +66,6 @@ fun lightAppColors(): AppColors = AppColors(
     onTertiary = md_theme_light_onTertiary,
     tertiaryContainer = md_theme_light_tertiaryContainer,
     onTertiaryContainer = md_theme_light_onTertiaryContainer,
-    background = md_theme_light_background,
-    onBackground = md_theme_light_onBackground,
     //Surface: màu nền của màn hình
     surface = md_theme_light_surface,
     onSurface = md_theme_light_onSurface,
@@ -82,6 +79,7 @@ fun lightAppColors(): AppColors = AppColors(
     onError = md_theme_light_onError,
     errorContainer = md_theme_light_errorContainer,
     onErrorContainer = md_theme_light_onErrorContainer,
+    //outlinr
     outline = md_theme_light_outline,
     outlineVariant = md_theme_light_outlineVariant,
     //scrim dùng cho overlay
@@ -103,9 +101,16 @@ fun lightAppColors(): AppColors = AppColors(
 //    Text
     primaryText = md_theme_light_primary_text,
     secondaryText = md_theme_light_secondary_text,
-    disabledText = md_theme_light_disabled_text,
+    //
+    disabledColor = md_theme_light_disabled_text,
     //Button
     primaryButtonBackground = md_theme_light_primary_button_background,
+    //background là màu background chính
+    background = md_theme_light_background,
+    onBackground = md_theme_light_onBackground,
+    primaryContainer = md_theme_light_primaryContainer,
+    onPrimaryContainer = md_theme_light_onPrimaryContainer,
+
 
 
 )
@@ -195,7 +200,7 @@ fun ColorScheme.toAppColors(isLight: Boolean): AppColors = AppColors(
     primaryText = md_theme_light_primary_text,
     primaryButtonBackground = md_theme_light_primary_button_background,
     secondaryText = md_theme_light_secondary_text,
-    disabledText = md_theme_light_disabled_text,
+    disabledColor = md_theme_light_disabled_text,
 )
 
 fun AppColors.toColorScheme(): ColorScheme = ColorScheme(

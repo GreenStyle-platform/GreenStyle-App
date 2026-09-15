@@ -20,12 +20,14 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.FocusManager
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
@@ -36,18 +38,29 @@ import com.vie.mit.auth.R
 import com.vie.mit.auth.components.AuthBackground
 import com.vie.mit.auth.components.GoogleLoginButton
 import com.vie.mit.common.extension.addFocusCleaner
-import com.vie.mit.common.ui.button.DebounceButton
+import com.vie.mit.common.extension.showToast
+import com.vie.mit.common.theme.AppTheme
+import com.vie.mit.common.theme.GreenTheme
+import com.vie.mit.common.ui.button.LoadingButton
 import com.vie.mit.common.ui.text.TextClickable
 import com.vie.mit.common.ui.textfield.OutlineTextFieldGre
 import com.vie.mit.common.ui.textfield.PasswordOutlineTextFieldGre
-import com.vie.mit.common.ui.theme.AppTheme
-import com.vie.mit.common.ui.theme.GreenTheme
+import kotlinx.coroutines.flow.collectLatest
 
 @Composable
 fun SignUpScreen(
     viewModel: SignUpViewModel
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+
+    LaunchedEffect(Unit) {
+        viewModel.event.collectLatest { event ->
+            when (event) {
+                is SignUpEvent.ShowToast -> context.showToast(event.messageId)
+            }
+        }
+    }
 
     SignUpContent(
         uiState = uiState,
@@ -55,6 +68,7 @@ fun SignUpScreen(
         onEmailChange = viewModel::onEmailChanged,
         onPhoneChange = viewModel::onPhoneChanged,
         onPasswordChange = viewModel::onPasswordChanged,
+        onConfirmPasswordChange = viewModel::onConfirmPasswordChanged,
         onSignUpClick = viewModel::signUp,
         onBackClick = viewModel::onBackClick,
         onLoginClick = viewModel::onLoginClick
@@ -68,6 +82,7 @@ fun SignUpContent(
     onEmailChange: (String) -> Unit,
     onPhoneChange: (String) -> Unit,
     onPasswordChange: (String) -> Unit,
+    onConfirmPasswordChange: (String) -> Unit,
     onSignUpClick: () -> Unit,
     onBackClick: () -> Unit,
     onLoginClick: () -> Unit
@@ -107,6 +122,7 @@ fun SignUpContent(
                 onEmailChange = onEmailChange,
                 onPhoneChange = onPhoneChange,
                 onPasswordChange = onPasswordChange,
+                onConfirmPasswordChange = onConfirmPasswordChange,
                 onSignUpClick = onSignUpClick,
                 modifier = Modifier.padding(horizontal = AppTheme.dimens.paddingExtraLarge)
             )
@@ -162,6 +178,7 @@ fun SignUpMainComponent(
     onEmailChange: (String) -> Unit,
     onPhoneChange: (String) -> Unit,
     onPasswordChange: (String) -> Unit,
+    onConfirmPasswordChange: (String) -> Unit,
     onSignUpClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -178,13 +195,14 @@ fun SignUpMainComponent(
                 onUsernameChange = onUsernameChange,
                 onEmailChange = onEmailChange,
                 onPhoneChange = onPhoneChange,
-                onPasswordChange = onPasswordChange
+                onPasswordChange = onPasswordChange,
+                onConfirmPasswordChange = onConfirmPasswordChange
             )
 
             Spacer(modifier = Modifier.height(24.dp))
 
             SignUpActions(
-                onSignUpClick = onSignUpClick
+                uiState = uiState, onSignUpClick = onSignUpClick
             )
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -200,7 +218,8 @@ fun SignUpForm(
     onUsernameChange: (String) -> Unit,
     onEmailChange: (String) -> Unit,
     onPhoneChange: (String) -> Unit,
-    onPasswordChange: (String) -> Unit
+    onPasswordChange: (String) -> Unit,
+    onConfirmPasswordChange: (String) -> Unit
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
         OutlineTextFieldGre(
@@ -234,6 +253,14 @@ fun SignUpForm(
             title = stringResource(R.string.password),
             placeholder = "Your password"
         )
+        Spacer(modifier = Modifier.height(8.dp))
+        PasswordOutlineTextFieldGre(
+            value = uiState.confirmPassword,
+            modifier = Modifier.fillMaxWidth(),
+            onValueChange = onConfirmPasswordChange,
+            title = stringResource(R.string.confirm_password),
+            placeholder = "Confirm your password"
+        )
 
         if (uiState.errorMessage != null) {
             Text(
@@ -248,20 +275,21 @@ fun SignUpForm(
 
 @Composable
 fun SignUpActions(
-    onSignUpClick: () -> Unit
+    uiState: SignUpUiState, onSignUpClick: () -> Unit
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
-        DebounceButton(
+        LoadingButton(
+            isLoading = uiState.isLoading,
             onClick = onSignUpClick,
             modifier = Modifier.fillMaxWidth(),
-            contentPadding = PaddingValues(vertical = 8.dp)
-        ) {
-            Text(
-                text = stringResource(R.string.sign_up),
-                style = AppTheme.typography.titleMedium,
-                color = AppTheme.colors.onPrimary
-            )
-        }
+            contentPadding = PaddingValues(vertical = 8.dp),
+            content = {
+                Text(
+                    text = stringResource(R.string.sign_up),
+                    style = AppTheme.typography.titleMedium,
+                    color = AppTheme.colors.onPrimary
+                )
+            })
     }
 }
 
@@ -275,9 +303,9 @@ private fun SignUpScreenPreview() {
             onEmailChange = {},
             onPhoneChange = {},
             onPasswordChange = {},
+            onConfirmPasswordChange = {},
             onSignUpClick = {},
             onBackClick = {},
-            onLoginClick = {}
-        )
+            onLoginClick = {})
     }
 }

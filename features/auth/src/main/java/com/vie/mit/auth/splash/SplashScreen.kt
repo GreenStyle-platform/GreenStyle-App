@@ -17,7 +17,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import com.vie.mit.auth.R
-import com.vie.mit.common.ui.theme.AppTheme
+import com.vie.mit.common.theme.AppTheme
 
 @Composable
 fun SplashScreen(

@@ -1,4 +1,4 @@
-package com.vie.mit.common.ui.theme
+package com.vie.mit.common.theme
 
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily

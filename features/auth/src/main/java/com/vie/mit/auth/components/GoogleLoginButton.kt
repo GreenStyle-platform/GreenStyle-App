@@ -16,8 +16,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.vie.mit.auth.R
+import com.vie.mit.common.theme.AppTheme
 import com.vie.mit.common.ui.button.DebounceOutlinedButton
-import com.vie.mit.common.ui.theme.AppTheme
 
 @Composable
 fun GoogleLoginButton(onClick: () -> Unit) {

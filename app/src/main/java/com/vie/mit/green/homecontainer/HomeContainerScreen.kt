@@ -1,20 +1,17 @@
 package com.vie.mit.green.homecontainer
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Chat
-import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.Map
-import androidx.compose.material.icons.filled.TimeToLeave
-import androidx.compose.material3.Icon
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.navigation.NavDestination.Companion.hierarchy
@@ -25,6 +22,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.vie.mit.chat.ChatScreen
 import com.vie.mit.chat.ChatViewModel
+import com.vie.mit.common.theme.AppTheme
 import com.vie.mit.green.navigation.main_graph.ChatTab
 import com.vie.mit.green.navigation.main_graph.HomeTab
 import com.vie.mit.green.navigation.main_graph.MapTab
@@ -36,13 +34,6 @@ import com.vie.mit.map.MapViewModel
 import com.vie.mit.ride.RideScreen
 import com.vie.mit.ride.RideViewModel
 
-sealed class BottomNavItem(val route: Any, val icon: ImageVector, val label: String) {
-    object Home : BottomNavItem(HomeTab, Icons.Default.Home, "Home")
-    object Ride : BottomNavItem(RideTab, Icons.Default.TimeToLeave, "Ride")
-    object Map : BottomNavItem(MapTab, Icons.Default.Map, "Map")
-    object Chat : BottomNavItem(ChatTab, Icons.Default.Chat, "Chat")
-}
-
 @Composable
 fun HomeContainerScreen(
     viewModel: HomeContainerViewModel = hiltViewModel()
@@ -50,26 +41,31 @@ fun HomeContainerScreen(
     val innerNavController = rememberNavController()
     val navBackStackEntry by innerNavController.currentBackStackEntryAsState()
     val currentDestination = navBackStackEntry?.destination
-
     val items = listOf(
-        BottomNavItem.Home,
-        BottomNavItem.Ride,
-        BottomNavItem.Map,
-        BottomNavItem.Chat
+        BottomNavItem.Home, BottomNavItem.Map, BottomNavItem.Ride, BottomNavItem.Chat
     )
 
     Scaffold(
         bottomBar = {
-            NavigationBar {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .shadow(elevation = 16.dp)
+                    .background(
+                        color = AppTheme.colors.background
+                    )
+                    .padding(start = 2.dp, bottom = 16.dp, top = 4.dp, end = 2.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceAround
+            ) {
                 items.forEach { item ->
-                    val isSelected = currentDestination?.hierarchy?.any { 
-                        it.hasRoute(item.route::class) 
+                    val isSelected = currentDestination?.hierarchy?.any {
+                        it.hasRoute(item.route::class)
                     } == true
-                    
-                    NavigationBarItem(
-                        icon = { Icon(item.icon, contentDescription = item.label) },
-                        label = { Text(item.label) },
-                        selected = isSelected,
+                    BottomNavigationItem(
+                        modifier = Modifier.weight(1f),
+                        item = item,
+                        isSelected = isSelected,
                         onClick = {
                             innerNavController.navigate(item.route) {
                                 popUpTo(innerNavController.graph.findStartDestination().id) {
@@ -78,12 +74,10 @@ fun HomeContainerScreen(
                                 launchSingleTop = true
                                 restoreState = true
                             }
-                        }
-                    )
+                        })
                 }
             }
-        }
-    ) { innerPadding ->
+        }) { innerPadding ->
         NavHost(
             navController = innerNavController,
             startDestination = HomeTab,

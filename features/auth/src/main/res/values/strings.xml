@@ -10,7 +10,10 @@
     <string name="email">Email</string>
     <string name="phone">Phone</string>
     <string name="password">Password</string>
+    <string name="confirm_password">Confirm Password</string>
     <string name="create_account">Create Account</string>
     <string name="enter_your_details_to_create_account">Enter your details to create account</string>
     <string name="login_success">Login Success</string>
+    <string name="sign_up_success">Sign up success</string>
+    <string name="sign_up_failed">Sign up failed</string>
 </resources>

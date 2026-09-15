@@ -23,7 +23,6 @@ class LoginViewModel @Inject constructor(
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(LoginUiState())
     val uiState: StateFlow<LoginUiState> = _uiState.asStateFlow()
-
     private val _event = MutableSharedFlow<LoginEvent>()
     val event: SharedFlow<LoginEvent> = _event.asSharedFlow()
 
@@ -67,9 +66,9 @@ class LoginViewModel @Inject constructor(
     }
 
     fun onLoginSuccess() {
-        authNavigation.navigateToHomeFromLogin()
         viewModelScope.launch {
             _event.emit(LoginEvent.ShowToast(R.string.login_success))
         }
+        authNavigation.navigateToHomeFromLogin()
     }
 }

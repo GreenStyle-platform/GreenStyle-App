@@ -21,7 +21,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.vie.mit.common.ui.theme.AppTheme
+import com.vie.mit.common.theme.AppTheme
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

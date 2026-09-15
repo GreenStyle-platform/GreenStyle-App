@@ -34,13 +34,12 @@ import com.vie.mit.auth.components.AuthBackground
 import com.vie.mit.auth.components.GoogleLoginButton
 import com.vie.mit.common.extension.addFocusCleaner
 import com.vie.mit.common.extension.showToast
-import com.vie.mit.common.ui.button.DebounceButton
+import com.vie.mit.common.theme.AppTheme
+import com.vie.mit.common.theme.GreenTheme
 import com.vie.mit.common.ui.button.LoadingButton
 import com.vie.mit.common.ui.text.TextClickable
 import com.vie.mit.common.ui.textfield.OutlineTextFieldGre
 import com.vie.mit.common.ui.textfield.PasswordOutlineTextFieldGre
-import com.vie.mit.common.ui.theme.AppTheme
-import com.vie.mit.common.ui.theme.GreenTheme
 import kotlinx.coroutines.flow.collectLatest
 
 @Composable
@@ -165,7 +164,9 @@ fun LoginMainComponent(
             )
             Spacer(modifier = Modifier.height(24.dp))
             LoginActions(
-                onLoginClick = onLoginClick, onSignUpClick = onSignUpClick
+                isLoading = uiState.isLoading,
+                onLoginClick = onLoginClick,
+                onSignUpClick = onSignUpClick
             )
         }
     }
@@ -251,20 +252,21 @@ fun LoginForm(
 
 @Composable
 fun LoginActions(
-    onLoginClick: () -> Unit, onSignUpClick: () -> Unit
+    isLoading: Boolean, onLoginClick: () -> Unit, onSignUpClick: () -> Unit
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
         LoadingButton(
+            isLoading = isLoading,
             onClick = onLoginClick,
             modifier = Modifier.fillMaxWidth(),
             contentPadding = PaddingValues(vertical = 8.dp),
             content = {
                 Text(
-                text = "Login",
-                style = AppTheme.typography.titleMedium,
-                color = AppTheme.colors.onPrimary
-            )}
-        )
+                    text = "Login",
+                    style = AppTheme.typography.titleMedium,
+                    color = AppTheme.colors.onPrimary
+                )
+            })
         Row(
             modifier = Modifier
                 .fillMaxWidth()
