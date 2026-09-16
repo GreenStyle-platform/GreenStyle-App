@@ -23,6 +23,10 @@ plugins {
         kotlinOptions {
             jvmTarget = "17"
         }
+
+        buildFeatures {
+            compose = true
+        }
     }
 
   dependencies {
@@ -53,4 +57,9 @@ plugins {
 
        //Timber
       implementation(libs.timber)
+        //Mapbox
+      implementation(libs.mapbox.maps)
+      implementation(libs.mapbox.maps.compose)
+
+      implementation("com.mapbox.extension:maps-compose-ndk27:11.30.1")
   }
