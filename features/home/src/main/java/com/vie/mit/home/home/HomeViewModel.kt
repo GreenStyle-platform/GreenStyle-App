@@ -1,6 +1,7 @@
-package com.vie.mit.home
+package com.vie.mit.home.home
 
 import androidx.lifecycle.ViewModel
+import com.vie.mit.home.HomeNavigation
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
@@ -20,6 +21,10 @@ class HomeViewModel @Inject constructor(
 ) : ViewModel() {
     fun onRideSelected(idRide: Int) {
         homeNavigation.navigateToDetailRide(idRide)
+    }
+
+    fun navigateToMainMap() {
+        homeNavigation.navigateHomeToMainMap()
     }
 
     suspend fun fetchData() {

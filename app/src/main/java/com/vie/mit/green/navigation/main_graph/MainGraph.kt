@@ -8,6 +8,8 @@ import androidx.navigation.navigation
 import androidx.navigation.toRoute
 import com.vie.mit.common.navigation.Arguments
 import com.vie.mit.green.homecontainer.HomeContainerScreen
+import com.vie.mit.home.map.MainMapScreen
+import com.vie.mit.home.map.MainMapViewModel
 import com.vie.mit.ride.DetailRideScreen
 import com.vie.mit.ride.DetailRideViewModel
 
@@ -17,6 +19,10 @@ fun NavGraphBuilder.mainGraph(navController: NavHostController) {
     ) {
         composable<HomeContainer> {
             HomeContainerScreen()
+        }
+
+        composable<MainMap> {
+            MainMapScreen(viewModel = hiltViewModel<MainMapViewModel>())
         }
 
         composable<DetailRide> { backStackEntry ->

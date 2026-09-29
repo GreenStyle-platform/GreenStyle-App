@@ -8,14 +8,20 @@ plugins {
 }
 
     android {
-    namespace = "com.vie.mit.map"
+        namespace = "com.vie.mit.mapbox"
         compileSdk = 35
 
         defaultConfig {
-    minSdk = 24
+            minSdk = 24
 
-      testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-    }
+            testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+            consumerProguardFiles("consumer-rules.pro")
+        }
+
+        buildFeatures {
+            compose = true
+        }
+
         compileOptions {
             sourceCompatibility = JavaVersion.VERSION_17
             targetCompatibility = JavaVersion.VERSION_17
@@ -23,22 +29,18 @@ plugins {
         kotlinOptions {
             jvmTarget = "17"
         }
-
-        buildFeatures {
-            compose = true
-        }
     }
 
   dependencies {
       implementation(libs.androidx.appcompat)
       implementation(libs.androidx.core.ktx)
+      implementation(libs.material)
       testImplementation(libs.junit)
       androidTestImplementation(libs.androidx.espresso.core)
       androidTestImplementation(libs.androidx.junit)
 
-      // Module
+      //Module
       implementation(project(":core:common"))
-      implementation(project(":core:mapbox"))
 
       // Compose
       implementation(platform(libs.androidx.compose.bom))
@@ -62,4 +64,6 @@ plugins {
       implementation(libs.mapbox.maps)
       implementation(libs.mapbox.maps.compose)
 
+      //PlayServiceLocation
+      implementation(libs.play.service.location)
   }

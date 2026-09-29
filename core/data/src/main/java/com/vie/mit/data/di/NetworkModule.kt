@@ -2,6 +2,7 @@ package com.vie.mit.data.di
 
 import com.vie.mit.data.Constants
 import com.vie.mit.data.network.api.auth.AuthApi
+import com.vie.mit.data.network.api.map.MapApi
 import com.vie.mit.data.network.interceptor.AuthInterceptor
 import com.vie.mit.data.network.interceptor.TokenProvider
 import dagger.Module
@@ -56,4 +57,8 @@ object NetworkModule {
     @Provides
     @Singleton
     fun provideAuthApi(retrofit: Retrofit): AuthApi = retrofit.create()
+
+    @Provides
+    @Singleton
+    fun provideMapApi(retrofit: Retrofit): MapApi = retrofit.create()
 }

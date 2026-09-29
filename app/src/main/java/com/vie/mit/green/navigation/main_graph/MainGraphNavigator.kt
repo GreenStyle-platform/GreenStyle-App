@@ -18,5 +18,9 @@ class MainGraphNavigator @Inject constructor(
     override fun navigateBack() {
         appNavigator.navigateUp()
     }
+
+    override fun navigateHomeToMainMap() {
+        appNavigator.navigateTo(MainMap)
+    }
 }
 

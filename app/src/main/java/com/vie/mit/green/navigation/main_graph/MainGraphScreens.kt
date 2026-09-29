@@ -28,3 +28,6 @@ object RideSearchResult
 
 @Serializable
 data class DetailRide(val idRide: Int)
+
+@Serializable
+object MainMap

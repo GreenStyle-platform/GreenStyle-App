@@ -34,6 +34,8 @@ dependencies {
 
     // Module
     implementation(project(":core:common"))
+    implementation(project(":core:data"))
+    implementation(project(":core:mapbox"))
 
     // Compose
       implementation(platform(libs.androidx.compose.bom))

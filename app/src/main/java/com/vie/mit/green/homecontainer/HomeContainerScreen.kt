@@ -27,8 +27,8 @@ import com.vie.mit.green.navigation.main_graph.ChatTab
 import com.vie.mit.green.navigation.main_graph.HomeTab
 import com.vie.mit.green.navigation.main_graph.MapTab
 import com.vie.mit.green.navigation.main_graph.RideTab
-import com.vie.mit.home.HomeScreen
-import com.vie.mit.home.HomeViewModel
+import com.vie.mit.home.home.HomeScreen
+import com.vie.mit.home.home.HomeViewModel
 import com.vie.mit.map.MapScreen
 import com.vie.mit.map.MapViewModel
 import com.vie.mit.ride.RideScreen
@@ -54,7 +54,7 @@ fun HomeContainerScreen(
                     .background(
                         color = AppTheme.colors.background
                     )
-                    .padding(start = 2.dp, bottom = 16.dp, top = 4.dp, end = 2.dp),
+                    .padding(start = 2.dp, bottom = 16.dp, top = 8.dp, end = 2.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceAround
             ) {

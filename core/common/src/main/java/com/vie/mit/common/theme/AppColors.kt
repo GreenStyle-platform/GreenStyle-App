@@ -110,9 +110,6 @@ fun lightAppColors(): AppColors = AppColors(
     onBackground = md_theme_light_onBackground,
     primaryContainer = md_theme_light_primaryContainer,
     onPrimaryContainer = md_theme_light_onPrimaryContainer,
-
-
-
 )
 
 //fun darkAppColors(): AppColors = AppColors(
