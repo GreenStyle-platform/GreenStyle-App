@@ -55,7 +55,6 @@ plugins {
       implementation(project(":features:auth"))
       implementation(project(":features:home"))
       implementation(project(":features:ride"))
-      implementation(project(":features:map"))
       implementation(project(":features:chat"))
 
       // acitivty compose

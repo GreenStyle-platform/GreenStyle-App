@@ -1,4 +1,4 @@
-package com.vie.mit.green.homecontainer
+package com.vie.mit.green.ui.homecontainer
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -25,12 +25,9 @@ import com.vie.mit.chat.ChatViewModel
 import com.vie.mit.common.theme.AppTheme
 import com.vie.mit.green.navigation.main_graph.ChatTab
 import com.vie.mit.green.navigation.main_graph.HomeTab
-import com.vie.mit.green.navigation.main_graph.MapTab
 import com.vie.mit.green.navigation.main_graph.RideTab
 import com.vie.mit.home.home.HomeScreen
 import com.vie.mit.home.home.HomeViewModel
-import com.vie.mit.map.MapScreen
-import com.vie.mit.map.MapViewModel
 import com.vie.mit.ride.RideScreen
 import com.vie.mit.ride.RideViewModel
 
@@ -42,7 +39,7 @@ fun HomeContainerScreen(
     val navBackStackEntry by innerNavController.currentBackStackEntryAsState()
     val currentDestination = navBackStackEntry?.destination
     val items = listOf(
-        BottomNavItem.Home, BottomNavItem.Map, BottomNavItem.Ride, BottomNavItem.Chat
+        BottomNavItem.Home, BottomNavItem.Ride, BottomNavItem.Chat
     )
 
     Scaffold(
@@ -88,9 +85,6 @@ fun HomeContainerScreen(
             }
             composable<RideTab> {
                 RideScreen(hiltViewModel<RideViewModel>())
-            }
-            composable<MapTab> {
-                MapScreen(hiltViewModel<MapViewModel>())
             }
             composable<ChatTab> {
                 ChatScreen(hiltViewModel<ChatViewModel>())

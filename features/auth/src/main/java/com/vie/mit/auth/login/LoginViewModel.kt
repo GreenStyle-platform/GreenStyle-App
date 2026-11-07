@@ -35,6 +35,8 @@ class LoginViewModel @Inject constructor(
     }
 
     fun login() {
+                 //Mock
+        onLoginSuccess()
         val currentState = _uiState.value
         if (uiState.value.isLoading) return
         if (currentState.email.isBlank() || currentState.password.isBlank()) {

@@ -24,7 +24,7 @@ class HomeViewModel @Inject constructor(
     }
 
     fun navigateToMainMap() {
-        homeNavigation.navigateHomeToMainMap()
+        homeNavigation.navigateHomeToPreviewMap()
     }
 
     suspend fun fetchData() {

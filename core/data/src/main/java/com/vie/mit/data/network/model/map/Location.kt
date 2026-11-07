@@ -8,4 +8,5 @@ data class Location(
     @SerialName("latitude") val latitude: Double,
     @SerialName("longitude") val longitude: Double,
     @SerialName("altitude") val altitude: Double = 0.0,
+    @SerialName("radius") val radius: Int = 100
 )

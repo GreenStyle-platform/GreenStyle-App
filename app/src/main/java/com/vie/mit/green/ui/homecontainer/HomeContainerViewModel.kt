@@ -1,4 +1,4 @@
-package com.vie.mit.green.homecontainer
+package com.vie.mit.green.ui.homecontainer
 
 import androidx.compose.runtime.State
 import androidx.compose.runtime.mutableStateOf

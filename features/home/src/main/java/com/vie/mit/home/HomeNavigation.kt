@@ -5,5 +5,5 @@ interface HomeNavigation {
     fun navigateToDetailRide(idRide: Int)
     fun navigateBack()
 
-    fun navigateHomeToMainMap()
+    fun navigateHomeToPreviewMap()
 }

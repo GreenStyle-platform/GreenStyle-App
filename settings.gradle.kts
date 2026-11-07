@@ -35,7 +35,6 @@ include(":features:auth")
 
 include(":core:common")
 include(":features:home")
-include(":features:map")
 include(":features:ride")
 include(":features:chat")
 include(":core:data")

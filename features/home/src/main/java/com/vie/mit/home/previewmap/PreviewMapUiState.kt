@@ -1,9 +1,9 @@
-package com.vie.mit.home.map
+package com.vie.mit.home.previewmap
 
 import com.vie.mit.data.network.model.map.PublicTransportSuggestion
 import com.vie.mit.mapbox.model.LocationData
 
-data class MainMapUiState(
+data class PreviewMapUiState(
     val isShowBottomSheet: Boolean = false,
     val currentLocation: LocationData? = null,
     val publicTransportSuggestions: List<PublicTransportSuggestion> = emptyList(),

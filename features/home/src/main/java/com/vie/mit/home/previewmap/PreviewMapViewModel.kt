@@ -1,4 +1,4 @@
-package com.vie.mit.home.map
+package com.vie.mit.home.previewmap
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -16,12 +16,12 @@ import timber.log.Timber
 import javax.inject.Inject
 
 @HiltViewModel
-class MainMapViewModel @Inject constructor(
+class PreviewMapViewModel @Inject constructor(
     private val mapRepository: MapRepository,
 ) : ViewModel() {
-    private val _uiState: MutableStateFlow<MainMapUiState> = MutableStateFlow(MainMapUiState())
-    val uiState: StateFlow<MainMapUiState> = _uiState.asStateFlow()
-
+    private val _uiState: MutableStateFlow<PreviewMapUiState> =
+        MutableStateFlow(PreviewMapUiState())
+    val uiState: StateFlow<PreviewMapUiState> = _uiState.asStateFlow()
     private var lastFetchedLocation: LocationData? = null
 
     companion object {
@@ -59,8 +59,7 @@ class MainMapViewModel @Inject constructor(
                 longitude = locationData.longitude,
                 altitude = locationData.altitude,
             )
-            mapRepository.getPublicTransportSuggestions(location)
-                .onSuccess { suggestions ->
+            mapRepository.getPublicTransportSuggestions(location).onSuccess { suggestions ->
                     Timber.d("Public transport suggestions received: ${suggestions.size}")
                     _uiState.update { currentState ->
                         currentState.copy(
@@ -68,8 +67,7 @@ class MainMapViewModel @Inject constructor(
                             isLoadingSuggestions = false,
                         )
                     }
-                }
-                .onFailure { exception ->
+                }.onFailure { exception ->
                     Timber.e(exception, "Failed to fetch public transport suggestions")
                     _uiState.update { currentState ->
                         currentState.copy(

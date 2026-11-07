@@ -1,5 +1,6 @@
-package com.vie.mit.home.map
+package com.vie.mit.home.previewmap
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -9,7 +10,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -28,57 +28,59 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.vie.mit.common.theme.AppTheme
 import com.vie.mit.common.ui.textfield.SearchTextFieldGre
 import com.vie.mit.data.network.model.map.PublicTransportSuggestion
 import com.vie.mit.mapbox.component.CurrentLocationMap
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MainMapScreen(viewModel: MainMapViewModel) {
-    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+fun PreviewMapScreen(viewModel: PreviewMapViewModel) {
+
     val scaffoldState = rememberBottomSheetScaffoldState()
 
     BottomSheetScaffold(
         scaffoldState = scaffoldState,
-        sheetPeekHeight = 160.dp,
+        sheetPeekHeight = 80.dp,
         sheetShape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp),
+        sheetTonalElevation = 8.dp,
+        sheetShadowElevation = 8.dp,
+        sheetDragHandle = null,
+        sheetSwipeEnabled = true,
         sheetContent = {
-            BottomSheetContent(uiState = uiState)
+            BottomSheetContent(viewModel)
         },
     ) { _ ->
         Box(modifier = Modifier.fillMaxSize()) {
             CurrentLocationMap(
                 modifier = Modifier.fillMaxSize(),
-                onLocationUpdate = { locationData ->
-                    viewModel.onLocationUpdated(locationData)
-                },
+                onLocationUpdate = viewModel::onLocationUpdated,
             )
 
-            SearchTextFieldGre(
-                value = uiState.searchQuery,
-                onValueChange = { query ->
-                    viewModel.onSearchQueryChanged(query)
-                },
-                placeholder = "Tìm kiếm điểm đến...",
-                onSearch = { query ->
-                    viewModel.onSearch(query)
-                },
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .statusBarsPadding()
-                    .padding(16.dp),
-            )
         }
     }
 }
 
 @Composable
-private fun BottomSheetContent(uiState: MainMapUiState) {
+private fun BottomSheetContent(viewModel: PreviewMapViewModel) {
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 8.dp),
     ) {
+
+        HorizontalDivider(modifier = Modifier.height(4.dp).width(80.dp).background(AppTheme.colors.disabledColor))
+        SearchTextFieldGre(
+            value = uiState.searchQuery,
+            onValueChange = { query ->
+                viewModel.onSearchQueryChanged(query)
+            },
+            placeholder = "Tìm kiếm điểm đến...",
+            onSearch = { query ->
+                viewModel.onSearch(query)
+            }
+        )
         // Current Location Header
         Text(
             text = "Vị trí hiện tại",
@@ -112,6 +114,8 @@ private fun BottomSheetContent(uiState: MainMapUiState) {
         )
         Spacer(modifier = Modifier.height(8.dp))
 
+        val suggestionsError = uiState.suggestionsError
+
         when {
             uiState.isLoadingSuggestions -> {
                 Box(
@@ -124,9 +128,9 @@ private fun BottomSheetContent(uiState: MainMapUiState) {
                 }
             }
 
-            uiState.suggestionsError != null -> {
+            suggestionsError != null -> {
                 Text(
-                    text = uiState.suggestionsError,
+                    text = suggestionsError,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.error,
                     modifier = Modifier.padding(vertical = 8.dp),

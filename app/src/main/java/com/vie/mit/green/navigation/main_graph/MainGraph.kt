@@ -7,9 +7,9 @@ import androidx.navigation.compose.composable
 import androidx.navigation.navigation
 import androidx.navigation.toRoute
 import com.vie.mit.common.navigation.Arguments
-import com.vie.mit.green.homecontainer.HomeContainerScreen
-import com.vie.mit.home.map.MainMapScreen
-import com.vie.mit.home.map.MainMapViewModel
+import com.vie.mit.green.ui.homecontainer.HomeContainerScreen
+import com.vie.mit.home.previewmap.PreviewMapScreen
+import com.vie.mit.home.previewmap.PreviewMapViewModel
 import com.vie.mit.ride.DetailRideScreen
 import com.vie.mit.ride.DetailRideViewModel
 
@@ -21,8 +21,8 @@ fun NavGraphBuilder.mainGraph(navController: NavHostController) {
             HomeContainerScreen()
         }
 
-        composable<MainMap> {
-            MainMapScreen(viewModel = hiltViewModel<MainMapViewModel>())
+        composable<PreviewMap> {
+            PreviewMapScreen(viewModel = hiltViewModel<PreviewMapViewModel>())
         }
 
         composable<DetailRide> { backStackEntry ->

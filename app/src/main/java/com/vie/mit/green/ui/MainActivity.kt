@@ -1,4 +1,4 @@
-package com.vie.mit.green
+package com.vie.mit.green.ui
 
 import android.os.Bundle
 import androidx.activity.compose.setContent

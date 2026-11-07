@@ -95,6 +95,7 @@ fun CurrentLocationMap(
             Manifest.permission.ACCESS_COARSE_LOCATION,
         ) == PackageManager.PERMISSION_GRANTED)
     }
+    Timber.d("PhucTH: Permission: $isPermissionGrantedInitially")
     var showMap by remember { mutableStateOf(isPermissionGrantedInitially) }
 
     MapPermissionHandler(
@@ -147,13 +148,14 @@ private fun CurrentLocationMapContent(
             puckBearingEnabled = true
             this.showAccuracyRing = showAccuracyRing
         }
-
         var lastNotifiedLocation: LocationData? = null
-
         val listener = OnIndicatorPositionChangedListener { point ->
             val locationData = point.toLocationData()
             val lastLocation = lastNotifiedLocation
-            if (minDistanceThresholdMeters <= 0f || lastLocation == null || lastLocation.distanceTo(locationData) >= minDistanceThresholdMeters) {
+            if (minDistanceThresholdMeters <= 0f || lastLocation == null || lastLocation.distanceTo(
+                    locationData
+                ) >= minDistanceThresholdMeters
+            ) {
                 lastNotifiedLocation = locationData
                 Timber.d("CurrentLocationMap location: ${locationData.latitude}, ${locationData.longitude}")
                 onLocationUpdate?.invoke(locationData)
@@ -163,6 +165,7 @@ private fun CurrentLocationMapContent(
         locationPlugin.addOnIndicatorPositionChangedListener(listener)
 
         if (followPuck) {
+            // TODO: note lại có thể xử lý tắt animation.
             mapViewportState.transitionToFollowPuckState()
         }
 

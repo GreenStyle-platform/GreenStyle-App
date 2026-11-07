@@ -1,4 +1,4 @@
-package com.vie.mit.green
+package com.vie.mit.green.ui
 
 import com.vie.mit.common.container.BaseViewModel
 import dagger.hilt.android.lifecycle.HiltViewModel
