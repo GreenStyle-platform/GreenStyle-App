@@ -1,2 +1,2 @@
 Green - Phuc CDR - PTIT \
-Chạy bằng H2O
+Chạy bằng năng lượng mặt trời
