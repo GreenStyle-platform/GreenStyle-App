@@ -5,33 +5,15 @@ import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.composable
 import androidx.navigation.navigation
-import androidx.navigation.toRoute
-import com.vie.mit.common.navigation.Arguments
-import com.vie.mit.green.ui.homecontainer.HomeContainerScreen
-import com.vie.mit.home.previewmap.PreviewMapScreen
-import com.vie.mit.home.previewmap.PreviewMapViewModel
-import com.vie.mit.ride.DetailRideScreen
-import com.vie.mit.ride.DetailRideViewModel
+import com.vie.mit.green.ui.home.HomeScreen
+import com.vie.mit.green.ui.home.HomeViewModel
 
 fun NavGraphBuilder.mainGraph(navController: NavHostController) {
     navigation<MainGraph>(
-        startDestination = HomeContainer
+        startDestination = Home
     ) {
-        composable<HomeContainer> {
-            HomeContainerScreen()
-        }
-
-        composable<PreviewMap> {
-            PreviewMapScreen(viewModel = hiltViewModel<PreviewMapViewModel>())
-        }
-
-        composable<DetailRide> { backStackEntry ->
-            val route: DetailRide = backStackEntry.toRoute<DetailRide>()
-            backStackEntry.savedStateHandle[Arguments.ID_RIDE] = route.idRide
-            DetailRideScreen(
-                idRide = route.idRide,
-                viewModel = hiltViewModel<DetailRideViewModel>(),
-            )
+        composable<Home> {
+            HomeScreen(viewModel = hiltViewModel<HomeViewModel>())
         }
     }
 }

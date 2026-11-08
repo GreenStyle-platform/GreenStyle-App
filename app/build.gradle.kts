@@ -52,10 +52,11 @@ plugins {
       //depencied module
       implementation(project(":core:common"))
       implementation(project(":core:data"))
-      implementation(project(":features:auth"))
-      implementation(project(":features:home"))
-      implementation(project(":features:ride"))
-      implementation(project(":features:chat"))
+      implementation(project(":core:mapbox"))
+//      implementation(project(":features:auth"))
+//      implementation(project(":features:home"))
+//      implementation(project(":features:ride"))
+//      implementation(project(":features:chat"))
 
       // acitivty compose
       implementation(libs.androidx.activity.compose)
