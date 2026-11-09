@@ -132,6 +132,21 @@ class HomeViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Called when user releases a gesture (long press / scroll / drag release).
+     * Directly triggers transit data loading for the current camera viewport.
+     */
+    fun onCameraGestureRelease(viewport: TransitMapViewportInfo) {
+        if (viewport.zoom < MIN_ZOOM_THRESHOLD) {
+            Timber.d("Skip load on gesture release: current zoom (${viewport.zoom}) is below threshold ($MIN_ZOOM_THRESHOLD)")
+            return
+        }
+        debounceLoadJob?.cancel()
+        triggerDataLoad(viewport)
+    }
+
+    fun onViewportGestureReleased(viewport: TransitMapViewportInfo) = onCameraGestureRelease(viewport)
+
     private fun triggerDataLoad(viewport: TransitMapViewportInfo) {
         // Expand bounding box with buffer factor to preload neighboring area
         val latSpan = viewport.maxLatitude - viewport.minLatitude

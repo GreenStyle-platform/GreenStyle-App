@@ -13,11 +13,13 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DirectionsTransit
 import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.BottomSheetScaffold
 import androidx.compose.material3.Card
@@ -26,6 +28,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -35,13 +38,19 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.rememberBottomSheetScaffoldState
 import androidx.compose.material3.rememberStandardBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.mapbox.maps.extension.compose.animation.viewport.rememberMapViewportState
 import com.vie.mit.mapbox.composable.TransitStopsMapScreen
+import com.vie.mit.mapbox.util.focusUserLocationBoundingBox
 import com.vie.mit.mapbox.model.StopFeatureClick
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -51,6 +60,24 @@ fun HomeScreen(
     modifier: Modifier = Modifier,
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val mapViewportState = rememberMapViewportState()
+
+    // Chỉ focus vị trí người dùng 1 lần duy nhất khi mở màn hình lần đầu
+    var hasFocusedInitialLocation by rememberSaveable { mutableStateOf(false) }
+
+    LaunchedEffect(uiState.currentLocation) {
+        val location = uiState.currentLocation
+        if (location != null && !hasFocusedInitialLocation) {
+            hasFocusedInitialLocation = true
+            focusUserLocationBoundingBox(
+                mapViewportState = mapViewportState,
+                location = location,
+                zoom = 14.5,
+                animate = true,
+            )
+        }
+    }
+
     val scaffoldState = rememberBottomSheetScaffoldState(
         bottomSheetState = rememberStandardBottomSheetState(
             initialValue = SheetValue.PartiallyExpanded
@@ -74,16 +101,17 @@ fun HomeScreen(
                 .fillMaxSize()
                 .padding(innerPadding)
         ) {
-            // 1. Pure Mapbox transit stops map with clustering
+            // 1. Pure Mapbox transit stops map with clustering (Free camera panning)
             TransitStopsMapScreen(
                 modifier = Modifier.fillMaxSize(),
                 transitSources = uiState.transitSources,
                 transitConfigs = uiState.transitConfigs,
+                mapViewportState = mapViewportState,
                 showUserLocation = true,
-                followPuckOnStart = true,
                 onLocationUpdate = viewModel::onLocationUpdated,
                 onStopClick = viewModel::onStopClicked,
                 onViewportChanged = viewModel::onViewportChanged,
+                onCameraGestureRelease = viewModel::onCameraGestureRelease,
             )
 
             // 2. Filter chips floating on top for toggling transit types
@@ -95,7 +123,34 @@ fun HomeScreen(
                     .padding(top = 16.dp, start = 16.dp, end = 16.dp),
             )
 
-            // 3. Loading indicator when fetching transit data
+            // 3. Floating "My Location" Button (để người dùng chủ động quay lại vị trí của mình khi cần)
+            uiState.currentLocation?.let { location ->
+                FloatingActionButton(
+                    onClick = {
+                        focusUserLocationBoundingBox(
+                            mapViewportState = mapViewportState,
+                            location = location,
+                            zoom = 15.0,
+                            animate = true,
+                        )
+                    },
+                    shape = CircleShape,
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    contentColor = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(bottom = 24.dp, end = 16.dp)
+                        .size(48.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.MyLocation,
+                        contentDescription = "My Location",
+                        modifier = Modifier.size(22.dp)
+                    )
+                }
+            }
+
+            // 4. Loading indicator when fetching transit data
             if (uiState.isLoadingTransit) {
                 Surface(
                     shape = RoundedCornerShape(20.dp),
@@ -123,7 +178,7 @@ fun HomeScreen(
                 }
             }
 
-            // 4. Floating Selected Stop Info Card (if selected)
+            // 5. Floating Selected Stop Info Card (if selected)
             uiState.selectedStop?.let { stop ->
                 StopDetailFloatingCard(
                     stop = stop,
