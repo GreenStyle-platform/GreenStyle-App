@@ -232,4 +232,40 @@ class HomeViewModel @Inject constructor(
     fun dismissStopDetail() {
         _uiState.update { it.copy(selectedStop = null) }
     }
+
+    /**
+     * Called when the map is clicked.
+     * Sets map focus to true and switches homeBottomSheet to nearbyStopBottomSheet.
+     */
+    fun onMapClick() {
+        _uiState.update { currentState ->
+            currentState.copy(
+                isMapFocused = true,
+                activeBottomSheet = HomeBottomSheetType.NEARBY_STOPS,
+            )
+        }
+    }
+
+    fun showHomeBottomSheet() {
+        _uiState.update { currentState ->
+            currentState.copy(
+                activeBottomSheet = HomeBottomSheetType.HOME,
+                isMapFocused = false,
+            )
+        }
+    }
+
+    fun showNearbyStopsBottomSheet() {
+        _uiState.update { currentState ->
+            currentState.copy(
+                activeBottomSheet = HomeBottomSheetType.NEARBY_STOPS,
+            )
+        }
+    }
+
+    fun setMapFocused(isFocused: Boolean) {
+        _uiState.update { currentState ->
+            currentState.copy(isMapFocused = isFocused)
+        }
+    }
 }

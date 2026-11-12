@@ -70,6 +70,7 @@ fun TransitStopsMapScreen(
     onViewportChanged: ((TransitMapViewportInfo) -> Unit)? = null,
     onCameraGestureRelease: ((TransitMapViewportInfo) -> Unit)? = null,
     onMapLongClick: ((Point) -> Unit)? = null,
+    onMapClick: ((Point) -> Unit)? = null,
 ) {
     val context = LocalContext.current
     val currentOnLocationUpdate by rememberUpdatedState(onLocationUpdate)
@@ -78,6 +79,7 @@ fun TransitStopsMapScreen(
     val currentOnViewportChanged by rememberUpdatedState(onViewportChanged)
     val currentOnCameraGestureRelease by rememberUpdatedState(onCameraGestureRelease)
     val currentOnMapLongClick by rememberUpdatedState(onMapLongClick)
+    val currentOnMapClick by rememberUpdatedState(onMapClick)
 
     val isPermissionGrantedInitially = remember(context) {
         (ContextCompat.checkSelfPermission(
@@ -157,6 +159,7 @@ fun TransitStopsMapScreen(
                                 currentOnClusterClick?.invoke(clusterPoint, expansionZoom)
                             }
                         )
+                        currentOnMapClick?.invoke(point)
                         true
                     }
                     mapView.gestures.addOnMapClickListener(clickListener)
