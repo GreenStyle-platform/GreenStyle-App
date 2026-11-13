@@ -26,6 +26,8 @@ plugins {
     }
 
   dependencies {
+      implementation(project(":core:mapbox"))
+
       implementation(libs.androidx.appcompat)
       implementation(libs.androidx.core.ktx)
       implementation(libs.material)

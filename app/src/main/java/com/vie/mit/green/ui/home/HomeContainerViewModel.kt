@@ -3,11 +3,11 @@ package com.vie.mit.green.ui.home
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.vie.mit.data.repository.map.MapRepository
+import com.vie.mit.green.ui.home.homesheet.HomeSheetUiState
 import com.vie.mit.mapbox.model.LocationData
 import com.vie.mit.mapbox.model.StopFeatureClick
 import com.vie.mit.mapbox.model.TransitMapViewportInfo
 import com.vie.mit.mapbox.model.TransitSourceData
-import com.vie.mit.mapbox.model.TransitTypeConfig
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -20,45 +20,14 @@ import timber.log.Timber
 import javax.inject.Inject
 
 @HiltViewModel
-class HomeViewModel @Inject constructor(
+class HomeContainerViewModel @Inject constructor(
     private val mapRepository: MapRepository,
 ) : ViewModel() {
 
-    private val defaultConfigs = listOf(
-        TransitTypeConfig(
-            typeId = "BUS",
-            iconResId = com.vie.mit.mapbox.R.drawable.ic_transit_bus,
-            clusterColor = 0xFF1E88E5.toInt(), // Blue
-            clusterTextColor = 0xFFFFFFFF.toInt(),
-            iconSize = 1.0,
-        ),
-        TransitTypeConfig(
-            typeId = "METRO",
-            iconResId = com.vie.mit.mapbox.R.drawable.ic_transit_metro,
-            clusterColor = 0xFFE53935.toInt(), // Red
-            clusterTextColor = 0xFFFFFFFF.toInt(),
-            iconSize = 1.0,
-        ),
-        TransitTypeConfig(
-            typeId = "TRAIN",
-            iconResId = com.vie.mit.mapbox.R.drawable.ic_transit_train,
-            clusterColor = 0xFF8E24AA.toInt(), // Purple
-            clusterTextColor = 0xFFFFFFFF.toInt(),
-            iconSize = 1.0,
-        ),
-        TransitTypeConfig(
-            typeId = "BIKE",
-            iconResId = com.vie.mit.mapbox.R.drawable.ic_transit_bike,
-            clusterColor = 0xFF43A047.toInt(), // Green
-            clusterTextColor = 0xFFFFFFFF.toInt(),
-            iconSize = 1.0,
-        ),
-    )
-
     private val _uiState = MutableStateFlow(
-        HomeUiState(transitConfigs = defaultConfigs)
+        HomeSheetUiState(transitConfigs = mapRepository.defaultConfigs)
     )
-    val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
+    val uiState: StateFlow<HomeSheetUiState> = _uiState.asStateFlow()
 
     // Smart caching state for camera viewport
     private var cachedBounds: TransitMapViewportInfo? = null
@@ -235,13 +204,12 @@ class HomeViewModel @Inject constructor(
 
     /**
      * Called when the map is clicked.
-     * Sets map focus to true and switches homeBottomSheet to nearbyStopBottomSheet.
+     * Sets map focus to true.
      */
     fun onMapClick() {
         _uiState.update { currentState ->
             currentState.copy(
                 isMapFocused = true,
-                activeBottomSheet = HomeBottomSheetType.NEARBY_STOPS,
             )
         }
     }
@@ -249,7 +217,6 @@ class HomeViewModel @Inject constructor(
     fun showHomeBottomSheet() {
         _uiState.update { currentState ->
             currentState.copy(
-                activeBottomSheet = HomeBottomSheetType.HOME,
                 isMapFocused = false,
             )
         }
@@ -258,7 +225,7 @@ class HomeViewModel @Inject constructor(
     fun showNearbyStopsBottomSheet() {
         _uiState.update { currentState ->
             currentState.copy(
-                activeBottomSheet = HomeBottomSheetType.NEARBY_STOPS,
+                isMapFocused = false,
             )
         }
     }

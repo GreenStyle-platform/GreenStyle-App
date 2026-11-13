@@ -4,6 +4,7 @@ import com.vie.mit.data.network.api.map.MapApi
 import com.vie.mit.data.network.model.map.Location
 import com.vie.mit.data.network.model.map.PublicTransportSuggestion
 import com.vie.mit.data.network.util.handleApiCall
+import com.vie.mit.mapbox.model.TransitTypeConfig
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -11,6 +12,37 @@ import javax.inject.Singleton
 class MapRepository @Inject constructor(
     private val mapApi: MapApi,
 ) {
+    val defaultConfigs: List<TransitTypeConfig> = listOf(
+        TransitTypeConfig(
+            typeId = "BUS",
+            iconResId = com.vie.mit.mapbox.R.drawable.ic_transit_bus,
+            clusterColor = 0xFF1E88E5.toInt(), // Blue
+            clusterTextColor = 0xFFFFFFFF.toInt(),
+            iconSize = 1.0,
+        ),
+        TransitTypeConfig(
+            typeId = "METRO",
+            iconResId = com.vie.mit.mapbox.R.drawable.ic_transit_metro,
+            clusterColor = 0xFFE53935.toInt(), // Red
+            clusterTextColor = 0xFFFFFFFF.toInt(),
+            iconSize = 1.0,
+        ),
+        TransitTypeConfig(
+            typeId = "TRAIN",
+            iconResId = com.vie.mit.mapbox.R.drawable.ic_transit_train,
+            clusterColor = 0xFF8E24AA.toInt(), // Purple
+            clusterTextColor = 0xFFFFFFFF.toInt(),
+            iconSize = 1.0,
+        ),
+        TransitTypeConfig(
+            typeId = "BIKE",
+            iconResId = com.vie.mit.mapbox.R.drawable.ic_transit_bike,
+            clusterColor = 0xFF43A047.toInt(), // Green
+            clusterTextColor = 0xFFFFFFFF.toInt(),
+            iconSize = 1.0,
+        ),
+    )
+
     suspend fun getPublicTransportSuggestions(
         location: Location,
     ): Result<List<PublicTransportSuggestion>> = handleApiCall {

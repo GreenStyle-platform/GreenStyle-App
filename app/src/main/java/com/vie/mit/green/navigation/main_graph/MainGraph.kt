@@ -5,16 +5,18 @@ import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.composable
 import androidx.navigation.navigation
-import com.vie.mit.green.ui.home.HomeScreen
-import com.vie.mit.green.ui.home.HomeViewModel
+import com.vie.mit.green.ui.home.HomeContainerScreen
+import com.vie.mit.green.ui.home.HomeContainerViewModel
 
 fun NavGraphBuilder.mainGraph(navController: NavHostController) {
     navigation<MainGraph>(
-        startDestination = Home
+        startDestination = MapContainerRoute
     ) {
-        composable<Home> {
-            HomeScreen(viewModel = hiltViewModel<HomeViewModel>())
+        composable<MapContainerRoute> {
+            HomeContainerScreen(
+                homeContainerViewModel = hiltViewModel<HomeContainerViewModel>(),
+                rootNavController = navController,
+            )
         }
     }
 }
-

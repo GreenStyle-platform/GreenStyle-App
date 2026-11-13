@@ -1,4 +1,4 @@
-package com.vie.mit.green.ui.home
+package com.vie.mit.green.ui.home.homesheet
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -35,7 +35,6 @@ import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Subway
 import androidx.compose.material.icons.filled.Train
@@ -43,25 +42,14 @@ import androidx.compose.material.icons.filled.WarningAmber
 import androidx.compose.material.icons.filled.Work
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.VerticalDivider
-import androidx.compose.material3.rememberBottomSheetScaffoldState
-import androidx.compose.material3.rememberStandardBottomSheetState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -71,183 +59,19 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.mapbox.maps.extension.compose.animation.viewport.rememberMapViewportState
-import com.vie.mit.green.ui.component.bottomsheet.CommonBottomSheet
-import com.vie.mit.mapbox.composable.TransitStopsMapScreen
+import com.vie.mit.common.theme.AppTheme
 import com.vie.mit.mapbox.model.StopFeatureClick
-import com.vie.mit.mapbox.util.focusUserLocationBoundingBox
 
-// Citymapper Color Palette
-private val CitymapperGreen = Color(0xFF1FAF4E)
-private val CitymapperNavBlue = Color(0xFF35698F)
-private val CitymapperButtonOverlay = Color(0x33000000)
+// ======================================================================================
+// Sheet Content Composables — Dùng bên trong SheetNavHost (Nested NavHost)
+// ======================================================================================
 
-@OptIn(ExperimentalMaterial3Api::class)
+/**
+ * HomeSheetContent: Nội dung BottomSheet trang chủ.
+ * Hiển thị thanh tìm kiếm, lưới phương tiện công cộng, và tiện ích.
+ */
 @Composable
-fun HomeScreen(
-    viewModel: HomeViewModel,
-    modifier: Modifier = Modifier,
-) {
-    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    val mapViewportState = rememberMapViewportState()
-
-    // Chỉ focus vị trí người dùng 1 lần duy nhất khi mở màn hình lần đầu
-    var hasFocusedInitialLocation by rememberSaveable { mutableStateOf(false) }
-
-    LaunchedEffect(uiState.currentLocation) {
-        val location = uiState.currentLocation
-        if (location != null && !hasFocusedInitialLocation) {
-            hasFocusedInitialLocation = true
-            focusUserLocationBoundingBox(
-                mapViewportState = mapViewportState,
-                location = location,
-                zoom = 14.5,
-                animate = true,
-            )
-        }
-    }
-
-    val scaffoldState = rememberBottomSheetScaffoldState(
-        bottomSheetState = rememberStandardBottomSheetState(
-            initialValue = SheetValue.PartiallyExpanded
-        )
-    )
-
-    CommonBottomSheet(
-        scaffoldState = scaffoldState,
-        sheetPeekHeight = 240.dp,
-        sheetShape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
-        sheetContainerColor = CitymapperGreen,
-        sheetContentColor = Color.White,
-        sheetContent = {
-            when (uiState.activeBottomSheet) {
-                HomeBottomSheetType.HOME -> {
-                    HomeBottomSheetContent(
-                        activeTransitTypes = uiState.activeTransitTypes,
-                        onToggleTransitType = viewModel::toggleTransitType,
-                    )
-                }
-                HomeBottomSheetType.NEARBY_STOPS -> {
-                    NearbyStopsBottomSheetContent(
-                        onBackToHome = viewModel::showHomeBottomSheet,
-                    )
-                }
-            }
-        },
-        modifier = modifier.fillMaxSize(),
-    ) { innerPadding ->
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-        ) {
-            // 1. Pure Mapbox transit stops map with clustering (Free camera panning)
-            TransitStopsMapScreen(
-                modifier = Modifier.fillMaxSize(),
-                transitSources = uiState.transitSources,
-                transitConfigs = uiState.transitConfigs,
-                mapViewportState = mapViewportState,
-                showUserLocation = true,
-                onLocationUpdate = viewModel::onLocationUpdated,
-                onStopClick = viewModel::onStopClicked,
-                onMapClick = { viewModel.onMapClick() },
-                onViewportChanged = viewModel::onViewportChanged,
-                onCameraGestureRelease = viewModel::onCameraGestureRelease,
-            )
-
-            // 2. Top-Left Floating Settings Button
-            Surface(
-                onClick = { /* TODO: Open Settings */ },
-                shape = CircleShape,
-                color = Color.White,
-                shadowElevation = 6.dp,
-                modifier = Modifier
-                    .align(Alignment.TopStart)
-                    .padding(top = 44.dp, start = 16.dp)
-                    .size(44.dp)
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                        imageVector = Icons.Default.Settings,
-                        contentDescription = "Settings",
-                        tint = Color(0xFF333333),
-                        modifier = Modifier.size(24.dp)
-                    )
-                }
-            }
-
-            // 3. Floating "My Location" Button (để người dùng chủ động quay lại vị trí của mình khi cần)
-            uiState.currentLocation?.let { location ->
-                FloatingActionButton(
-                    onClick = {
-                        focusUserLocationBoundingBox(
-                            mapViewportState = mapViewportState,
-                            location = location,
-                            zoom = 15.0,
-                            animate = true,
-                        )
-                    },
-                    shape = CircleShape,
-                    containerColor = MaterialTheme.colorScheme.surface,
-                    contentColor = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier
-                        .align(Alignment.BottomEnd)
-                        .padding(bottom = 24.dp, end = 16.dp)
-                        .size(48.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.MyLocation,
-                        contentDescription = "My Location",
-                        modifier = Modifier.size(22.dp)
-                    )
-                }
-            }
-
-            // 4. Loading indicator when fetching transit data
-            if (uiState.isLoadingTransit) {
-                Surface(
-                    shape = RoundedCornerShape(20.dp),
-                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
-                    shadowElevation = 4.dp,
-                    modifier = Modifier
-                        .align(Alignment.TopCenter)
-                        .padding(top = 44.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(16.dp),
-                            strokeWidth = 2.dp
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = "Đang tải trạm dừng...",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                    }
-                }
-            }
-
-            // 5. Floating Selected Stop Info Card (if selected)
-            uiState.selectedStop?.let { stop ->
-                StopDetailFloatingCard(
-                    stop = stop,
-                    onClose = viewModel::dismissStopDetail,
-                    modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .padding(bottom = 16.dp, start = 16.dp, end = 16.dp)
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun HomeBottomSheetContent(
+internal fun HomeSheetContent(
     activeTransitTypes: Set<String>,
     onToggleTransitType: (String) -> Unit,
     modifier: Modifier = Modifier,
@@ -274,7 +98,7 @@ private fun HomeBottomSheetContent(
 
         Spacer(modifier = Modifier.height(20.dp))
 
-        // 2. Thành phần 2: Phương tiện công cộng (Transit Modes Grid 2x5)
+        // 2. Phương tiện công cộng (Transit Modes Grid 2x5)
         Text(
             text = "Phương tiện công cộng",
             style = MaterialTheme.typography.titleMedium.copy(
@@ -292,7 +116,7 @@ private fun HomeBottomSheetContent(
 
         Spacer(modifier = Modifier.height(20.dp))
 
-        // 3. Thành phần 3: Tiện ích (Vé, Lịch sử chuyến đi)
+        // 3. Tiện ích (Vé, Lịch sử chuyến đi)
         Text(
             text = "Tiện ích",
             style = MaterialTheme.typography.titleMedium.copy(
@@ -312,9 +136,12 @@ private fun HomeBottomSheetContent(
     }
 }
 
+/**
+ * NearbyStopsSheetContent: Nội dung BottomSheet hiển thị trạm dừng xung quanh.
+ */
 @Composable
-private fun NearbyStopsBottomSheetContent(
-    onBackToHome: () -> Unit,
+internal fun NearbyStopsSheetContent(
+    onBack: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -337,10 +164,10 @@ private fun NearbyStopsBottomSheetContent(
                 )
             )
             IconButton(
-                onClick = onBackToHome,
+                onClick = onBack,
                 modifier = Modifier
                     .size(32.dp)
-                    .background(CitymapperButtonOverlay, CircleShape)
+                    .background(AppTheme.colors.overlayColor, CircleShape)
             ) {
                 Icon(
                     imageVector = Icons.Default.Close,
@@ -369,7 +196,7 @@ private fun NearbyStopsBottomSheetContent(
                     Icon(
                         imageVector = Icons.Default.MyLocation,
                         contentDescription = null,
-                        tint = CitymapperNavBlue,
+                        tint = AppTheme.colors.navyBlue,
                         modifier = Modifier.size(20.dp)
                     )
                     Spacer(modifier = Modifier.width(8.dp))
@@ -392,7 +219,7 @@ private fun NearbyStopsBottomSheetContent(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Sample nearby stops cards (UI structure for nearby stops)
+        // Sample nearby stops cards
         NearbyStopItemCard(
             title = "Trạm xe buýt Bến Thành",
             distance = "120m",
@@ -425,6 +252,81 @@ private fun NearbyStopsBottomSheetContent(
     }
 }
 
+// ======================================================================================
+// Floating Card — Dùng bởi MapContainerScreen
+// ======================================================================================
+
+@Composable
+internal fun StopDetailFloatingCard(
+    stop: StopFeatureClick,
+    onClose: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = Icons.Default.DirectionsTransit,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(28.dp)
+                )
+                Spacer(modifier = Modifier.width(12.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = stop.name ?: "Trạm dừng công cộng",
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        text = "Loại: ${stop.typeId} | ID: ${stop.stopId}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                IconButton(onClick = onClose) {
+                    Icon(
+                        imageVector = Icons.Default.Close,
+                        contentDescription = "Close",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+
+            // Stop extra properties (e.g. routes or available bikes)
+            val info = stop.properties["routes"]
+                ?: stop.properties["line"]
+                ?: stop.properties["available_bikes"]?.let { "Xe khả dụng: $it" }
+            if (info != null) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = info,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+        }
+    }
+}
+
+// ======================================================================================
+// Private UI Components
+// ======================================================================================
+
 @Composable
 private fun NearbyStopItemCard(
     title: String,
@@ -449,7 +351,7 @@ private fun NearbyStopItemCard(
             Box(
                 modifier = Modifier
                     .size(40.dp)
-                    .background(CitymapperNavBlue, CircleShape),
+                    .background(AppTheme.colors.navyBlue, CircleShape),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
@@ -478,7 +380,7 @@ private fun NearbyStopItemCard(
                 text = distance,
                 style = MaterialTheme.typography.labelMedium.copy(
                     fontWeight = FontWeight.SemiBold,
-                    color = CitymapperNavBlue
+                    color = AppTheme.colors.navyBlue
                 )
             )
         }
@@ -511,7 +413,7 @@ private fun CitymapperNavigationCard(
                 Box(
                     modifier = Modifier
                         .size(36.dp)
-                        .background(CitymapperNavBlue, CircleShape),
+                        .background(AppTheme.colors.navyBlue, CircleShape),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
@@ -556,7 +458,7 @@ private fun CitymapperNavigationCard(
                     Box(
                         modifier = Modifier
                             .size(34.dp)
-                            .background(CitymapperNavBlue, CircleShape),
+                            .background(AppTheme.colors.navyBlue, CircleShape),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
@@ -595,7 +497,7 @@ private fun CitymapperNavigationCard(
                     Box(
                         modifier = Modifier
                             .size(34.dp)
-                            .background(CitymapperNavBlue, CircleShape),
+                            .background(AppTheme.colors.navyBlue, CircleShape),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
@@ -634,7 +536,7 @@ private fun CitymapperNavigationCard(
                     Box(
                         modifier = Modifier
                             .size(34.dp)
-                            .background(CitymapperNavBlue, CircleShape),
+                            .background(AppTheme.colors.navyBlue, CircleShape),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
@@ -790,7 +692,7 @@ private fun CitymapperGridButton(
     Surface(
         onClick = onClick,
         shape = RoundedCornerShape(14.dp),
-        color = if (isActive) CitymapperButtonOverlay else Color(0x18000000),
+        color = if (isActive) AppTheme.colors.overlayColor else Color(0x18000000),
         modifier = modifier.aspectRatio(1f)
     ) {
         Column(
@@ -837,73 +739,6 @@ private fun CitymapperGridButton(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
-        }
-    }
-}
-
-@Composable
-private fun StopDetailFloatingCard(
-    stop: StopFeatureClick,
-    onClose: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Card(
-        modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
-        ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(
-                    imageVector = Icons.Default.DirectionsTransit,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(28.dp)
-                )
-                Spacer(modifier = Modifier.width(12.dp))
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = stop.name ?: "Trạm dừng công cộng",
-                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    Text(
-                        text = "Loại: ${stop.typeId} | ID: ${stop.stopId}",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                IconButton(onClick = onClose) {
-                    Icon(
-                        imageVector = Icons.Default.Close,
-                        contentDescription = "Close",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
-
-            // Stop extra properties (e.g. routes or available bikes)
-            val info = stop.properties["routes"]
-                ?: stop.properties["line"]
-                ?: stop.properties["available_bikes"]?.let { "Xe khả dụng: $it" }
-            if (info != null) {
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = info,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.primary
-                )
-            }
         }
     }
 }

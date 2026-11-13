@@ -1,16 +1,11 @@
-package com.vie.mit.green.ui.home
+package com.vie.mit.green.ui.home.homesheet
 
 import com.vie.mit.mapbox.model.LocationData
 import com.vie.mit.mapbox.model.StopFeatureClick
 import com.vie.mit.mapbox.model.TransitSourceData
 import com.vie.mit.mapbox.model.TransitTypeConfig
 
-enum class HomeBottomSheetType {
-    HOME,
-    NEARBY_STOPS,
-}
-
-data class HomeUiState(
+data class HomeSheetUiState(
     val currentLocation: LocationData? = null,
     val transitSources: List<TransitSourceData> = emptyList(),
     val transitConfigs: List<TransitTypeConfig> = emptyList(),
@@ -19,5 +14,4 @@ data class HomeUiState(
     val isLoadingTransit: Boolean = false,
     val errorMessage: String? = null,
     val isMapFocused: Boolean = false,
-    val activeBottomSheet: HomeBottomSheetType = HomeBottomSheetType.HOME,
 )
