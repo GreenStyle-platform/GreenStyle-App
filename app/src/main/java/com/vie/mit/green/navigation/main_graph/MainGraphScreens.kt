@@ -13,10 +13,7 @@ object MapContainerRoute
 object HomeSheetRoute
 
 @Serializable
-data class NearbyStopsSheetRoute(
-    val focusLat: Double = 0.0,
-    val focusLng: Double = 0.0,
-)
+data object NearbyTransitStopsSheetRoute
 
 @Serializable
 data class StopDetailSheetRoute(

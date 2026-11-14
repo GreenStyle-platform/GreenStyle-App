@@ -1,27 +1,54 @@
 package com.vie.mit.common.screenbottomsheet
 
-import androidx.annotation.FloatRange
+import androidx.compose.animation.core.AnimationSpec
+import androidx.compose.animation.core.DecayAnimationSpec
+import androidx.compose.animation.core.exponentialDecay
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.gestures.AnchoredDraggableState
 import androidx.compose.foundation.gestures.DraggableAnchors
 import androidx.compose.foundation.gestures.animateTo
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.dp
 
 /**
  * Phuccdr: Lớp quản lý trạng thái (State Holder) của Custom Bottom Sheet.
  * Quản lý trạng thái ẩn/hiện, vị trí vuốt kéo và hỗ trợ cấu hình chiều cao khi mở rộng.
  *
  * @param initialValue Trạng thái ban đầu của Bottom Sheet.
- * @param expandedHeightFraction Tỷ lệ chiều cao của Bottom Sheet khi mở rộng (Expanded) so với chiều cao màn hình (từ 0.0f đến 1.0f, mặc định là 1.0f tức 100%).
  */
 @Stable
 class CustomBottomSheetState(
     initialValue: CustomBottomSheetValue,
-    @get:FloatRange(from = 0.0, to = 1.0) val expandedHeightFraction: Float = 1.0f,
+    positionalThreshold: (totalDistance: Float) -> Float = { distance -> distance * 0.5f },
+    velocityThreshold: () -> Float = { 125f },
+    snapAnimationSpec: AnimationSpec<Float> = spring(),
+    decayAnimationSpec: DecayAnimationSpec<Float> = exponentialDecay(),
+    confirmValueChange: (newValue: CustomBottomSheetValue) -> Boolean = { true },
 ) {
-    internal val anchoredState = AnchoredDraggableState(
-        initialValue = initialValue
+    var currentConfig: BottomSheetConfig by mutableStateOf(BottomSheetConfig())
+        private set
+    private var isProgrammaticHide: Boolean = false
+
+    @Suppress("DEPRECATION")
+    val anchoredState = AnchoredDraggableState(
+        initialValue = initialValue,
+        positionalThreshold = positionalThreshold,
+        velocityThreshold = velocityThreshold,
+        snapAnimationSpec = snapAnimationSpec,
+        decayAnimationSpec = decayAnimationSpec,
+        confirmValueChange = { newValue ->
+            if (newValue == CustomBottomSheetValue.Hidden && currentConfig.peekedRatio > 0f && !isProgrammaticHide) {
+                false
+            } else {
+                confirmValueChange(newValue)
+            }
+        },
     )
 
     /** Total height in pixels, set when [updateAnchors] is called. */
@@ -45,6 +72,17 @@ class CustomBottomSheetState(
             val currentOffset = offset
             return if (currentOffset.isNaN() || totalHeightPx <= 0f) 0f
             else (totalHeightPx - currentOffset).coerceAtLeast(0f)
+        }
+
+    /**
+     * Height in pixels of the BottomSheet when at [CustomBottomSheetValue.PartiallyExpanded].
+     */
+    val partiallyExpandedHeightPx: Float
+        get() {
+            if (totalHeightPx <= 0f) return 0f
+            val partialOffset = anchoredState.anchors.positionOf(CustomBottomSheetValue.PartiallyExpanded)
+            if (partialOffset.isNaN()) return 0f
+            return (totalHeightPx - partialOffset).coerceAtLeast(0f)
         }
 
     /**
@@ -91,28 +129,34 @@ class CustomBottomSheetState(
     val dragDownFromPartialProgress: Float
         get() {
             if (totalHeightPx <= 0f) return 0f
-            val partialOffset = anchoredState.anchors.positionOf(CustomBottomSheetValue.PartiallyExpanded)
+            val partialOffset =
+                anchoredState.anchors.positionOf(CustomBottomSheetValue.PartiallyExpanded)
             val peekOffset = anchoredState.anchors.positionOf(CustomBottomSheetValue.Peeked)
             if (partialOffset.isNaN() || peekOffset.isNaN()) return 0f
             val currentOffset = offset
             if (currentOffset.isNaN() || currentOffset <= partialOffset) return 0f
             val range = peekOffset - partialOffset
-            return if (range > 0f) ((currentOffset - partialOffset) / range).coerceIn(0f, 1f) else 0f
+            return if (range > 0f) ((currentOffset - partialOffset) / range).coerceIn(
+                0f,
+                1f
+            ) else 0f
         }
 
     /**
-     * Configures the draggable anchors for the three sheet states based on total screen height.
+     * Configures the draggable anchors for the sheet states based on total screen height.
      *
      * @param totalHeightPx Total available height in pixels.
      * @param config Configuration defining ratios for the sheet positions.
      */
     fun updateAnchors(totalHeightPx: Float, config: BottomSheetConfig) {
+        if (this.totalHeightPx == totalHeightPx && this.currentConfig == config) return
         this.totalHeightPx = totalHeightPx
+        this.currentConfig = config
         val newAnchors = DraggableAnchors {
-            CustomBottomSheetValue.Hidden at totalHeightPx
-            CustomBottomSheetValue.Peeked at totalHeightPx * (1f - config.minSheetRatio)
-            CustomBottomSheetValue.PartiallyExpanded at totalHeightPx * (1f - config.initialPeekRatio)
-            CustomBottomSheetValue.Expanded at totalHeightPx * (1f - config.maxExpandedRatio)
+//            CustomBottomSheetValue.Hidden at totalHeightPx
+            CustomBottomSheetValue.Peeked at totalHeightPx * (1f - config.peekedRatio)
+            CustomBottomSheetValue.PartiallyExpanded at totalHeightPx * (1f - config.partiallyExpandedRatio)
+            CustomBottomSheetValue.Expanded at totalHeightPx * (1f - config.expandedRatio)
         }
         anchoredState.updateAnchors(newAnchors)
     }
@@ -132,7 +176,33 @@ class CustomBottomSheetState(
     }
 
     suspend fun hide() {
-        anchoredState.animateTo(CustomBottomSheetValue.Hidden)
+        isProgrammaticHide = true
+        try {
+            anchoredState.animateTo(CustomBottomSheetValue.Hidden)
+        } finally {
+            isProgrammaticHide = false
+        }
+    }
+
+    suspend fun animateTo(target: CustomBottomSheetValue) {
+        when (target) {
+            CustomBottomSheetValue.Expanded -> expand()
+            CustomBottomSheetValue.PartiallyExpanded -> partialExpand()
+            CustomBottomSheetValue.Peeked -> peek()
+            CustomBottomSheetValue.Hidden -> hide()
+        }
+    }
+
+    @Suppress("DEPRECATION")
+    suspend fun settle(velocity: Float): Float {
+        if (currentConfig.peekedRatio > 0f && velocity > 0f && !isProgrammaticHide) {
+            val peekPosition = anchoredState.anchors.positionOf(CustomBottomSheetValue.Peeked)
+            if (!peekPosition.isNaN() && anchoredState.offset >= peekPosition) {
+                anchoredState.animateTo(CustomBottomSheetValue.Peeked)
+                return velocity
+            }
+        }
+        return anchoredState.settle(velocity)
     }
 }
 
@@ -140,17 +210,30 @@ class CustomBottomSheetState(
  * Phuccdr: Tạo và lưu giữ (remember) trạng thái [CustomBottomSheetState] qua các lần Recomposition.
  *
  * @param initialValue Trạng thái ban đầu của Bottom Sheet (mặc định là [CustomBottomSheetValue.PartiallyExpanded]).
- * @param expandedHeightFraction Tỷ lệ chiều cao khi mở rộng so với chiều cao màn hình (từ 0.0f đến 1.0f, mặc định 1.0f).
  */
 @Composable
 fun rememberCustomBottomSheetState(
     initialValue: CustomBottomSheetValue = CustomBottomSheetValue.PartiallyExpanded,
-    @FloatRange(from = 0.0, to = 1.0) expandedHeightFraction: Float = 1.0f,
+    positionalThreshold: (totalDistance: Float) -> Float = { distance -> distance * 0.5f },
+    velocityThreshold: (() -> Float)? = null,
+    snapAnimationSpec: AnimationSpec<Float> = spring(),
+    decayAnimationSpec: DecayAnimationSpec<Float> = exponentialDecay(),
+    confirmValueChange: (newValue: CustomBottomSheetValue) -> Boolean = { true },
 ): CustomBottomSheetState {
-    return remember(initialValue, expandedHeightFraction) {
+    val density = LocalDensity.current
+    val resolvedVelocityThreshold = velocityThreshold ?: remember(density) {
+        { with(density) { 125.dp.toPx() } }
+    }
+    return remember(initialValue) {
         CustomBottomSheetState(
             initialValue = initialValue,
-            expandedHeightFraction = expandedHeightFraction.coerceIn(0f, 1f),
+            positionalThreshold = positionalThreshold,
+            velocityThreshold = resolvedVelocityThreshold,
+            snapAnimationSpec = snapAnimationSpec,
+            decayAnimationSpec = decayAnimationSpec,
+            confirmValueChange = confirmValueChange,
         )
     }
 }
+
+

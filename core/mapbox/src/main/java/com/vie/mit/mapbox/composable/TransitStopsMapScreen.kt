@@ -1,3 +1,5 @@
+@file:Suppress("COMPOSE_APPLIER_CALL_MISMATCH")
+
 package com.vie.mit.mapbox.composable
 
 import android.Manifest
@@ -5,9 +7,6 @@ import android.content.pm.PackageManager
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.offset
-import androidx.compose.ui.unit.IntOffset
-import kotlin.math.roundToInt
-import com.mapbox.maps.EdgeInsets
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -16,10 +15,13 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.IntOffset
 import androidx.core.content.ContextCompat
 import com.mapbox.android.gestures.MoveGestureDetector
 import com.mapbox.geojson.Point
+import com.mapbox.maps.CameraBoundsOptions
 import com.mapbox.maps.CameraChangedCallback
+import com.mapbox.maps.EdgeInsets
 import com.mapbox.maps.MapboxMap
 import com.mapbox.maps.dsl.cameraOptions
 import com.mapbox.maps.extension.compose.MapEffect
@@ -45,7 +47,9 @@ import com.vie.mit.mapbox.model.toLocationData
 import com.vie.mit.mapbox.permission.MapPermissionHandler
 import com.vie.mit.mapbox.util.createZoomScaled2DPuck
 import kotlinx.coroutines.awaitCancellation
-
+import java.util.concurrent.atomic.AtomicReference
+import kotlin.math.abs
+import kotlin.math.roundToInt
 
 const val distanceThreshold:Float = 30f
 
@@ -68,6 +72,8 @@ fun TransitStopsMapScreen(
     showUserLocation: Boolean = true,
     showCenterPin: Boolean = true,
     cameraBottomPadding: Float = 0f,
+    minZoom: Double? = null,
+    maxZoom: Double? = null,
     centerPinContent: (@Composable () -> Unit)? = null,
     onLocationUpdate: ((LocationData) -> Unit)? = null,
     onStopClick: ((StopFeatureClick) -> Unit)? = null,
@@ -85,6 +91,8 @@ fun TransitStopsMapScreen(
     val currentOnCameraGestureRelease by rememberUpdatedState(onCameraGestureRelease)
     val currentOnMapLongClick by rememberUpdatedState(onMapLongClick)
     val currentOnMapClick by rememberUpdatedState(onMapClick)
+    val currentTransitConfigs by rememberUpdatedState(transitConfigs)
+    val userLocationRef = remember { AtomicReference<LocationData?>(null) }
 
     val isPermissionGrantedInitially = remember(context) {
         (ContextCompat.checkSelfPermission(
@@ -96,7 +104,6 @@ fun TransitStopsMapScreen(
         ) == PackageManager.PERMISSION_GRANTED)
     }
     var showMap by remember { mutableStateOf(if (showUserLocation) isPermissionGrantedInitially else true) }
-    var userLocationData by remember { mutableStateOf<LocationData?>(null) }
     var isCameraFocusedOnUserLocation by remember { mutableStateOf(false) }
 
     if (showUserLocation) {
@@ -112,12 +119,22 @@ fun TransitStopsMapScreen(
                 modifier = Modifier.fillMaxSize(),
                 mapViewportState = mapViewportState,
             ) {
+                // Thiết lập giới hạn Zoom (minZoom, maxZoom)
+                MapEffect(minZoom, maxZoom) { mapView ->
+                    if (minZoom != null || maxZoom != null) {
+                        val boundsBuilder = CameraBoundsOptions.Builder()
+                        minZoom?.let { boundsBuilder.minZoom(it) }
+                        maxZoom?.let { boundsBuilder.maxZoom(it) }
+                        mapView.mapboxMap.setBounds(boundsBuilder.build())
+                    }
+                }
+
                 // Đồng bộ Camera Bottom Padding (Phương pháp 2: Mapbox EdgeInsets)
                 MapEffect(cameraBottomPadding) { mapView ->
                     val mapboxMap = mapView.mapboxMap
                     val currentCamera = mapboxMap.cameraState
                     val targetBottom = cameraBottomPadding.toDouble().coerceAtLeast(0.0)
-                    if (Math.abs(currentCamera.padding.bottom - targetBottom) >= 2.0) {
+                    if (abs(currentCamera.padding.bottom - targetBottom) >= 2.0) {
                         val currentCenter = currentCamera.center
                         mapboxMap.setCamera(
                             cameraOptions {
@@ -131,16 +148,20 @@ fun TransitStopsMapScreen(
                     }
                 }
 
-                MapEffect(transitSources, transitConfigs, clusterConfig, showUserLocation) { mapView ->
+                // 2. Configure GTFS Icons, Sources & Layers (chỉ cập nhật data layer, không đụng tới listeners)
+                MapEffect(transitSources, transitConfigs, clusterConfig) { mapView ->
                     val mapboxMap = mapView.mapboxMap
-
-                    // 1. Configure GTFS Icons & Layers via StyleManager
                     mapboxMap.getStyle { style ->
                         setupTransitIcons(context, style, transitConfigs)
                         setupTransitSourcesAndLayers(style, transitSources, transitConfigs, clusterConfig)
                     }
+                }
 
-                    // 2. Setup User Location Puck if enabled
+                // 3. Location Puck & Map Gestures/Camera Listeners (chỉ khởi tạo 1 lần theo showUserLocation)
+                MapEffect(showUserLocation) { mapView ->
+                    val mapboxMap = mapView.mapboxMap
+
+                    // 3.1 Setup User Location Puck if enabled
                     var indicatorListener: OnIndicatorPositionChangedListener? = null
                     if (showUserLocation) {
                         val locationPlugin = mapView.location
@@ -153,28 +174,31 @@ fun TransitStopsMapScreen(
                         }
                         indicatorListener = OnIndicatorPositionChangedListener { point ->
                             val loc = point.toLocationData()
-                            userLocationData = loc
+                            userLocationRef.set(loc)
                             val centerLoc = mapboxMap.cameraState.center.toLocationData()
-                            isCameraFocusedOnUserLocation = centerLoc.distanceTo(loc) < distanceThreshold
+                            val isNear = centerLoc.distanceTo(loc) < distanceThreshold
+                            if (isCameraFocusedOnUserLocation != isNear) {
+                                isCameraFocusedOnUserLocation = isNear
+                            }
                             currentOnLocationUpdate?.invoke(loc)
                         }
                         locationPlugin.addOnIndicatorPositionChangedListener(indicatorListener)
                     }
 
-                    // 3. Register Map Click Listener for clusters & stops
+                    // 3.2 Register Map Click Listener for clusters & stops
                     val clickListener = OnMapClickListener { point ->
                         val screenCoordinate = mapboxMap.pixelForCoordinate(point)
                         handleMapClick(
                             mapboxMap = mapboxMap,
                             screenCoordinate = screenCoordinate,
                             clickPoint = point,
-                            transitConfigs = transitConfigs,
+                            transitConfigs = currentTransitConfigs,
                             onStopClick = { currentOnStopClick?.invoke(it) },
                             onClusterClick = { clusterPoint, expansionZoom ->
                                 mapViewportState.flyTo(
                                     cameraOptions {
                                         center(clusterPoint)
-                                        zoom(expansionZoom + 0.5)
+                                        zoom(expansionZoom + 2)
                                     },
                                     MapAnimationOptions.mapAnimationOptions {
                                         duration(500)
@@ -188,7 +212,7 @@ fun TransitStopsMapScreen(
                     }
                     mapView.gestures.addOnMapClickListener(clickListener)
 
-                    // 4. Register Long Click and Move Listeners for drag release
+                    // 3.3 Register Long Click and Move Listeners for drag release
                     var isLongPressActive = false
 
                     val longClickListener = OnMapLongClickListener { point ->
@@ -216,13 +240,16 @@ fun TransitStopsMapScreen(
                     }
                     mapView.gestures.addOnMoveListener(moveListener)
 
-                    // 5. Register Camera change listener to notify viewport changes
+                    // 3.4 Register Camera change listener to notify viewport changes
                     val cameraChangedCallback = CameraChangedCallback {
                         val cameraState = mapboxMap.cameraState
                         val cameraCenterLoc = cameraState.center.toLocationData()
-                        val uLoc = userLocationData
+                        val uLoc = userLocationRef.get()
                         if (uLoc != null) {
-                            isCameraFocusedOnUserLocation = cameraCenterLoc.distanceTo(uLoc) < 15f
+                            val isNear = cameraCenterLoc.distanceTo(uLoc) < 15f
+                            if (isCameraFocusedOnUserLocation != isNear) {
+                                isCameraFocusedOnUserLocation = isNear
+                            }
                         }
                         val viewportInfo = mapboxMap.getCurrentViewportInfo()
                         currentOnViewportChanged?.invoke(viewportInfo)

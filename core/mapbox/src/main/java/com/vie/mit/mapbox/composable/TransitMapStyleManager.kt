@@ -33,7 +33,7 @@ fun setupTransitIcons(
     transitConfigs: List<TransitTypeConfig>,
 ) {
     transitConfigs.forEach { config ->
-        if (!style.styleSourceExists(config.iconName)) {
+        if (style.getStyleImage(config.iconName) == null) {
             val bitmap = bitmapFromDrawableRes(context, config.iconResId)
             if (bitmap != null) {
                 style.addImage(config.iconName, bitmap)
@@ -64,19 +64,21 @@ fun setupTransitSourcesAndLayers(
         val stopSymbolLayerId = getStopSymbolLayerIdForType(sourceData.typeId)
 
         // 1. Add or Update GeoJsonSource
-        val existingSource = style.getSourceAs<GeoJsonSource>(sourceId)
-        if (existingSource != null) {
-            existingSource.data(sourceData.geoJson)
-            Timber.d("TransitMapStyleManager: updated data for GeoJsonSource '$sourceId'")
-        } else {
-            val newSource = geoJsonSource(sourceId) {
-                data(sourceData.geoJson)
-                cluster(true)
-                clusterRadius(clusterConfig.clusterRadius)
-                clusterMaxZoom(clusterConfig.clusterMaxZoom)
+        if (sourceData.geoJson.isNotBlank()) {
+            val existingSource = style.getSourceAs<GeoJsonSource>(sourceId)
+            if (existingSource != null) {
+                existingSource.data(sourceData.geoJson)
+                Timber.d("TransitMapStyleManager: updated data for GeoJsonSource '$sourceId'")
+            } else {
+                val newSource = geoJsonSource(sourceId) {
+                    data(sourceData.geoJson)
+                    cluster(true)
+                    clusterRadius(clusterConfig.clusterRadius)
+                    clusterMaxZoom(clusterConfig.clusterMaxZoom)
+                }
+                style.addSource(newSource)
+                Timber.d("TransitMapStyleManager: added GeoJsonSource '$sourceId' with clustering")
             }
-            style.addSource(newSource)
-            Timber.d("TransitMapStyleManager: added GeoJsonSource '$sourceId' with clustering")
         }
 
         val targetVisibility = if (sourceData.isVisible) Visibility.VISIBLE else Visibility.NONE
@@ -145,9 +147,10 @@ fun handleMapClick(
     onStopClick: (StopFeatureClick) -> Unit,
     onClusterClick: (Point, Double) -> Unit,
 ) {
-    val clusterLayerIds = transitConfigs.map { getClusterCircleLayerIdForType(it.typeId) }
+    val clusterCircleLayerIds = transitConfigs.map { getClusterCircleLayerIdForType(it.typeId) }
+    val clusterCountLayerIds = transitConfigs.map { getClusterCountLayerIdForType(it.typeId) }
     val stopLayerIds = transitConfigs.map { getStopSymbolLayerIdForType(it.typeId) }
-    val allLayerIds = clusterLayerIds + stopLayerIds
+    val allLayerIds = clusterCircleLayerIds + clusterCountLayerIds + stopLayerIds
 
     val queryOptions = RenderedQueryOptions(allLayerIds, null)
     val queryGeometry = RenderedQueryGeometry(screenCoordinate)
@@ -161,11 +164,19 @@ fun handleMapClick(
 
         // Check if a cluster was clicked
         if (topFeature.hasNonNullValueForProperty("point_count")) {
-            val matchingConfig = transitConfigs.find { getClusterCircleLayerIdForType(it.typeId) == topLayerId }
+            val matchingConfig = transitConfigs.find {
+                getClusterCircleLayerIdForType(it.typeId) == topLayerId ||
+                getClusterCountLayerIdForType(it.typeId) == topLayerId
+            }
             val sourceId = getSourceIdForType(matchingConfig?.typeId ?: "")
 
             mapboxMap.getGeoJsonClusterExpansionZoom(sourceId, topFeature) { zoomResult ->
-                val expansionZoom = zoomResult.value?.toString()?.toDoubleOrNull()
+                val featureExtensionValue = zoomResult.value
+                val bindgenValue = featureExtensionValue?.value
+                val rawContent = bindgenValue?.contents
+                val expansionZoom = (rawContent as? Number)?.toDouble()
+                    ?: bindgenValue?.toString()?.toDoubleOrNull()
+
                 val centerPoint = (topFeature.geometry() as? Point) ?: clickPoint
                 if (expansionZoom != null) {
                     onClusterClick(centerPoint, expansionZoom)
