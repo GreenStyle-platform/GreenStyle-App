@@ -59,15 +59,45 @@ class CustomBottomSheetState(
     val expandProgress: Float
         get() {
             if (totalHeightPx <= 0f) return 0f
-            val partialOffset =
+            val partialOffset: Float =
                 anchoredState.anchors.positionOf(CustomBottomSheetValue.PartiallyExpanded)
-            val expandedOffset = anchoredState.anchors.positionOf(CustomBottomSheetValue.Expanded)
+            val expandedOffset: Float =
+                anchoredState.anchors.positionOf(CustomBottomSheetValue.Expanded)
             if (partialOffset.isNaN() || expandedOffset.isNaN()) return 0f
             val range = partialOffset - expandedOffset
             if (range <= 0f) return 0f
             val currentOffset = offset
             if (currentOffset.isNaN()) return 0f
             return ((partialOffset - currentOffset) / range).coerceIn(0f, 1f)
+        }
+
+    /**
+     * Visible height in pixels of the content above the BottomSheet.
+     * When Hidden or offset is NaN, returns totalHeightPx (full screen).
+     */
+    val visibleTopHeightPx: Float
+        get() {
+            val currentOffset = offset
+            return if (currentOffset.isNaN() || currentValue == CustomBottomSheetValue.Hidden) {
+                totalHeightPx
+            } else {
+                currentOffset.coerceIn(0f, totalHeightPx)
+            }
+        }
+
+    /**
+     * Progress (0f..1f) when sheet is dragged down past PartiallyExpanded towards Peeked/Hidden.
+     */
+    val dragDownFromPartialProgress: Float
+        get() {
+            if (totalHeightPx <= 0f) return 0f
+            val partialOffset = anchoredState.anchors.positionOf(CustomBottomSheetValue.PartiallyExpanded)
+            val peekOffset = anchoredState.anchors.positionOf(CustomBottomSheetValue.Peeked)
+            if (partialOffset.isNaN() || peekOffset.isNaN()) return 0f
+            val currentOffset = offset
+            if (currentOffset.isNaN() || currentOffset <= partialOffset) return 0f
+            val range = peekOffset - partialOffset
+            return if (range > 0f) ((currentOffset - partialOffset) / range).coerceIn(0f, 1f) else 0f
         }
 
     /**
@@ -80,6 +110,7 @@ class CustomBottomSheetState(
         this.totalHeightPx = totalHeightPx
         val newAnchors = DraggableAnchors {
             CustomBottomSheetValue.Hidden at totalHeightPx
+            CustomBottomSheetValue.Peeked at totalHeightPx * (1f - config.minSheetRatio)
             CustomBottomSheetValue.PartiallyExpanded at totalHeightPx * (1f - config.initialPeekRatio)
             CustomBottomSheetValue.Expanded at totalHeightPx * (1f - config.maxExpandedRatio)
         }
@@ -94,6 +125,10 @@ class CustomBottomSheetState(
         anchoredState.animateTo(
             CustomBottomSheetValue.PartiallyExpanded
         )
+    }
+
+    suspend fun peek() {
+        anchoredState.animateTo(CustomBottomSheetValue.Peeked)
     }
 
     suspend fun hide() {

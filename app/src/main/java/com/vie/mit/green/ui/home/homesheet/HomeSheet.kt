@@ -71,7 +71,7 @@ import com.vie.mit.mapbox.model.StopFeatureClick
  * Hiển thị thanh tìm kiếm, lưới phương tiện công cộng, và tiện ích.
  */
 @Composable
-internal fun HomeSheetContent(
+internal fun HomeSheet(
     activeTransitTypes: Set<String>,
     onToggleTransitType: (String) -> Unit,
     modifier: Modifier = Modifier,
@@ -84,7 +84,7 @@ internal fun HomeSheetContent(
 ) {
     Column(
         modifier = modifier
-            .fillMaxWidth()
+            .fillMaxSize()
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 16.dp, vertical = 8.dp)
     ) {

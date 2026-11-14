@@ -10,7 +10,7 @@ import androidx.navigation.toRoute
 import com.vie.mit.green.navigation.main_graph.HomeSheetRoute
 import com.vie.mit.green.navigation.main_graph.NearbyStopsSheetRoute
 import com.vie.mit.green.navigation.main_graph.StopDetailSheetRoute
-import com.vie.mit.green.ui.home.homesheet.HomeSheetContent
+import com.vie.mit.green.ui.home.homesheet.HomeSheet
 import com.vie.mit.green.ui.home.homesheet.HomeSheetUiState
 import com.vie.mit.green.ui.home.homesheet.NearbyStopsSheetContent
 
@@ -32,7 +32,7 @@ fun SheetNavHost(
         modifier = modifier.fillMaxWidth(),
     ) {
         composable<HomeSheetRoute> {
-            HomeSheetContent(
+            HomeSheet(
                 activeTransitTypes = uiState.activeTransitTypes,
                 onToggleTransitType = homeContainerViewModel::toggleTransitType,
             )

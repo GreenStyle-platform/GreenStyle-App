@@ -12,9 +12,9 @@ import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -38,7 +38,8 @@ fun CommonScreenBottomSheet(
     initState: CustomBottomSheetState = rememberCustomBottomSheetState(),
     config: BottomSheetConfig = BottomSheetConfig(),
     backgroundContent: @Composable (mapTransform: MapTransform) -> Unit,
-    sheetContent: @Composable () -> Unit
+    sheetContent: @Composable () -> Unit,
+    
 ) {
     BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
         val density = LocalDensity.current
@@ -48,32 +49,6 @@ fun CommonScreenBottomSheet(
         SideEffect {
             initState.updateAnchors(totalHeightPx, config)
         }
-
-        val sheetFraction = initState.sheetFraction
-
-        // Compute MapTransform for the background content
-        val mapTransform = run {
-            // Scale: 1.0 when sheet <= mapScaleLimitRatio, shrinks to 0.85 as sheet reaches maxExpandedRatio
-            val scaleProgress = if (sheetFraction > config.mapScaleLimitRatio) {
-                val range = config.maxExpandedRatio - config.mapScaleLimitRatio
-                if (range > 0f) ((sheetFraction - config.mapScaleLimitRatio) / range).coerceIn(0f, 1f)
-                else 0f
-            } else 0f
-            val scale = 1f - (scaleProgress * 0.15f) // 1.0 -> 0.85
-
-            // TranslationY: negative shift proportional to expand progress
-            val translationY = -(initState.expandProgress * totalHeightPx * 0.05f)
-
-            // HeightFraction: portion of the screen NOT covered by the sheet
-            val heightFraction = (1f - sheetFraction).coerceIn(0f, 1f)
-
-            MapTransform(
-                scale = scale,
-                translationY = translationY,
-                heightFraction = heightFraction
-            )
-        }
-
         // NestedScrollConnection liên kết giữa scrollable content bên trong và BottomSheet
         val nestedScrollConnection = remember(initState.anchoredState) {
             object : NestedScrollConnection {
@@ -127,43 +102,43 @@ fun CommonScreenBottomSheet(
             }
         }
 
-        // Background content (e.g. map) — full screen with graphicsLayer transform
+        // Background content (e.g. map) — full screen at background, zero layout resize for max performance
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .graphicsLayer {
-                    scaleX = mapTransform.scale
-                    scaleY = mapTransform.scale
-                    this.translationY = mapTransform.translationY
-                }
+                .align(Alignment.TopCenter)
         ) {
-            backgroundContent(mapTransform)
+            backgroundContent(
+                MapTransform(
+                    scale = 1f,
+                    translationY = 0f,
+                    heightFraction = initState.sheetFraction,
+                )
+            )
         }
 
         // Sheet container with anchored draggable and nested scroll connection
         Box(
-            modifier = Modifier
-                .fillMaxSize()
-
+            modifier = Modifier.fillMaxSize()
         ) {
-            val currentOffset = initState.offset
-            if (!currentOffset.isNaN()) {
-                Surface(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .offset { IntOffset(0, currentOffset.roundToInt()) }
-                        .nestedScroll(nestedScrollConnection)
-                        .anchoredDraggable(
-                            state = initState.anchoredState,
-                            orientation = Orientation.Vertical
-                        ),
-                    shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
-
-                    color = AppTheme.colors.primary,
-                    shadowElevation = 8.dp
-                ) {
-                        sheetContent()
-                }
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .offset {
+                        val offset = initState.offset
+                        val y = if (offset.isNaN()) totalHeightPx.roundToInt() else offset.roundToInt()
+                        IntOffset(0, y)
+                    }
+                    .nestedScroll(nestedScrollConnection)
+                    .anchoredDraggable(
+                        state = initState.anchoredState,
+                        orientation = Orientation.Vertical
+                    ),
+                shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+                color = AppTheme.colors.primary,
+                shadowElevation = 8.dp
+            ) {
+                sheetContent()
             }
         }
     }

@@ -20,10 +20,18 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.foundation.layout.offset
+import androidx.compose.ui.unit.IntOffset
+import androidx.navigation.compose.currentBackStackEntryAsState
+import com.vie.mit.common.screenbottomsheet.BottomSheetConfig
+import com.vie.mit.common.screenbottomsheet.CustomBottomSheetValue
+import kotlin.math.roundToInt
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -36,6 +44,7 @@ import androidx.navigation.compose.rememberNavController
 import com.mapbox.maps.extension.compose.animation.viewport.rememberMapViewportState
 import com.vie.mit.common.screenbottomsheet.CommonScreenBottomSheet
 import com.vie.mit.common.screenbottomsheet.rememberCustomBottomSheetState
+import com.vie.mit.common.theme.AppTheme
 import com.vie.mit.green.ui.home.homesheet.StopDetailFloatingCard
 import com.vie.mit.mapbox.composable.TransitStopsMapScreen
 import com.vie.mit.mapbox.util.focusUserLocationBoundingBox
@@ -59,6 +68,43 @@ fun HomeContainerScreen(
     val sheetNavController = rememberNavController()
     val bottomSheetState = rememberCustomBottomSheetState()
 
+    // Cấu hình động BottomSheetConfig cho từng Sheet route bên trong SheetNavHost
+    val currentBackStackEntry by sheetNavController.currentBackStackEntryAsState()
+    val currentRoute = currentBackStackEntry?.destination?.route
+    val sheetConfig = remember(currentRoute) {
+        when {
+            currentRoute?.contains("HomeSheetRoute") == true -> BottomSheetConfig(
+                initialPeekRatio = 0.35f,
+                minSheetRatio = 0.15f,
+                maxExpandedRatio = 0.85f,
+            )
+            currentRoute?.contains("NearbyStopsSheetRoute") == true -> BottomSheetConfig(
+                initialPeekRatio = 0.60f,
+                minSheetRatio = 0.20f,
+                maxExpandedRatio = 0.95f,
+            )
+            currentRoute?.contains("StopDetailSheetRoute") == true -> BottomSheetConfig(
+                initialPeekRatio = 0.45f,
+                minSheetRatio = 0.20f,
+                maxExpandedRatio = 0.85f,
+            )
+            else -> BottomSheetConfig()
+        }
+    }
+
+    // Phương pháp 2: Chiều cao padding đáy của Mapbox Camera tương ứng với chiều cao của BottomSheet.
+    // Khi BottomSheet hạ xuống (qua PartiallyExpanded tới Peeked/Hidden), cameraBottomPadding giảm,
+    // Mapbox Camera tự động mở rộng vùng hiển thị và giữ vững tâm toạ độ địa lý.
+    val cameraBottomPadding by remember(bottomSheetState) {
+        derivedStateOf {
+            if (bottomSheetState.currentValue == CustomBottomSheetValue.Hidden) {
+                0f
+            } else {
+                bottomSheetState.sheetHeightPx
+            }
+        }
+    }
+
     // Focus vị trí người dùng 1 lần duy nhất khi mở màn hình lần đầu
     var hasFocusedInitialLocation by rememberSaveable { mutableStateOf(false) }
 
@@ -75,33 +121,32 @@ fun HomeContainerScreen(
         }
     }
 
+    // Khi người dùng chạm bản đồ (isMapFocused), hạ sheet xuống trạng thái Peeked để xem bản đồ
+    LaunchedEffect(uiState.isMapFocused) {
+        if (uiState.isMapFocused) {
+            bottomSheetState.peek()
+        }
+    }
+
     CommonScreenBottomSheet(
         initState = bottomSheetState,
-        backgroundContent = { mapTransform ->
+        config = sheetConfig,
+        backgroundContent = { _ ->
             Box(modifier = Modifier.fillMaxSize()) {
-                // 1. Mapbox dùng chung — Single Instance
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .graphicsLayer {
-                            scaleX = mapTransform.scale
-                            scaleY = mapTransform.scale
-                            transformOrigin = TransformOrigin(0.5f, 0.5f)
-                        }
-                ) {
-                    TransitStopsMapScreen(
-                        modifier = Modifier.fillMaxSize(),
-                        transitSources = uiState.transitSources,
-                        transitConfigs = uiState.transitConfigs,
-                        mapViewportState = mapViewportState,
-                        showUserLocation = true,
-                        onLocationUpdate = homeContainerViewModel::onLocationUpdated,
-                        onStopClick = homeContainerViewModel::onStopClicked,
-                        onMapClick = { homeContainerViewModel.onMapClick() },
-                        onViewportChanged = homeContainerViewModel::onViewportChanged,
-                        onCameraGestureRelease = homeContainerViewModel::onCameraGestureRelease,
-                    )
-                }
+                // 1. Mapbox dùng chung — Single Instance (Phương pháp 2: Camera Padding)
+                TransitStopsMapScreen(
+                    modifier = Modifier.fillMaxSize(),
+                    transitSources = uiState.transitSources,
+                    transitConfigs = uiState.transitConfigs,
+                    mapViewportState = mapViewportState,
+                    showUserLocation = true,
+                    cameraBottomPadding = cameraBottomPadding,
+                    onLocationUpdate = homeContainerViewModel::onLocationUpdated,
+                    onStopClick = homeContainerViewModel::onStopClicked,
+                    onMapClick = { homeContainerViewModel.onMapClick() },
+                    onViewportChanged = homeContainerViewModel::onViewportChanged,
+                    onCameraGestureRelease = homeContainerViewModel::onCameraGestureRelease,
+                )
 
                 // 2. Top-Left Floating Settings Button
                 Surface(
@@ -111,20 +156,20 @@ fun HomeContainerScreen(
                     shadowElevation = 6.dp,
                     modifier = Modifier
                         .align(Alignment.TopStart)
-                        .padding(top = 44.dp, start = 16.dp)
-                        .size(44.dp)
+                        .padding(top = 48.dp, start = 16.dp)
+                        .size(40.dp)
                 ) {
                     Box(contentAlignment = Alignment.Center) {
                         Icon(
                             imageVector = Icons.Default.Settings,
                             contentDescription = "Settings",
-                            tint = Color(0xFF333333),
+                            tint = AppTheme.colors.black,
                             modifier = Modifier.size(24.dp)
                         )
                     }
                 }
 
-                // 3. Floating "My Location" Button
+                // 3. Floating "My Location" Button (di chuyển mượt theo mép sheet không recompose)
                 uiState.currentLocation?.let { location ->
                     FloatingActionButton(
                         onClick = {
@@ -136,23 +181,20 @@ fun HomeContainerScreen(
                             )
                         },
                         shape = CircleShape,
-                        containerColor = MaterialTheme.colorScheme.surface,
+                        containerColor = AppTheme.colors.white,
                         contentColor = MaterialTheme.colorScheme.primary,
                         modifier = Modifier
                             .align(Alignment.BottomEnd)
-                            .padding(
-                                bottom = with(bottomSheetState) {
-                                    val heightDp = sheetHeightPx / 2.625f // ~dp approximation
-                                    (heightDp / 1f).dp.coerceAtLeast(260.dp) + 16.dp
-                                },
-                                end = 16.dp
-                            )
+                            .padding(end = 16.dp, bottom = 16.dp)
+                            .offset {
+                                IntOffset(0, -bottomSheetState.sheetHeightPx.roundToInt())
+                            }
                             .size(48.dp)
                     ) {
                         Icon(
                             imageVector = Icons.Default.MyLocation,
                             contentDescription = "My Location",
-                            modifier = Modifier.size(22.dp)
+                            modifier = Modifier.size(20.dp)
                         )
                     }
                 }
@@ -165,7 +207,7 @@ fun HomeContainerScreen(
                         shadowElevation = 4.dp,
                         modifier = Modifier
                             .align(Alignment.TopCenter)
-                            .padding(top = 44.dp)
+                            .padding(top = 40.dp)
                     ) {
                         Row(
                             modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
@@ -190,12 +232,12 @@ fun HomeContainerScreen(
                     StopDetailFloatingCard(
                         stop = stop,
                         onClose = homeContainerViewModel::dismissStopDetail,
-                        modifier = Modifier.align(Alignment.BottomCenter).padding(
-                                bottom = with(bottomSheetState) {
-                                    val heightDp = sheetHeightPx / 2.625f
-                                    (heightDp / 1f).dp.coerceAtLeast(260.dp) + 16.dp
-                                }, start = 16.dp, end = 16.dp
-                            )
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .padding(start = 16.dp, end = 16.dp, bottom = 16.dp)
+                            .offset {
+                                IntOffset(0, -bottomSheetState.sheetHeightPx.roundToInt())
+                            }
                     )
                 }
             }

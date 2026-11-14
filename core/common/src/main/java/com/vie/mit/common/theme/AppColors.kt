@@ -22,7 +22,9 @@ data class AppColors(
     val isLight: Boolean = true,
     val navyBlue: Color,
     val overlayColor: Color,
-    val backgroundGreenCard: Color
+    val backgroundGreenCard: Color,
+    val black: Color,
+    val white: Color
 )
 
 fun lightAppColors(): AppColors = AppColors(
@@ -43,5 +45,7 @@ fun lightAppColors(): AppColors = AppColors(
     isLight = true,
     navyBlue = NavyBlue,
     overlayColor = OverlayColor,
-    backgroundGreenCard = GreenBackgroundCard
+    backgroundGreenCard = GreenBackgroundCard,
+    black = Color.Black,
+    white = Color.White
 )

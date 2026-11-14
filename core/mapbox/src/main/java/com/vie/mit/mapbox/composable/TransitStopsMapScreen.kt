@@ -4,6 +4,10 @@ import android.Manifest
 import android.content.pm.PackageManager
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.offset
+import androidx.compose.ui.unit.IntOffset
+import kotlin.math.roundToInt
+import com.mapbox.maps.EdgeInsets
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -63,6 +67,7 @@ fun TransitStopsMapScreen(
     clusterConfig: TransitClusterConfig = remember { TransitClusterConfig() },
     showUserLocation: Boolean = true,
     showCenterPin: Boolean = true,
+    cameraBottomPadding: Float = 0f,
     centerPinContent: (@Composable () -> Unit)? = null,
     onLocationUpdate: ((LocationData) -> Unit)? = null,
     onStopClick: ((StopFeatureClick) -> Unit)? = null,
@@ -107,6 +112,25 @@ fun TransitStopsMapScreen(
                 modifier = Modifier.fillMaxSize(),
                 mapViewportState = mapViewportState,
             ) {
+                // Đồng bộ Camera Bottom Padding (Phương pháp 2: Mapbox EdgeInsets)
+                MapEffect(cameraBottomPadding) { mapView ->
+                    val mapboxMap = mapView.mapboxMap
+                    val currentCamera = mapboxMap.cameraState
+                    val targetBottom = cameraBottomPadding.toDouble().coerceAtLeast(0.0)
+                    if (Math.abs(currentCamera.padding.bottom - targetBottom) >= 2.0) {
+                        val currentCenter = currentCamera.center
+                        mapboxMap.setCamera(
+                            cameraOptions {
+                                center(currentCenter)
+                                zoom(currentCamera.zoom)
+                                pitch(currentCamera.pitch)
+                                bearing(currentCamera.bearing)
+                                padding(EdgeInsets(0.0, 0.0, targetBottom, 0.0))
+                            }
+                        )
+                    }
+                }
+
                 MapEffect(transitSources, transitConfigs, clusterConfig, showUserLocation) { mapView ->
                     val mapboxMap = mapView.mapboxMap
 
@@ -219,10 +243,13 @@ fun TransitStopsMapScreen(
                 }
             }
 
-            // 6. Center pin overlay fixed at map camera center (hidden when camera is focused on user location puck)
+            // 6. Center pin overlay fixed at map camera center (offset theo cameraBottomPadding để luôn ở tâm)
             MapCenterPin(
                 showPin = showCenterPin && !isCameraFocusedOnUserLocation,
                 customContent = centerPinContent,
+                modifier = Modifier.offset {
+                    IntOffset(0, -((cameraBottomPadding / 2f).roundToInt()))
+                }
             )
         }
     }

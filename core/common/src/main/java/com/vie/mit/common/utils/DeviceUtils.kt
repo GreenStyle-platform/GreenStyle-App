@@ -2,6 +2,7 @@ package com.vie.mit.common.utils
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.content.res.Resources
 import android.os.Build
 import android.provider.Settings
 import android.view.WindowManager
@@ -40,6 +41,7 @@ data class DeviceInfo(
  * - Device ID (Android ID)
  * - Mật độ điểm ảnh (density, densityDpi, scaledDensity)
  * - Chiều rộng, chiều dài màn hình (pixel và dp)
+ * - Chuyển đổi qua lại giữa dp, px và sp
  * - Thông số phần cứng và hệ điều hành (brand, model, manufacturer, sdkInt,...)
  */
 object DeviceUtils {
@@ -125,6 +127,77 @@ object DeviceUtils {
         } else {
             context.resources.configuration.screenHeightDp
         }
+    }
+
+    /**
+     * Chuyển đổi từ DP sang Pixel (px) dạng Float với mật độ điểm ảnh (density) cho trước.
+     */
+    fun dpToPx(density: Float, dp: Float): Float {
+        return dp * density
+    }
+
+    /**
+     * Chuyển đổi từ DP sang Pixel (px) dạng Int (làm tròn) với mật độ điểm ảnh (density) cho trước.
+     */
+    fun dpToPx(density: Float, dp: Int): Int {
+        return (dp * density).roundToInt()
+    }
+
+    /**
+     * Chuyển đổi từ Pixel (px) sang DP dạng Float với mật độ điểm ảnh (density) cho trước.
+     */
+    fun pxToDp(density: Float, px: Float): Float {
+        return if (density > 0f) px / density else 0f
+    }
+
+    /**
+     * Chuyển đổi từ Pixel (px) sang DP dạng Int (làm tròn) với mật độ điểm ảnh (density) cho trước.
+     */
+    fun pxToDp(density: Float, px: Int): Int {
+        return if (density > 0f) (px / density).roundToInt() else 0
+    }
+
+    /**
+     * Chuyển đổi từ DP sang Pixel (px) dạng Float.
+     */
+    fun dpToPx(context: Context, dp: Float): Float {
+        return dpToPx(getScreenDensity(context), dp)
+    }
+
+    /**
+     * Chuyển đổi từ DP sang Pixel (px) dạng Int (làm tròn).
+     */
+    fun dpToPx(context: Context, dp: Int): Int {
+        return dpToPx(getScreenDensity(context), dp)
+    }
+
+    /**
+     * Chuyển đổi từ Pixel (px) sang DP dạng Float.
+     */
+    fun pxToDp(context: Context, px: Float): Float {
+        return pxToDp(getScreenDensity(context), px)
+    }
+
+    /**
+     * Chuyển đổi từ Pixel (px) sang DP dạng Int (làm tròn).
+     */
+    fun pxToDp(context: Context, px: Int): Int {
+        return pxToDp(getScreenDensity(context), px)
+    }
+
+    /**
+     * Chuyển đổi từ SP sang Pixel (px) dạng Float (cho font size).
+     */
+    fun spToPx(context: Context, sp: Float): Float {
+        return sp * getScreenScaledDensity(context)
+    }
+
+    /**
+     * Chuyển đổi từ Pixel (px) sang SP dạng Float (cho font size).
+     */
+    fun pxToSp(context: Context, px: Float): Float {
+        val scaledDensity = getScreenScaledDensity(context)
+        return if (scaledDensity > 0f) px / scaledDensity else 0f
     }
 
     /**
@@ -227,6 +300,36 @@ val Context.screenHeightDp: Int
     get() = DeviceUtils.getScreenHeightDp(this)
 
 /**
+ * Chuyển đổi từ DP sang Pixel (px) dạng Float.
+ */
+fun Context.dpToPx(dp: Float): Float = DeviceUtils.dpToPx(this, dp)
+
+/**
+ * Chuyển đổi từ DP sang Pixel (px) dạng Int (làm tròn).
+ */
+fun Context.dpToPx(dp: Int): Int = DeviceUtils.dpToPx(this, dp)
+
+/**
+ * Chuyển đổi từ Pixel (px) sang DP dạng Float.
+ */
+fun Context.pxToDp(px: Float): Float = DeviceUtils.pxToDp(this, px)
+
+/**
+ * Chuyển đổi từ Pixel (px) sang DP dạng Int (làm tròn).
+ */
+fun Context.pxToDp(px: Int): Int = DeviceUtils.pxToDp(this, px)
+
+/**
+ * Chuyển đổi từ SP sang Pixel (px) dạng Float.
+ */
+fun Context.spToPx(sp: Float): Float = DeviceUtils.spToPx(this, sp)
+
+/**
+ * Chuyển đổi từ Pixel (px) sang SP dạng Float.
+ */
+fun Context.pxToSp(px: Float): Float = DeviceUtils.pxToSp(this, px)
+
+/**
  * Lấy thông tin chi tiết màn hình [ScreenInfo].
  */
 val Context.screenInfo: ScreenInfo
@@ -237,3 +340,57 @@ val Context.screenInfo: ScreenInfo
  */
 val Context.deviceInfo: DeviceInfo
     get() = DeviceUtils.getDeviceInfo(this)
+
+// =============================================================================
+// Extension functions & properties on Int & Float (dp / px / sp conversion)
+// =============================================================================
+
+/**
+ * Chuyển đổi Int (dp) sang Pixel (px) dạng Int dùng [Context].
+ */
+fun Int.dpToPx(context: Context): Int = DeviceUtils.dpToPx(context, this)
+
+/**
+ * Chuyển đổi Float (dp) sang Pixel (px) dạng Float dùng [Context].
+ */
+fun Float.dpToPx(context: Context): Float = DeviceUtils.dpToPx(context, this)
+
+/**
+ * Chuyển đổi Int (px) sang DP dạng Int dùng [Context].
+ */
+fun Int.pxToDp(context: Context): Int = DeviceUtils.pxToDp(context, this)
+
+/**
+ * Chuyển đổi Float (px) sang DP dạng Float dùng [Context].
+ */
+fun Float.pxToDp(context: Context): Float = DeviceUtils.pxToDp(context, this)
+
+/**
+ * Extension thuộc tính chuyển Float (dp) sang Pixel (px) dạng Float sử dụng DisplayMetrics hệ thống.
+ */
+val Float.dpPx: Float
+    get() = this * Resources.getSystem().displayMetrics.density
+
+/**
+ * Extension thuộc tính chuyển Int (dp) sang Pixel (px) dạng Int sử dụng DisplayMetrics hệ thống.
+ */
+val Int.dpPx: Int
+    get() = (this * Resources.getSystem().displayMetrics.density).roundToInt()
+
+/**
+ * Extension thuộc tính chuyển Float (px) sang DP dạng Float sử dụng DisplayMetrics hệ thống.
+ */
+val Float.pxDp: Float
+    get() {
+        val density = Resources.getSystem().displayMetrics.density
+        return if (density > 0f) this / density else 0f
+    }
+
+/**
+ * Extension thuộc tính chuyển Int (px) sang DP dạng Int sử dụng DisplayMetrics hệ thống.
+ */
+val Int.pxDp: Int
+    get() {
+        val density = Resources.getSystem().displayMetrics.density
+        return if (density > 0f) (this / density).roundToInt() else 0
+    }
