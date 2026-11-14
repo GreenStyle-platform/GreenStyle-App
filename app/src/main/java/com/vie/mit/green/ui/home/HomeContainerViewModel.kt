@@ -11,6 +11,7 @@ import com.vie.mit.mapbox.model.TransitMapViewportInfo
 import com.vie.mit.mapbox.model.TransitSourceData
 import com.vie.mit.mapbox.model.distanceTo
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -21,6 +22,7 @@ import kotlinx.coroutines.launch
 import org.json.JSONObject
 import timber.log.Timber
 import javax.inject.Inject
+import kotlin.time.Duration.Companion.milliseconds
 
 @HiltViewModel
 class HomeContainerViewModel @Inject constructor(
@@ -36,6 +38,12 @@ class HomeContainerViewModel @Inject constructor(
     private var cachedBounds: TransitMapViewportInfo? = null
     private var lastLoadedZoom: Double = 0.0
     private var debounceLoadJob: Job? = null
+    private var fetchTransitDataJob: Job? = null
+    private var computeNearbyStopsJob: Job? = null
+    private var lastKnownLocation: LocationData? = null
+    private var currentMapCenter: LocationData? = null
+    private var hasLoadedInitialLocation: Boolean = false
+    private var isNearbySheetVisible: Boolean = false
 
     companion object {
         private const val MIN_ZOOM_THRESHOLD = 11.0
@@ -45,47 +53,61 @@ class HomeContainerViewModel @Inject constructor(
 
     /**
      * Called when the user's GPS location is first acquired or updated.
+     * Caches the latest location without triggering continuous recomposition.
+     * Only updates UI State on the very first fix to initialize data.
      */
     fun onLocationUpdated(location: LocationData) {
-        _uiState.update { currentState ->
-            val mapCenter = currentState.currentMapCenter ?: location
-            val updatedState = currentState.copy(
-                currentLocation = location,
-                currentMapCenter = mapCenter,
-            )
-            updatedState.copy(
-                nearbyStops = computeNearbyStops(updatedState.transitSources, mapCenter, updatedState.selectedRadiusKm)
-            )
-        }
+        lastKnownLocation = location
 
-        // Initial load based on user location if we haven't loaded any data yet
-        if (cachedBounds == null) {
-            val delta = 0.025 // ~2.5km radius bounding box
-            val initialBounds = TransitMapViewportInfo(
-                minLatitude = location.latitude - delta,
-                minLongitude = location.longitude - delta,
-                maxLatitude = location.latitude + delta,
-                maxLongitude = location.longitude + delta,
-                zoom = 14.0,
-                centerLatitude = location.latitude,
-                centerLongitude = location.longitude,
+        if (!hasLoadedInitialLocation) {
+            hasLoadedInitialLocation = true
+            _uiState.update { currentState ->
+                currentState.copy(
+                    currentLocation = location,
+                )
+            }
+
+            // Initial load based on user location if we haven't loaded any data yet
+            if (cachedBounds == null) {
+                val delta = 0.025 // ~2.5km radius bounding box
+                val initialBounds = TransitMapViewportInfo(
+                    minLatitude = location.latitude - delta,
+                    minLongitude = location.longitude - delta,
+                    maxLatitude = location.latitude + delta,
+                    maxLongitude = location.longitude + delta,
+                    zoom = 14.0,
+                    centerLatitude = location.latitude,
+                    centerLongitude = location.longitude,
+                )
+                loadTransitStopsData(initialBounds)
+            }
+        }
+    }
+
+    /**
+     * Returns the latest cached GPS location.
+     */
+    fun getLastKnownLocation(): LocationData? = lastKnownLocation
+
+    /**
+     * Updates user location on-demand (e.g. when clicking My Location button).
+     */
+    fun onUserLocationButtonClicked(location: LocationData) {
+        _uiState.update { currentState ->
+            currentState.copy(
+                currentLocation = location,
             )
-            triggerDataLoad(initialBounds)
         }
     }
 
     /**
      * Evaluates camera movement and determines whether new data is needed.
      * Prevents unnecessary reloads when zooming in or panning within cached bounds.
+     * Updates [currentMapCenter] directly from MapView camera state as Single Source of Truth.
      */
     fun onViewportChanged(viewport: TransitMapViewportInfo) {
-        val centerLocation = LocationData(viewport.centerLatitude, viewport.centerLongitude)
-        _uiState.update { currentState ->
-            currentState.copy(
-                currentMapCenter = centerLocation,
-                nearbyStops = computeNearbyStops(currentState.transitSources, centerLocation, currentState.selectedRadiusKm)
-            )
-        }
+        // Cập nhật tâm bản đồ trực tiếp từ MapView (SSOT)
+        currentMapCenter = LocationData(viewport.centerLatitude, viewport.centerLongitude)
 
         if (viewport.zoom < MIN_ZOOM_THRESHOLD) {
             Timber.d("Skip load: current zoom (${viewport.zoom}) is below threshold ($MIN_ZOOM_THRESHOLD)")
@@ -105,19 +127,13 @@ class HomeContainerViewModel @Inject constructor(
                 Timber.d("Skip load: viewport is within cached bounds and user is zooming in")
                 return
             }
-
-            // Rule 2: If user is panning within cached bounds, do NOT reload!
-            if (isWithinCachedBounds && (lastLoadedZoom - viewport.zoom) < 1.0) {
-                Timber.d("Skip load: camera moved within loaded buffer area")
-                return
-            }
         }
 
         // Debounce camera movements before fetching
         debounceLoadJob?.cancel()
         debounceLoadJob = viewModelScope.launch {
-            delay(DEBOUNCE_DELAY_MS)
-            triggerDataLoad(viewport)
+            delay(DEBOUNCE_DELAY_MS.milliseconds)
+            loadTransitStopsData(viewport)
         }
     }
 
@@ -126,17 +142,23 @@ class HomeContainerViewModel @Inject constructor(
      * Directly triggers transit data loading for the current camera viewport.
      */
     fun onCameraGestureRelease(viewport: TransitMapViewportInfo) {
+        val centerLocation = LocationData(viewport.centerLatitude, viewport.centerLongitude)
+        currentMapCenter = centerLocation
+
+        // Tự động tính toán lại trạm theo tâm bản đồ mới khi kéo và nhả tay (nếu NearbyTransitSheet đang hiển thị)
+        if (isNearbySheetVisible) {
+            computeNearbyStopsForSheet()
+        }
+
         if (viewport.zoom < MIN_ZOOM_THRESHOLD) {
             Timber.d("Skip load on gesture release: current zoom (${viewport.zoom}) is below threshold ($MIN_ZOOM_THRESHOLD)")
             return
         }
         debounceLoadJob?.cancel()
-        triggerDataLoad(viewport)
+        loadTransitStopsData(viewport)
     }
 
-    fun onViewportGestureReleased(viewport: TransitMapViewportInfo) = onCameraGestureRelease(viewport)
-
-    private fun triggerDataLoad(viewport: TransitMapViewportInfo) {
+    private fun loadTransitStopsData(viewport: TransitMapViewportInfo) {
         // Expand bounding box with buffer factor to preload neighboring area
         val latSpan = viewport.maxLatitude - viewport.minLatitude
         val lonSpan = viewport.maxLongitude - viewport.minLongitude
@@ -153,7 +175,8 @@ class HomeContainerViewModel @Inject constructor(
         cachedBounds = bufferedBounds
         lastLoadedZoom = viewport.zoom
 
-        viewModelScope.launch {
+        fetchTransitDataJob?.cancel()
+        fetchTransitDataJob = viewModelScope.launch {
             _uiState.update { it.copy(isLoadingTransit = true, errorMessage = null) }
 
             mapRepository.getTransitStopsGeoJson(
@@ -176,13 +199,11 @@ class HomeContainerViewModel @Inject constructor(
                     currentState.copy(
                         transitSources = sources,
                         isLoadingTransit = false,
-                        nearbyStops = computeNearbyStops(
-                            sources = sources,
-                            centerLocation = currentState.currentMapCenter ?: currentState.currentLocation,
-                            radiusKm = currentState.selectedRadiusKm
-                        )
                     )
                 }
+//                if (isNearbySheetVisible) {
+//                    computeNearbyStopsForSheet(_uiState.value.currentMapCenter)
+//                }
                 Timber.d("Successfully loaded GTFS data for ${sources.size} transit types")
             }.onFailure { error ->
                 Timber.e(error, "Failed to load GTFS transit stops")
@@ -228,16 +249,49 @@ class HomeContainerViewModel @Inject constructor(
     }
 
     /**
+     * Controls lifecycle visibility of NearbyTransitSheet.
+     * Starts computing nearby stops when sheet appears, cancels ongoing computation when sheet disappears.
+     */
+    fun setNearbySheetVisible(isVisible: Boolean) {
+        isNearbySheetVisible = isVisible
+        if (isVisible) {
+            computeNearbyStopsForSheet()
+        } else {
+            computeNearbyStopsJob?.cancel()
+        }
+    }
+
+    /**
+     * Computes nearby stops around [targetLocation] or the current map center/user location.
+     * Runs asynchronously on Dispatchers.Default to avoid blocking the Main UI thread.
+     * Called ONLY when NearbyTransitSheet is displayed.
+     */
+    fun computeNearbyStopsForSheet(targetLocation: LocationData? = null) {
+        computeNearbyStopsJob?.cancel()
+        computeNearbyStopsJob = viewModelScope.launch(Dispatchers.Default) {
+            val currentState = _uiState.value
+            val center = targetLocation
+                ?: currentMapCenter
+                ?: currentState.currentLocation
+                ?: return@launch
+
+            val stops = computeNearbyStops(
+                sources = currentState.transitSources,
+                centerLocation = center,
+                radiusKm = currentState.selectedRadiusKm
+            )
+
+            _uiState.update { it.copy(nearbyStops = stops) }
+        }
+    }
+
+    /**
      * Updates selected radius in KM for nearby transit stops filter.
+     * Recomputes nearby stops for the sheet.
      */
     fun setSelectedRadiusKm(radiusKm: Double) {
-        _uiState.update { currentState ->
-            val center = currentState.currentMapCenter ?: currentState.currentLocation
-            currentState.copy(
-                selectedRadiusKm = radiusKm,
-                nearbyStops = computeNearbyStops(currentState.transitSources, center, radiusKm)
-            )
-        }
+        _uiState.update { it.copy(selectedRadiusKm = radiusKm) }
+        computeNearbyStopsForSheet()
     }
 
     /**
@@ -246,14 +300,8 @@ class HomeContainerViewModel @Inject constructor(
      */
     fun onMapClick(lat: Double? = null, lon: Double? = null) {
         _uiState.update { currentState ->
-            val clickedCenter = if (lat != null && lon != null) {
-                LocationData(lat, lon)
-            } else currentState.currentMapCenter ?: currentState.currentLocation
-
             currentState.copy(
                 isMapFocused = true,
-                currentMapCenter = clickedCenter,
-                nearbyStops = computeNearbyStops(currentState.transitSources, clickedCenter, currentState.selectedRadiusKm)
             )
         }
     }

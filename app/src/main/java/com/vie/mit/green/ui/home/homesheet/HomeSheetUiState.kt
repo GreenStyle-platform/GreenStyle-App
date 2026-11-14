@@ -8,7 +8,6 @@ import com.vie.mit.mapbox.model.TransitTypeConfig
 
 data class HomeSheetUiState(
     val currentLocation: LocationData? = null,
-    val currentMapCenter: LocationData? = null,
     val selectedRadiusKm: Double = 1.0,
     val nearbyStops: List<NearbyStopItem> = emptyList(),
     val transitSources: List<TransitSourceData> = emptyList(),
@@ -18,4 +17,4 @@ data class HomeSheetUiState(
     val isLoadingTransit: Boolean = false,
     val errorMessage: String? = null,
     val isMapFocused: Boolean = false,
-)
+    )

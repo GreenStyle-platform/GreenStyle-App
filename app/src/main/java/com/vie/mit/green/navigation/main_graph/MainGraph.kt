@@ -15,7 +15,6 @@ fun NavGraphBuilder.mainGraph(navController: NavHostController) {
         composable<MapContainerRoute> {
             HomeContainerScreen(
                 homeContainerViewModel = hiltViewModel<HomeContainerViewModel>(),
-                rootNavController = navController,
             )
         }
     }

@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -39,14 +38,14 @@ fun CommonScreenBottomSheet(
     config: BottomSheetConfig = BottomSheetConfig(),
     backgroundContent: @Composable (mapTransform: MapTransform) -> Unit,
     sheetContent: @Composable () -> Unit,
-    
+    modifier: Modifier
 ) {
-    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+    BoxWithConstraints(modifier = modifier.fillMaxSize()) {
         val density = LocalDensity.current
         val totalHeightPx = with(density) { maxHeight.toPx() }
 
-        // Configure anchors whenever totalHeightPx or config changes
-        SideEffect {
+        // Cập nhật anchors ngay trong lúc Composition để offset khởi tạo đúng trước bước Layout/Placement
+        if (totalHeightPx > 0f) {
             initState.updateAnchors(totalHeightPx, config)
         }
         // NestedScrollConnection liên kết giữa scrollable content bên trong và BottomSheet
@@ -83,8 +82,8 @@ fun CommonScreenBottomSheet(
                     val currentOffset = initState.offset
                     val minAnchor = initState.anchoredState.anchors.minPosition()
                     return if (toFling < 0f && currentOffset > minAnchor) {
-                        initState.expand()
-                        available
+                        val consumedY = initState.settle(toFling)
+                        Velocity(0f, consumedY)
                     } else {
                         Velocity.Zero
                     }
@@ -93,8 +92,8 @@ fun CommonScreenBottomSheet(
                 override suspend fun onPostFling(consumed: Velocity, available: Velocity): Velocity {
                     val toFling = available.y
                     return if (toFling > 0f) {
-                        initState.partialExpand()
-                        available
+                        val consumedY = initState.settle(toFling)
+                        Velocity(0f, consumedY)
                     } else {
                         Velocity.Zero
                     }

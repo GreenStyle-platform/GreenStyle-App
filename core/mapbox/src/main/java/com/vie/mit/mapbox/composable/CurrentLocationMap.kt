@@ -12,6 +12,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
+import com.mapbox.maps.CameraBoundsOptions
 import com.mapbox.maps.extension.compose.MapEffect
 import com.mapbox.maps.extension.compose.MapboxMap
 import com.mapbox.maps.extension.compose.MapboxMapComposable
@@ -44,6 +45,8 @@ fun CurrentLocationMap(
     followPuck: Boolean = true,
     showAccuracyRing: Boolean = true,
     minDistanceThresholdMeters: Float = 0f,
+    minZoom: Double? = null,
+    maxZoom: Double? = null,
     onLocationUpdate: ((LocationData) -> Unit)? = null,
     onPermissionDenied: (() -> Unit)? = null,
 ) {
@@ -54,6 +57,8 @@ fun CurrentLocationMap(
         showAccuracyRing = showAccuracyRing,
         puckBearing = PuckBearing.HEADING,
         minDistanceThresholdMeters = minDistanceThresholdMeters,
+        minZoom = minZoom,
+        maxZoom = maxZoom,
         onLocationUpdate = onLocationUpdate,
         onPermissionDenied = onPermissionDenied,
         content = {},
@@ -69,6 +74,8 @@ fun CurrentLocationMap(
  * @param showAccuracyRing Whether to show an accuracy ring around the location puck.
  * @param puckBearing Specifies the bearing source for the puck (e.g., HEADING or COURSE).
  * @param minDistanceThresholdMeters Minimum movement in meters before triggering [onLocationUpdate] (default 0f = notify all changes).
+ * @param minZoom Minimum zoom level allowed for the map camera.
+ * @param maxZoom Maximum zoom level allowed for the map camera.
  * @param onLocationUpdate Callback invoked when the user's location updates as [LocationData].
  * @param onPermissionDenied Callback invoked when location permissions are denied.
  * @param content Additional composable map content (markers, polylines, annotations).
@@ -81,6 +88,8 @@ fun CurrentLocationMap(
     showAccuracyRing: Boolean = true,
     puckBearing: PuckBearing = PuckBearing.HEADING,
     minDistanceThresholdMeters: Float = 0f,
+    minZoom: Double? = null,
+    maxZoom: Double? = null,
     onLocationUpdate: ((LocationData) -> Unit)? = null,
     onPermissionDenied: (() -> Unit)? = null,
     content: @Composable @MapboxMapComposable () -> Unit = {},
@@ -114,6 +123,14 @@ fun CurrentLocationMap(
                 modifier = Modifier.fillMaxSize(),
                 mapViewportState = mapViewportState,
             ) {
+                MapEffect(minZoom, maxZoom) { mapView ->
+                    if (minZoom != null || maxZoom != null) {
+                        val boundsBuilder = CameraBoundsOptions.Builder()
+                        minZoom?.let { boundsBuilder.minZoom(it) }
+                        maxZoom?.let { boundsBuilder.maxZoom(it) }
+                        mapView.mapboxMap.setBounds(boundsBuilder.build())
+                    }
+                }
                 CurrentLocationMapContent(
                     mapViewportState = mapViewportState,
                     followPuck = followPuck,
