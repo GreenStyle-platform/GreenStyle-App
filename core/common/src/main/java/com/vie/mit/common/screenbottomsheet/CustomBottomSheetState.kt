@@ -20,7 +20,7 @@ class CustomBottomSheetState(
     initialValue: CustomBottomSheetValue,
     @get:FloatRange(from = 0.0, to = 1.0) val expandedHeightFraction: Float = 1.0f,
 ) {
-    internal val anchoredState = AnchoredDraggableState(
+    val anchoredState = AnchoredDraggableState(
         initialValue = initialValue
     )
 
@@ -45,6 +45,17 @@ class CustomBottomSheetState(
             val currentOffset = offset
             return if (currentOffset.isNaN() || totalHeightPx <= 0f) 0f
             else (totalHeightPx - currentOffset).coerceAtLeast(0f)
+        }
+
+    /**
+     * Height in pixels of the BottomSheet when at [CustomBottomSheetValue.PartiallyExpanded].
+     */
+    val partiallyExpandedHeightPx: Float
+        get() {
+            if (totalHeightPx <= 0f) return 0f
+            val partialOffset = anchoredState.anchors.positionOf(CustomBottomSheetValue.PartiallyExpanded)
+            if (partialOffset.isNaN()) return 0f
+            return (totalHeightPx - partialOffset).coerceAtLeast(0f)
         }
 
     /**
@@ -91,13 +102,17 @@ class CustomBottomSheetState(
     val dragDownFromPartialProgress: Float
         get() {
             if (totalHeightPx <= 0f) return 0f
-            val partialOffset = anchoredState.anchors.positionOf(CustomBottomSheetValue.PartiallyExpanded)
+            val partialOffset =
+                anchoredState.anchors.positionOf(CustomBottomSheetValue.PartiallyExpanded)
             val peekOffset = anchoredState.anchors.positionOf(CustomBottomSheetValue.Peeked)
             if (partialOffset.isNaN() || peekOffset.isNaN()) return 0f
             val currentOffset = offset
             if (currentOffset.isNaN() || currentOffset <= partialOffset) return 0f
             val range = peekOffset - partialOffset
-            return if (range > 0f) ((currentOffset - partialOffset) / range).coerceIn(0f, 1f) else 0f
+            return if (range > 0f) ((currentOffset - partialOffset) / range).coerceIn(
+                0f,
+                1f
+            ) else 0f
         }
 
     /**

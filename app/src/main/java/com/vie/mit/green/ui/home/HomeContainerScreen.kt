@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -26,28 +27,29 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.foundation.layout.offset
-import androidx.compose.ui.unit.IntOffset
-import androidx.navigation.compose.currentBackStackEntryAsState
-import com.vie.mit.common.screenbottomsheet.BottomSheetConfig
-import com.vie.mit.common.screenbottomsheet.CustomBottomSheetValue
-import kotlin.math.roundToInt
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.TransformOrigin
-import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.navigation.NavHostController
+import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.mapbox.maps.extension.compose.animation.viewport.rememberMapViewportState
+import com.vie.mit.common.screenbottomsheet.BottomSheetConfig
 import com.vie.mit.common.screenbottomsheet.CommonScreenBottomSheet
+import com.vie.mit.common.screenbottomsheet.CustomBottomSheetValue
 import com.vie.mit.common.screenbottomsheet.rememberCustomBottomSheetState
 import com.vie.mit.common.theme.AppTheme
+import com.vie.mit.green.navigation.main_graph.HomeSheetRoute
+import com.vie.mit.green.navigation.main_graph.NearbyStopsSheetRoute
+import com.vie.mit.green.navigation.main_graph.StopDetailSheetRoute
 import com.vie.mit.green.ui.home.homesheet.StopDetailFloatingCard
 import com.vie.mit.mapbox.composable.TransitStopsMapScreen
 import com.vie.mit.mapbox.util.focusUserLocationBoundingBox
+import kotlin.math.roundToInt
 
 /**
  * MapContainerScreen: Container chính chứa duy nhất 1 Mapbox instance ở background
@@ -70,20 +72,20 @@ fun HomeContainerScreen(
 
     // Cấu hình động BottomSheetConfig cho từng Sheet route bên trong SheetNavHost
     val currentBackStackEntry by sheetNavController.currentBackStackEntryAsState()
-    val currentRoute = currentBackStackEntry?.destination?.route
-    val sheetConfig = remember(currentRoute) {
+    val currentDestination = currentBackStackEntry?.destination
+    val sheetConfig = remember(currentDestination) {
         when {
-            currentRoute?.contains("HomeSheetRoute") == true -> BottomSheetConfig(
+            currentDestination?.hasRoute<HomeSheetRoute>() == true -> BottomSheetConfig(
                 initialPeekRatio = 0.35f,
                 minSheetRatio = 0.15f,
                 maxExpandedRatio = 0.85f,
             )
-            currentRoute?.contains("NearbyStopsSheetRoute") == true -> BottomSheetConfig(
+            currentDestination?.hasRoute<NearbyStopsSheetRoute>() == true -> BottomSheetConfig(
                 initialPeekRatio = 0.60f,
                 minSheetRatio = 0.20f,
                 maxExpandedRatio = 0.95f,
             )
-            currentRoute?.contains("StopDetailSheetRoute") == true -> BottomSheetConfig(
+            currentDestination?.hasRoute<StopDetailSheetRoute>() == true -> BottomSheetConfig(
                 initialPeekRatio = 0.45f,
                 minSheetRatio = 0.20f,
                 maxExpandedRatio = 0.85f,
@@ -93,14 +95,19 @@ fun HomeContainerScreen(
     }
 
     // Phương pháp 2: Chiều cao padding đáy của Mapbox Camera tương ứng với chiều cao của BottomSheet.
-    // Khi BottomSheet hạ xuống (qua PartiallyExpanded tới Peeked/Hidden), cameraBottomPadding giảm,
-    // Mapbox Camera tự động mở rộng vùng hiển thị và giữ vững tâm toạ độ địa lý.
+    // Khi BottomSheet ở anchor PartiallyExpanded và kéo lên (Expanded), padding đáy giữ nguyên không đổi.
+    // Khi BottomSheet hạ xuống (về Peeked/Hidden), cameraBottomPadding giảm mượt mà theo sheetHeightPx.
     val cameraBottomPadding by remember(bottomSheetState) {
         derivedStateOf {
             if (bottomSheetState.currentValue == CustomBottomSheetValue.Hidden) {
                 0f
             } else {
-                bottomSheetState.sheetHeightPx
+                val partialHeight = bottomSheetState.partiallyExpandedHeightPx
+                if (partialHeight > 0f) {
+                    bottomSheetState.sheetHeightPx.coerceAtMost(partialHeight)
+                } else {
+                    bottomSheetState.sheetHeightPx
+                }
             }
         }
     }
@@ -131,7 +138,7 @@ fun HomeContainerScreen(
     CommonScreenBottomSheet(
         initState = bottomSheetState,
         config = sheetConfig,
-        backgroundContent = { _ ->
+        backgroundContent = { mapTransform ->
             Box(modifier = Modifier.fillMaxSize()) {
                 // 1. Mapbox dùng chung — Single Instance (Phương pháp 2: Camera Padding)
                 TransitStopsMapScreen(
@@ -143,7 +150,17 @@ fun HomeContainerScreen(
                     cameraBottomPadding = cameraBottomPadding,
                     onLocationUpdate = homeContainerViewModel::onLocationUpdated,
                     onStopClick = homeContainerViewModel::onStopClicked,
-                    onMapClick = { homeContainerViewModel.onMapClick() },
+                    onMapClick = { point ->
+                        homeContainerViewModel.onMapClick(point.latitude(), point.longitude())
+                        if (currentDestination?.hasRoute<HomeSheetRoute>() == true) {
+                            sheetNavController.navigate(
+                                NearbyStopsSheetRoute(
+                                    focusLat = point.latitude(),
+                                    focusLng = point.longitude(),
+                                )
+                            )
+                        }
+                    },
                     onViewportChanged = homeContainerViewModel::onViewportChanged,
                     onCameraGestureRelease = homeContainerViewModel::onCameraGestureRelease,
                 )

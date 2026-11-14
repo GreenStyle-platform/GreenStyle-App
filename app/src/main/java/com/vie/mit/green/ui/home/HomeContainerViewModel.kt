@@ -4,10 +4,12 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.vie.mit.data.repository.map.MapRepository
 import com.vie.mit.green.ui.home.homesheet.HomeSheetUiState
+import com.vie.mit.green.ui.home.nearbytransitsheet.NearbyStopItem
 import com.vie.mit.mapbox.model.LocationData
 import com.vie.mit.mapbox.model.StopFeatureClick
 import com.vie.mit.mapbox.model.TransitMapViewportInfo
 import com.vie.mit.mapbox.model.TransitSourceData
+import com.vie.mit.mapbox.model.distanceTo
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -16,6 +18,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import org.json.JSONObject
 import timber.log.Timber
 import javax.inject.Inject
 
@@ -44,7 +47,16 @@ class HomeContainerViewModel @Inject constructor(
      * Called when the user's GPS location is first acquired or updated.
      */
     fun onLocationUpdated(location: LocationData) {
-        _uiState.update { it.copy(currentLocation = location) }
+        _uiState.update { currentState ->
+            val mapCenter = currentState.currentMapCenter ?: location
+            val updatedState = currentState.copy(
+                currentLocation = location,
+                currentMapCenter = mapCenter,
+            )
+            updatedState.copy(
+                nearbyStops = computeNearbyStops(updatedState.transitSources, mapCenter, updatedState.selectedRadiusKm)
+            )
+        }
 
         // Initial load based on user location if we haven't loaded any data yet
         if (cachedBounds == null) {
@@ -67,6 +79,14 @@ class HomeContainerViewModel @Inject constructor(
      * Prevents unnecessary reloads when zooming in or panning within cached bounds.
      */
     fun onViewportChanged(viewport: TransitMapViewportInfo) {
+        val centerLocation = LocationData(viewport.centerLatitude, viewport.centerLongitude)
+        _uiState.update { currentState ->
+            currentState.copy(
+                currentMapCenter = centerLocation,
+                nearbyStops = computeNearbyStops(currentState.transitSources, centerLocation, currentState.selectedRadiusKm)
+            )
+        }
+
         if (viewport.zoom < MIN_ZOOM_THRESHOLD) {
             Timber.d("Skip load: current zoom (${viewport.zoom}) is below threshold ($MIN_ZOOM_THRESHOLD)")
             return
@@ -152,10 +172,15 @@ class HomeContainerViewModel @Inject constructor(
                         isVisible = activeTypes.contains(typeId),
                     )
                 }
-                _uiState.update {
-                    it.copy(
+                _uiState.update { currentState ->
+                    currentState.copy(
                         transitSources = sources,
                         isLoadingTransit = false,
+                        nearbyStops = computeNearbyStops(
+                            sources = sources,
+                            centerLocation = currentState.currentMapCenter ?: currentState.currentLocation,
+                            radiusKm = currentState.selectedRadiusKm
+                        )
                     )
                 }
                 Timber.d("Successfully loaded GTFS data for ${sources.size} transit types")
@@ -203,13 +228,32 @@ class HomeContainerViewModel @Inject constructor(
     }
 
     /**
-     * Called when the map is clicked.
-     * Sets map focus to true.
+     * Updates selected radius in KM for nearby transit stops filter.
      */
-    fun onMapClick() {
+    fun setSelectedRadiusKm(radiusKm: Double) {
         _uiState.update { currentState ->
+            val center = currentState.currentMapCenter ?: currentState.currentLocation
+            currentState.copy(
+                selectedRadiusKm = radiusKm,
+                nearbyStops = computeNearbyStops(currentState.transitSources, center, radiusKm)
+            )
+        }
+    }
+
+    /**
+     * Called when the map is clicked.
+     * Sets map focus to true and updates clicked map location as center.
+     */
+    fun onMapClick(lat: Double? = null, lon: Double? = null) {
+        _uiState.update { currentState ->
+            val clickedCenter = if (lat != null && lon != null) {
+                LocationData(lat, lon)
+            } else currentState.currentMapCenter ?: currentState.currentLocation
+
             currentState.copy(
                 isMapFocused = true,
+                currentMapCenter = clickedCenter,
+                nearbyStops = computeNearbyStops(currentState.transitSources, clickedCenter, currentState.selectedRadiusKm)
             )
         }
     }
@@ -234,5 +278,88 @@ class HomeContainerViewModel @Inject constructor(
         _uiState.update { currentState ->
             currentState.copy(isMapFocused = isFocused)
         }
+    }
+
+    private fun computeNearbyStops(
+        sources: List<TransitSourceData>,
+        centerLocation: LocationData?,
+        radiusKm: Double,
+    ): List<NearbyStopItem> {
+        if (centerLocation == null) return emptyList()
+        val maxDistanceMeters = radiusKm * 1000.0
+        val allStops = mutableListOf<NearbyStopItem>()
+
+        for (source in sources) {
+            if (!source.isVisible) continue
+            val stops = parseStopsFromGeoJson(source.geoJson, source.typeId, centerLocation)
+            allStops.addAll(stops)
+        }
+
+        return allStops
+            .filter { it.distanceMeters <= maxDistanceMeters }
+            .sortedBy { it.distanceMeters }
+    }
+
+    private fun parseStopsFromGeoJson(
+        geoJsonStr: String,
+        defaultTypeId: String,
+        centerLocation: LocationData,
+    ): List<NearbyStopItem> {
+        val result = mutableListOf<NearbyStopItem>()
+        try {
+            val json = JSONObject(geoJsonStr)
+            val features = json.optJSONArray("features") ?: return emptyList()
+            for (i in 0 until features.length()) {
+                val feature = features.optJSONObject(i) ?: continue
+                val geometry = feature.optJSONObject("geometry") ?: continue
+                val coordinates = geometry.optJSONArray("coordinates") ?: continue
+                if (coordinates.length() < 2) continue
+                val lon = coordinates.optDouble(0)
+                val lat = coordinates.optDouble(1)
+                val stopLocation = LocationData(lat, lon)
+                val dist = stopLocation.distanceTo(centerLocation)
+
+                val propertiesObj = feature.optJSONObject("properties")
+                val propertiesMap = mutableMapOf<String, String>()
+                var stopId = feature.optString("id", "stop_$i")
+                var name = ""
+                var typeId = defaultTypeId
+                var routesOrInfo = ""
+
+                if (propertiesObj != null) {
+                    val keys = propertiesObj.keys()
+                    while (keys.hasNext()) {
+                        val key = keys.next()
+                        propertiesMap[key] = propertiesObj.optString(key, "")
+                    }
+                    if (propertiesMap.containsKey("stop_id")) stopId = propertiesMap["stop_id"] ?: stopId
+                    name = propertiesMap["name"] ?: ""
+                    typeId = propertiesMap["type"] ?: defaultTypeId
+                    routesOrInfo = propertiesMap["routes"]
+                        ?: propertiesMap["line"]
+                        ?: propertiesMap["available_bikes"]?.let { "Xe khả dụng: $it" }
+                        ?: ""
+                }
+
+                if (name.isBlank()) {
+                    name = "Trạm $typeId ($stopId)"
+                }
+
+                result.add(
+                    NearbyStopItem(
+                        stopId = stopId,
+                        name = name,
+                        typeId = typeId,
+                        location = stopLocation,
+                        distanceMeters = dist,
+                        routesOrInfo = routesOrInfo,
+                        properties = propertiesMap,
+                    )
+                )
+            }
+        } catch (e: Exception) {
+            Timber.e(e, "Error parsing GeoJSON for nearby stops")
+        }
+        return result
     }
 }
