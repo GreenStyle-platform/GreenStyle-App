@@ -1,18 +1,15 @@
 package com.vie.mit.common.theme
 
 import android.app.Activity
-import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.dynamicDarkColorScheme
-import androidx.compose.material3.dynamicLightColorScheme
+import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.toArgb
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 
@@ -39,21 +36,10 @@ object AppTheme {
 @Composable
 fun GreenTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
-    // Dynamic color is available on Android 12+
-    dynamicColor: Boolean = false, // dynamicColor: tính năng của material 3 đổi màu theo maàu của hệ thống, để màu theo app cho nó =false
-    content: @Composable () -> Unit
+    content: @Composable () -> Unit,
 ) {
-    val appColors = when {
-        dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
-            val context = LocalContext.current
-            val colorScheme = if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
-            colorScheme.toAppColors(!darkTheme)
-        }
-//TODO: Implement dark mode
-//        darkTheme -> darkAppColors()
-        else -> lightAppColors()
-    }
-    
+    val appColors = lightAppColors()
+
     val view = LocalView.current
     if (!view.isInEditMode) {
         SideEffect {
@@ -69,7 +55,15 @@ fun GreenTheme(
         LocalAppDimens provides Dimens
     ) {
         MaterialTheme(
-            colorScheme = appColors.toColorScheme(),
+            colorScheme = lightColorScheme(
+                primary = appColors.primary,
+                onPrimary = appColors.onPrimary,
+                surface = appColors.surface,
+                onSurface = appColors.onSurface,
+                onSurfaceVariant = appColors.secondaryText,
+                outline = appColors.outline,
+                error = appColors.error
+            ),
             typography = Typography,
             content = content
         )

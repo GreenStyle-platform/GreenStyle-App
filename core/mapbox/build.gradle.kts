@@ -61,8 +61,8 @@ plugins {
        //Timber
       implementation(libs.timber)
         //Mapbox
-      implementation(libs.mapbox.maps)
-      implementation(libs.mapbox.maps.compose)
+      api(libs.mapbox.maps)
+      api(libs.mapbox.maps.compose)
 
       //PlayServiceLocation
       implementation(libs.play.service.location)

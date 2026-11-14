@@ -6,28 +6,21 @@ import kotlinx.serialization.Serializable
 object MainGraph
 
 @Serializable
-object HomeContainer
+object MapContainerRoute
+
+// Sheet routes (dùng trong Nested NavHost bên trong BottomSheet)
+@Serializable
+object HomeSheetRoute
 
 @Serializable
-object HomeTab
+data class NearbyStopsSheetRoute(
+    val focusLat: Double = 0.0,
+    val focusLng: Double = 0.0,
+)
 
 @Serializable
-object RideTab
-
-@Serializable
-object MapTab
-
-@Serializable
-object ChatTab
-
-@Serializable
-object Home
-
-@Serializable
-object RideSearchResult
-
-@Serializable
-data class DetailRide(val idRide: Int)
-
-@Serializable
-object PreviewMap
+data class StopDetailSheetRoute(
+    val stopId: String,
+    val typeId: String = "",
+    val name: String = "",
+)

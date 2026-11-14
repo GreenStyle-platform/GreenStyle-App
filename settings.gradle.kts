@@ -31,11 +31,12 @@ include(":app")
 
 
 
-include(":features:auth")
 
-include(":core:common")
-include(":features:home")
-include(":features:ride")
-include(":features:chat")
 include(":core:data")
 include(":core:mapbox")
+include(":core:common")
+//include(":features:auth")
+//include(":features:home")
+//include(":features:ride")
+//include(":features:chat")
+
