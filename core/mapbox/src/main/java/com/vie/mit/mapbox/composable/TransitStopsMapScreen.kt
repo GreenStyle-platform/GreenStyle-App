@@ -290,11 +290,11 @@ fun MapboxMap.getCurrentViewportInfo(): TransitMapViewportInfo {
     val cameraOpts = cameraOptions {
         center(currentCamera.center)
         zoom(currentCamera.zoom)
-        pitch(0.0)
+        pitch(currentCamera.pitch)
         bearing(currentCamera.bearing)
         padding(currentCamera.padding)
     }
-    val bounds = this.coordinateBoundsForCamera(cameraOpts)
+    val bounds = this.coordinateBoundsForCameraUnwrapped(cameraOpts)
     return TransitMapViewportInfo(
         minLatitude = bounds.south(),
         minLongitude = bounds.west(),

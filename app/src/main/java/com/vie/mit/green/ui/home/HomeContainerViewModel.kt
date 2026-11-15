@@ -2,6 +2,7 @@ package com.vie.mit.green.ui.home
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.vie.mit.data.network.model.map.TransitStopBoundsRequest
 import com.vie.mit.data.repository.map.MapRepository
 import com.vie.mit.green.ui.home.homesheet.HomeSheetUiState
 import com.vie.mit.green.ui.home.nearbytransitsheet.NearbyStopItem
@@ -9,6 +10,8 @@ import com.vie.mit.mapbox.model.LocationData
 import com.vie.mit.mapbox.model.StopFeatureClick
 import com.vie.mit.mapbox.model.TransitMapViewportInfo
 import com.vie.mit.mapbox.model.TransitSourceData
+import com.vie.mit.mapbox.model.TransitViewportBounds
+import com.vie.mit.mapbox.model.bufferedRequestBounds
 import com.vie.mit.mapbox.model.distanceTo
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
@@ -35,7 +38,7 @@ class HomeContainerViewModel @Inject constructor(
     val uiState: StateFlow<HomeSheetUiState> = _uiState.asStateFlow()
 
     // Smart caching state for camera viewport
-    private var cachedBounds: TransitMapViewportInfo? = null
+    private var cachedBounds: List<TransitViewportBounds>? = null
     private var lastLoadedZoom: Double = 0.0
     private var debounceLoadJob: Job? = null
     private var fetchTransitDataJob: Job? = null
@@ -67,20 +70,7 @@ class HomeContainerViewModel @Inject constructor(
                 )
             }
 
-            // Initial load based on user location if we haven't loaded any data yet
-            if (cachedBounds == null) {
-                val delta = 0.025 // ~2.5km radius bounding box
-                val initialBounds = TransitMapViewportInfo(
-                    minLatitude = location.latitude - delta,
-                    minLongitude = location.longitude - delta,
-                    maxLatitude = location.latitude + delta,
-                    maxLongitude = location.longitude + delta,
-                    zoom = 14.0,
-                    centerLatitude = location.latitude,
-                    centerLongitude = location.longitude,
-                )
-                loadTransitStopsData(initialBounds)
-            }
+            // Data loads from Mapbox's viewport callback after the camera focuses this location.
         }
     }
 
@@ -108,8 +98,11 @@ class HomeContainerViewModel @Inject constructor(
     fun onViewportChanged(viewport: TransitMapViewportInfo) {
         // Cập nhật tâm bản đồ trực tiếp từ MapView (SSOT)
         currentMapCenter = LocationData(viewport.centerLatitude, viewport.centerLongitude)
+        debounceLoadJob?.cancel()
+        debounceLoadJob = null
 
         if (viewport.zoom < MIN_ZOOM_THRESHOLD) {
+            cancelTransitDataLoad()
             Timber.d("Skip load: current zoom (${viewport.zoom}) is below threshold ($MIN_ZOOM_THRESHOLD)")
             return
         }
@@ -118,19 +111,18 @@ class HomeContainerViewModel @Inject constructor(
         if (cached != null) {
             // Rule 1: If zooming in within cached bounds, do NOT reload!
             val isZoomingIn = viewport.zoom >= lastLoadedZoom
-            val isWithinCachedBounds = viewport.minLatitude >= cached.minLatitude &&
-                    viewport.maxLatitude <= cached.maxLatitude &&
-                    viewport.minLongitude >= cached.minLongitude &&
-                    viewport.maxLongitude <= cached.maxLongitude
+            val isWithinCachedBounds = viewport.bufferedRequestBounds(bufferFactor = 0.0).all { visibleBounds ->
+                cached.any { cachedBound -> visibleBounds.isInside(cachedBound) }
+            }
 
             if (isWithinCachedBounds && isZoomingIn) {
+                cancelTransitDataLoad()
                 Timber.d("Skip load: viewport is within cached bounds and user is zooming in")
                 return
             }
         }
 
         // Debounce camera movements before fetching
-        debounceLoadJob?.cancel()
         debounceLoadJob = viewModelScope.launch {
             delay(DEBOUNCE_DELAY_MS.milliseconds)
             loadTransitStopsData(viewport)
@@ -159,41 +151,36 @@ class HomeContainerViewModel @Inject constructor(
     }
 
     private fun loadTransitStopsData(viewport: TransitMapViewportInfo) {
-        // Expand bounding box with buffer factor to preload neighboring area
-        val latSpan = viewport.maxLatitude - viewport.minLatitude
-        val lonSpan = viewport.maxLongitude - viewport.minLongitude
-        val bufferedBounds = TransitMapViewportInfo(
-            minLatitude = viewport.minLatitude - latSpan * BOUNDS_BUFFER_FACTOR,
-            minLongitude = viewport.minLongitude - lonSpan * BOUNDS_BUFFER_FACTOR,
-            maxLatitude = viewport.maxLatitude + latSpan * BOUNDS_BUFFER_FACTOR,
-            maxLongitude = viewport.maxLongitude + lonSpan * BOUNDS_BUFFER_FACTOR,
-            zoom = viewport.zoom,
-            centerLatitude = viewport.centerLatitude,
-            centerLongitude = viewport.centerLongitude,
-        )
+        val bufferedBounds = viewport.bufferedRequestBounds(BOUNDS_BUFFER_FACTOR)
+        val requestBounds = bufferedBounds.map {
+            TransitStopBoundsRequest(
+                minLat = it.minLatitude,
+                minLon = it.minLongitude,
+                maxLat = it.maxLatitude,
+                maxLon = it.maxLongitude,
+            )
+        }
 
-        cachedBounds = bufferedBounds
-        lastLoadedZoom = viewport.zoom
-
-        fetchTransitDataJob?.cancel()
+        cancelTransitDataLoad()
         fetchTransitDataJob = viewModelScope.launch {
             _uiState.update { it.copy(isLoadingTransit = true, errorMessage = null) }
 
-            mapRepository.getTransitStopsGeoJson(
-                minLat = bufferedBounds.minLatitude,
-                minLon = bufferedBounds.minLongitude,
-                maxLat = bufferedBounds.maxLatitude,
-                maxLon = bufferedBounds.maxLongitude,
-                zoom = bufferedBounds.zoom,
-                types = _uiState.value.activeTransitTypes.toList(),
-            ).onSuccess { geoJsonMap ->
+            mapRepository.getTransitStopsGeoJson(requestBounds).onSuccess { load ->
+                val geoJsonMap = load.geoJsonByType
                 val activeTypes = _uiState.value.activeTransitTypes
-                val sources = geoJsonMap.map { (typeId, geoJsonStr) ->
+                val sources = _uiState.value.transitConfigs.map { config ->
                     TransitSourceData(
-                        typeId = typeId,
-                        geoJson = geoJsonStr,
-                        isVisible = activeTypes.contains(typeId),
+                        typeId = config.typeId,
+                        geoJson = geoJsonMap.getValue(config.typeId),
+                        isVisible = activeTypes.contains(config.typeId),
                     )
+                }
+                if (load.failedTypeIds.isEmpty()) {
+                    cachedBounds = bufferedBounds
+                    lastLoadedZoom = viewport.zoom
+                } else {
+                    cachedBounds = null
+                    Timber.w("Transit stop load was partial; will retry failed types: ${load.failedTypeIds}")
                 }
                 _uiState.update { currentState ->
                     currentState.copy(
@@ -216,6 +203,18 @@ class HomeContainerViewModel @Inject constructor(
             }
         }
     }
+
+    private fun cancelTransitDataLoad() {
+        fetchTransitDataJob?.cancel()
+        fetchTransitDataJob = null
+        _uiState.update { it.clearTransitLoading() }
+    }
+
+    private fun TransitViewportBounds.isInside(container: TransitViewportBounds): Boolean =
+        minLatitude >= container.minLatitude &&
+                maxLatitude <= container.maxLatitude &&
+                minLongitude >= container.minLongitude &&
+                maxLongitude <= container.maxLongitude
 
     /**
      * Toggles visibility for a given transit vehicle type (BUS, METRO, etc.).
@@ -411,3 +410,6 @@ class HomeContainerViewModel @Inject constructor(
         return result
     }
 }
+
+internal fun HomeSheetUiState.clearTransitLoading(): HomeSheetUiState =
+    if (isLoadingTransit) copy(isLoadingTransit = false) else this
