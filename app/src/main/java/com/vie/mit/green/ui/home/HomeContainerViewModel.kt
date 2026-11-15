@@ -2,7 +2,8 @@ package com.vie.mit.green.ui.home
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.vie.mit.data.network.model.map.TransitStopBoundsRequest
+import com.vie.mit.data.model.domain.map.TransitStopsGeoJsonLoad
+import com.vie.mit.data.model.remote.request.map.TransitStopBoundsRequest
 import com.vie.mit.data.repository.map.MapRepository
 import com.vie.mit.green.ui.home.homesheet.HomeSheetUiState
 import com.vie.mit.green.ui.home.nearbytransitsheet.NearbyStopItem
@@ -151,7 +152,7 @@ class HomeContainerViewModel @Inject constructor(
     }
 
     private fun loadTransitStopsData(viewport: TransitMapViewportInfo) {
-        val bufferedBounds = viewport.bufferedRequestBounds(BOUNDS_BUFFER_FACTOR)
+        val bufferedBounds:List<TransitViewportBounds> = viewport.bufferedRequestBounds(BOUNDS_BUFFER_FACTOR)
         val requestBounds = bufferedBounds.map {
             TransitStopBoundsRequest(
                 minLat = it.minLatitude,
@@ -165,7 +166,7 @@ class HomeContainerViewModel @Inject constructor(
         fetchTransitDataJob = viewModelScope.launch {
             _uiState.update { it.copy(isLoadingTransit = true, errorMessage = null) }
 
-            mapRepository.getTransitStopsGeoJson(requestBounds).onSuccess { load ->
+            mapRepository.getTransitStopsGeoJson(requestBounds).onSuccess { load: TransitStopsGeoJsonLoad ->
                 val geoJsonMap = load.geoJsonByType
                 val activeTypes = _uiState.value.activeTransitTypes
                 val sources = _uiState.value.transitConfigs.map { config ->

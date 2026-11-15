@@ -1,9 +1,9 @@
 package com.vie.mit.data.network.api.auth
 
-import com.vie.mit.data.network.model.login.LoginRequest
-import com.vie.mit.data.network.model.login.LoginResponse
-import com.vie.mit.data.network.model.signup.SignUpRequest
-import com.vie.mit.data.network.model.signup.SignUpResponse
+import com.vie.mit.data.model.remote.request.auth.LoginRequest
+import com.vie.mit.data.model.remote.request.auth.SignUpRequest
+import com.vie.mit.data.model.remote.response.auth.LoginResponse
+import com.vie.mit.data.model.remote.response.auth.SignUpResponse
 import retrofit2.http.Body
 import retrofit2.http.POST
 

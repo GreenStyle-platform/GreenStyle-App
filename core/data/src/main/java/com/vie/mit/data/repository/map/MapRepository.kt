@@ -1,23 +1,28 @@
 package com.vie.mit.data.repository.map
 
+import com.vie.mit.data.model.domain.map.Location
+import com.vie.mit.data.model.domain.map.PublicTransportSuggestion
+import com.vie.mit.data.model.domain.map.TransitStopsGeoJsonLoad
+import com.vie.mit.data.model.mapper.toDomain
+import com.vie.mit.data.model.mapper.toLocationRequest
+import com.vie.mit.data.model.remote.request.map.TransitStopBoundsRequest
+import com.vie.mit.data.model.remote.response.map.TransitStopMarkerResponse
 import com.vie.mit.data.network.api.map.MapApi
-import com.vie.mit.data.network.model.map.Location
-import com.vie.mit.data.network.model.map.PublicTransportSuggestion
-import com.vie.mit.data.network.model.map.TransitStopBoundsRequest
-import com.vie.mit.data.network.model.map.TransitStopMarkerResponse
 import com.vie.mit.data.network.util.handleApiCall
 import com.vie.mit.mapbox.model.TransitTypeConfig
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.supervisorScope
-import kotlinx.serialization.json.addJsonObject
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.add
+import kotlinx.serialization.json.addJsonObject
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
 import kotlinx.serialization.json.putJsonObject
-import kotlinx.serialization.json.put
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -59,7 +64,7 @@ class MapRepository @Inject constructor(
     suspend fun getPublicTransportSuggestions(
         location: Location,
     ): Result<List<PublicTransportSuggestion>> = handleApiCall {
-        mapApi.getPublicTransportSuggestions(location)
+        mapApi.getPublicTransportSuggestions(location.toLocationRequest()).map { it.toDomain() }
     }
 
     suspend fun getTransitStopsGeoJson(
@@ -73,34 +78,46 @@ class MapRepository @Inject constructor(
 
     suspend fun getTransitStopsGeoJson(
         bounds: List<TransitStopBoundsRequest>,
-    ): Result<TransitStopsGeoJsonLoad> = try {
-        require(bounds.isNotEmpty()) { "At least one viewport bound is required" }
-        val stopResults = supervisorScope {
-            defaultConfigs.associate { config ->
-                config.typeId to async {
-                    loadStopsResult(config.typeId, bounds)
+    ): Result<TransitStopsGeoJsonLoad> = withContext(Dispatchers.IO) {
+        try {
+            require(bounds.isNotEmpty()) { "At least one viewport bound is required" }
+            val stopResults: Map<String, Result<List<TransitStopMarkerResponse>>> =
+                supervisorScope {
+                    defaultConfigs.associate { config ->
+                        config.typeId to async {
+                            loadStopsResult(config.typeId, bounds)
+                        }
+                    }.mapValues { (_, deferredResult) -> deferredResult.await() }
                 }
-            }.mapValues { (_, deferredResult) -> deferredResult.await() }
-        }
 
-        val supportedResults = stopResults.filterKeys { it in SUPPORTED_TRANSIT_TYPES }
-        if (supportedResults.isNotEmpty() && supportedResults.values.all { it.isFailure }) {
-            throw supportedResults.values.first().exceptionOrNull()!!
-        }
+            val supportedFailures = stopResults
+                .filterKeys { it in SUPPORTED_TRANSIT_TYPES }
+                .values
+                .count { it.isFailure }
 
-        Result.success(
-            TransitStopsGeoJsonLoad(
-                geoJsonByType = defaultConfigs.associate { config ->
-                val stops = stopResults[config.typeId]?.getOrDefault(emptyList()).orEmpty()
-                config.typeId to stops.toFeatureCollectionGeoJson(config.typeId)
-                },
-                failedTypeIds = supportedResults.filterValues { it.isFailure }.keys,
-            ),
-        )
-    } catch (exception: CancellationException) {
-        throw exception
-    } catch (exception: Exception) {
-        Result.failure(exception)
+            if (supportedFailures == SUPPORTED_TRANSIT_TYPES.size) {
+                val firstException = stopResults
+                    .filterKeys { it in SUPPORTED_TRANSIT_TYPES }
+                    .values
+                    .firstNotNullOfOrNull { it.exceptionOrNull() }
+                    ?: IllegalStateException("Failed to load transit stops")
+                return@withContext Result.failure(firstException)
+            }
+
+            Result.success(
+                TransitStopsGeoJsonLoad(
+                    geoJsonByType = defaultConfigs.associate { config ->
+                        val stops = stopResults[config.typeId]?.getOrDefault(emptyList()).orEmpty()
+                        config.typeId to stops.toFeatureCollectionGeoJson(config.typeId)
+                    },
+                    failedTypeIds = stopResults.filterValues { it.isFailure }.keys,
+                ),
+            )
+        } catch (exception: CancellationException) {
+            throw exception
+        } catch (exception: Exception) {
+            Result.failure(exception)
+        }
     }
 
     private suspend fun loadStopsResult(

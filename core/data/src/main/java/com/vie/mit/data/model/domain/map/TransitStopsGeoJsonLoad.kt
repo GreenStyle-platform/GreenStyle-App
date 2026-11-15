@@ -1,4 +1,4 @@
-package com.vie.mit.data.repository.map
+package com.vie.mit.data.model.domain.map
 
 data class TransitStopsGeoJsonLoad(
     val geoJsonByType: Map<String, String>,

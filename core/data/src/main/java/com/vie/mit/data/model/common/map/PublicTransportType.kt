@@ -1,4 +1,4 @@
-package com.vie.mit.data.network.model.map
+package com.vie.mit.data.model.common.map
 
 import kotlinx.serialization.Serializable
 

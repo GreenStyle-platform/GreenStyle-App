@@ -1,4 +1,4 @@
-package com.vie.mit.data.network.model.signup
+package com.vie.mit.data.model.remote.request.auth
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable

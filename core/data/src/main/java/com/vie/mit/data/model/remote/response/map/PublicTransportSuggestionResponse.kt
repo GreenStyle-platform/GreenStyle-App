@@ -1,10 +1,11 @@
-package com.vie.mit.data.network.model.map
+package com.vie.mit.data.model.remote.response.map
 
+import com.vie.mit.data.model.common.map.PublicTransportType
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 @Serializable
-data class PublicTransportSuggestion(
+data class PublicTransportSuggestionResponse(
     @SerialName("name") val name: String,
     @SerialName("type") val type: PublicTransportType,
     @SerialName("distance") val distance: Long,

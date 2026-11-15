@@ -1,10 +1,10 @@
 package com.vie.mit.data.repository.map
 
+import com.vie.mit.data.model.remote.request.map.LocationRequest
+import com.vie.mit.data.model.remote.request.map.TransitStopBoundsRequest
+import com.vie.mit.data.model.remote.response.map.PublicTransportSuggestionResponse
+import com.vie.mit.data.model.remote.response.map.TransitStopMarkerResponse
 import com.vie.mit.data.network.api.map.MapApi
-import com.vie.mit.data.network.model.map.Location
-import com.vie.mit.data.network.model.map.PublicTransportSuggestion
-import com.vie.mit.data.network.model.map.TransitStopBoundsRequest
-import com.vie.mit.data.network.model.map.TransitStopMarkerResponse
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.runBlocking
@@ -19,7 +19,6 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class MapRepositoryTest {
-
     @Test
     fun loadsBusAndMetroRequestsConcurrently() = runBlocking {
         val busStarted = CompletableDeferred<Unit>()
@@ -27,7 +26,8 @@ class MapRepositoryTest {
         val releaseRequests = CompletableDeferred<Unit>()
         val repository = MapRepository(
             object : MapApi {
-                override suspend fun getPublicTransportSuggestions(location: Location): List<PublicTransportSuggestion> = emptyList()
+                override suspend fun getPublicTransportSuggestions(location: LocationRequest): List<PublicTransportSuggestionResponse> =
+                    emptyList()
 
                 override suspend fun searchBusStopsInBounds(bounds: TransitStopBoundsRequest): List<TransitStopMarkerResponse> {
                     busStarted.complete(Unit)
@@ -42,7 +42,6 @@ class MapRepositoryTest {
                 }
             },
         )
-
         val load = async { repository.getTransitStopsGeoJson(20.99, 105.78, 21.05, 105.90) }
 
         withTimeout(1_000) {
@@ -76,7 +75,6 @@ class MapRepositoryTest {
                 ),
             ),
         )
-
         val result = repository.getTransitStopsGeoJson(20.99, 105.78, 21.05, 105.90)
 
         assertTrue(result.isSuccess)
@@ -86,16 +84,18 @@ class MapRepositoryTest {
         assertTrue(load.failedTypeIds.isEmpty())
         assertEquals(emptyList<String>(), featureCoordinates(sources.getValue("TRAIN")))
         assertEquals(emptyList<String>(), featureCoordinates(sources.getValue("BIKE")))
-
-        val busFeature = Json.parseToJsonElement(sources.getValue("BUS"))
-            .jsonObject["features"]!!.jsonArray.first().jsonObject
+        val busFeature =
+            Json.parseToJsonElement(sources.getValue("BUS")).jsonObject["features"]!!.jsonArray.first().jsonObject
         assertEquals("bus-1", busFeature["id"]!!.jsonPrimitive.content)
         assertEquals(
             listOf("105.8151131", "20.9998526"),
             busFeature["geometry"]!!.jsonObject["coordinates"]!!.jsonArray.map { it.jsonPrimitive.content },
         )
         assertEquals("BUS", busFeature["properties"]!!.jsonObject["type"]!!.jsonPrimitive.content)
-        assertEquals("Bến xe", busFeature["properties"]!!.jsonObject["name"]!!.jsonPrimitive.content)
+        assertEquals(
+            "Bến xe",
+            busFeature["properties"]!!.jsonObject["name"]!!.jsonPrimitive.content
+        )
     }
 
     @Test
@@ -106,14 +106,19 @@ class MapRepositoryTest {
                 metroFailure = IllegalStateException("Metro unavailable"),
             ),
         )
-
         val result = repository.getTransitStopsGeoJson(20.99, 105.78, 21.05, 105.90)
 
         assertTrue(result.isSuccess)
         val load = result.getOrThrow()
         val sources = load.geoJsonByType
-        assertEquals(1, Json.parseToJsonElement(sources.getValue("BUS")).jsonObject["features"]!!.jsonArray.size)
-        assertEquals(0, Json.parseToJsonElement(sources.getValue("METRO")).jsonObject["features"]!!.jsonArray.size)
+        assertEquals(
+            1,
+            Json.parseToJsonElement(sources.getValue("BUS")).jsonObject["features"]!!.jsonArray.size
+        )
+        assertEquals(
+            0,
+            Json.parseToJsonElement(sources.getValue("METRO")).jsonObject["features"]!!.jsonArray.size
+        )
         assertEquals(setOf("METRO"), load.failedTypeIds)
     }
 
@@ -125,7 +130,6 @@ class MapRepositoryTest {
                 metroFailure = IllegalStateException("Metro unavailable"),
             ),
         )
-
         val result = repository.getTransitStopsGeoJson(20.99, 105.78, 21.05, 105.90)
 
         assertFalse(result.isSuccess)
@@ -135,7 +139,8 @@ class MapRepositoryTest {
     fun aggregatesAndDeduplicatesStopsFromSplitViewportRequests() = runBlocking {
         val repository = MapRepository(
             object : MapApi {
-                override suspend fun getPublicTransportSuggestions(location: Location): List<PublicTransportSuggestion> = emptyList()
+                override suspend fun getPublicTransportSuggestions(location: LocationRequest): List<PublicTransportSuggestionResponse> =
+                    emptyList()
 
                 override suspend fun searchBusStopsInBounds(bounds: TransitStopBoundsRequest): List<TransitStopMarkerResponse> =
                     if (bounds.minLon >= 0.0) {
@@ -147,20 +152,18 @@ class MapRepositoryTest {
                         )
                     }
 
-                override suspend fun searchMetroStopsInBounds(bounds: TransitStopBoundsRequest): List<TransitStopMarkerResponse> = emptyList()
+                override suspend fun searchMetroStopsInBounds(bounds: TransitStopBoundsRequest): List<TransitStopMarkerResponse> =
+                    emptyList()
             },
         )
-
         val result = repository.getTransitStopsGeoJson(
             listOf(
                 TransitStopBoundsRequest(19.0, 178.0, 21.0, 180.0),
                 TransitStopBoundsRequest(19.0, -180.0, 21.0, -178.0),
             ),
         )
-
-        val features = Json.parseToJsonElement(result.getOrThrow().geoJsonByType.getValue("BUS"))
-            .jsonObject["features"]!!
-            .jsonArray
+        val features =
+            Json.parseToJsonElement(result.getOrThrow().geoJsonByType.getValue("BUS")).jsonObject["features"]!!.jsonArray
         assertEquals(2, features.size)
         assertEquals(
             setOf("east", "west"),
@@ -168,10 +171,8 @@ class MapRepositoryTest {
         )
     }
 
-    private fun featureCoordinates(geoJson: String): List<String> = Json.parseToJsonElement(geoJson)
-        .jsonObject["features"]!!
-        .jsonArray
-        .flatMap { feature ->
+    private fun featureCoordinates(geoJson: String): List<String> =
+        Json.parseToJsonElement(geoJson).jsonObject["features"]!!.jsonArray.flatMap { feature ->
             feature.jsonObject["geometry"]!!.jsonObject["coordinates"]!!.jsonArray.map { it.jsonPrimitive.content }
         }
 
@@ -181,7 +182,8 @@ class MapRepositoryTest {
         private val busFailure: Throwable? = null,
         private val metroFailure: Throwable? = null,
     ) : MapApi {
-        override suspend fun getPublicTransportSuggestions(location: Location): List<PublicTransportSuggestion> = emptyList()
+        override suspend fun getPublicTransportSuggestions(location: LocationRequest): List<PublicTransportSuggestionResponse> =
+            emptyList()
 
         override suspend fun searchBusStopsInBounds(bounds: TransitStopBoundsRequest): List<TransitStopMarkerResponse> {
             busFailure?.let { throw it }

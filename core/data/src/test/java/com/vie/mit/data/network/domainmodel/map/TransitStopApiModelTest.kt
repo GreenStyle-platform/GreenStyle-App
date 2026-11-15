@@ -1,5 +1,7 @@
-package com.vie.mit.data.network.model.map
+package com.vie.mit.data.network.domainmodel.map
 
+import com.vie.mit.data.model.remote.request.map.TransitStopBoundsRequest
+import com.vie.mit.data.model.remote.response.map.TransitStopMarkerResponse
 import com.vie.mit.data.network.api.map.MapApi
 import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
