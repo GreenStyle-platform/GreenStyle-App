@@ -8,7 +8,7 @@ data class TransitViewportBounds(
 )
 
 fun TransitMapViewportInfo.bufferedRequestBounds(
-    bufferFactor: Double = 0.35,
+    bufferFactor: Double = 0.15,
 ): List<TransitViewportBounds> {
     val latSpan = maxLatitude - minLatitude
     val lonSpan = if (minLongitude <= maxLongitude) {
@@ -33,7 +33,6 @@ private fun splitWrappedLongitudes(
     if (maxLon - minLon >= 360.0) {
         return listOf(TransitViewportBounds(minLat, -180.0, maxLat, 180.0))
     }
-
     val normalizedMinLon = normalizeLongitude(minLon)
     val normalizedMaxLon = normalizeLongitude(maxLon)
     return if (normalizedMinLon <= normalizedMaxLon && minLon <= maxLon) {

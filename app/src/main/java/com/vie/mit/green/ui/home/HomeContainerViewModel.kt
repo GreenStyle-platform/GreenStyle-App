@@ -14,6 +14,7 @@ import com.vie.mit.mapbox.model.TransitSourceData
 import com.vie.mit.mapbox.model.TransitViewportBounds
 import com.vie.mit.mapbox.model.bufferedRequestBounds
 import com.vie.mit.mapbox.model.distanceTo
+import com.vie.mit.mapbox.util.isInside
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -210,12 +211,6 @@ class HomeContainerViewModel @Inject constructor(
         fetchTransitDataJob = null
         _uiState.update { it.clearTransitLoading() }
     }
-
-    private fun TransitViewportBounds.isInside(container: TransitViewportBounds): Boolean =
-        minLatitude >= container.minLatitude &&
-                maxLatitude <= container.maxLatitude &&
-                minLongitude >= container.minLongitude &&
-                maxLongitude <= container.maxLongitude
 
     /**
      * Toggles visibility for a given transit vehicle type (BUS, METRO, etc.).

@@ -1,5 +1,7 @@
 package com.vie.mit.data.repository.map
 
+import com.vie.mit.data.model.common.map.PublicTransportType
+import com.vie.mit.data.model.common.map.TravelMode
 import com.vie.mit.data.model.domain.map.Location
 import com.vie.mit.data.model.domain.map.PublicTransportSuggestion
 import com.vie.mit.data.model.domain.map.TransitStopsGeoJsonLoad
@@ -32,28 +34,28 @@ class MapRepository @Inject constructor(
 ) {
     val defaultConfigs: List<TransitTypeConfig> = listOf(
         TransitTypeConfig(
-            typeId = "BUS",
+            typeId = PublicTransportType.BUS.name,
             iconResId = com.vie.mit.mapbox.R.drawable.ic_transit_bus,
             clusterColor = 0xFF1E88E5.toInt(),
             clusterTextColor = 0xFFFFFFFF.toInt(),
             iconSize = 1.0,
         ),
         TransitTypeConfig(
-            typeId = "METRO",
+            typeId = PublicTransportType.SUBWAY.name,
             iconResId = com.vie.mit.mapbox.R.drawable.ic_transit_metro,
             clusterColor = 0xFFE53935.toInt(),
             clusterTextColor = 0xFFFFFFFF.toInt(),
             iconSize = 1.0,
         ),
         TransitTypeConfig(
-            typeId = "TRAIN",
+            typeId = PublicTransportType.RAIL.name,
             iconResId = com.vie.mit.mapbox.R.drawable.ic_transit_train,
             clusterColor = 0xFF8E24AA.toInt(),
             clusterTextColor = 0xFFFFFFFF.toInt(),
             iconSize = 1.0,
         ),
         TransitTypeConfig(
-            typeId = "BIKE",
+            typeId = TravelMode.BICYCLE_RENT.name,
             iconResId = com.vie.mit.mapbox.R.drawable.ic_transit_bike,
             clusterColor = 0xFF43A047.toInt(),
             clusterTextColor = 0xFFFFFFFF.toInt(),
@@ -68,15 +70,6 @@ class MapRepository @Inject constructor(
     }
 
     suspend fun getTransitStopsGeoJson(
-        minLat: Double,
-        minLon: Double,
-        maxLat: Double,
-        maxLon: Double,
-    ): Result<TransitStopsGeoJsonLoad> = getTransitStopsGeoJson(
-        listOf(TransitStopBoundsRequest(minLat, minLon, maxLat, maxLon)),
-    )
-
-    suspend fun getTransitStopsGeoJson(
         bounds: List<TransitStopBoundsRequest>,
     ): Result<TransitStopsGeoJsonLoad> = withContext(Dispatchers.IO) {
         try {
@@ -89,20 +82,6 @@ class MapRepository @Inject constructor(
                         }
                     }.mapValues { (_, deferredResult) -> deferredResult.await() }
                 }
-
-            val supportedFailures = stopResults
-                .filterKeys { it in SUPPORTED_TRANSIT_TYPES }
-                .values
-                .count { it.isFailure }
-
-            if (supportedFailures == SUPPORTED_TRANSIT_TYPES.size) {
-                val firstException = stopResults
-                    .filterKeys { it in SUPPORTED_TRANSIT_TYPES }
-                    .values
-                    .firstNotNullOfOrNull { it.exceptionOrNull() }
-                    ?: IllegalStateException("Failed to load transit stops")
-                return@withContext Result.failure(firstException)
-            }
 
             Result.success(
                 TransitStopsGeoJsonLoad(
@@ -124,7 +103,7 @@ class MapRepository @Inject constructor(
         typeId: String,
         bounds: List<TransitStopBoundsRequest>,
     ): Result<List<TransitStopMarkerResponse>> = try {
-        val stops = coroutineScope {
+        val stops: List<TransitStopMarkerResponse> = coroutineScope {
             bounds.map { bound ->
                 async { loadStops(typeId, bound) }
             }.awaitAll().flatten().distinctBy(TransitStopMarkerResponse::id)
@@ -140,8 +119,8 @@ class MapRepository @Inject constructor(
         typeId: String,
         bounds: TransitStopBoundsRequest,
     ): List<TransitStopMarkerResponse> = when (typeId) {
-        "BUS" -> mapApi.searchBusStopsInBounds(bounds)
-        "METRO" -> mapApi.searchMetroStopsInBounds(bounds)
+        PublicTransportType.BUS.name -> mapApi.searchBusStopsInBounds(bounds)
+        PublicTransportType.SUBWAY.name -> mapApi.searchMetroStopsInBounds(bounds)
         else -> emptyList()
     }
 
@@ -169,8 +148,4 @@ class MapRepository @Inject constructor(
                 }
             }
         }.toString()
-
-    private companion object {
-        val SUPPORTED_TRANSIT_TYPES = setOf("BUS", "METRO")
-    }
 }
