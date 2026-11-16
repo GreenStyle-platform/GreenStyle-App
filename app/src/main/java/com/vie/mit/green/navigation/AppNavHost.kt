@@ -15,6 +15,6 @@ fun AppNavHost(
         navController = navController, startDestination = MainGraph
     ) {
         authGraph(navController)
-        mainGraph(navController)
+        mainGraph()
     }
 }

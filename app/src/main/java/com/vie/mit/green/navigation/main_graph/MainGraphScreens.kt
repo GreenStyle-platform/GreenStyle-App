@@ -21,3 +21,18 @@ data class StopDetailSheetRoute(
     val typeId: String = "",
     val name: String = "",
 )
+
+@Serializable
+object SettingRoute
+
+@Serializable
+object JourneyDetailRoute
+
+@Serializable
+object JourneyNavigationRoute
+
+@Serializable
+object TransitRoutePathRoute
+
+@Serializable
+object TransitStopDetailRoute

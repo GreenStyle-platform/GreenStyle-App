@@ -68,7 +68,7 @@ fun TransitStopsMapScreen(
     transitSources: List<TransitSourceData>,
     transitConfigs: List<TransitTypeConfig>,
     mapViewportState: MapViewportState = rememberMapViewportState(),
-    clusterConfig: TransitClusterConfig = remember { TransitClusterConfig() },
+    clusterConfig: TransitClusterConfig = remember { TransitClusterConfig(isEnabled = false) },
     showUserLocation: Boolean = true,
     showCenterPin: Boolean = true,
     cameraBottomPadding: Float = 0f,

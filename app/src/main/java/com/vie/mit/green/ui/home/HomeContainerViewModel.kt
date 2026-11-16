@@ -2,9 +2,11 @@ package com.vie.mit.green.ui.home
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.vie.mit.common.navigation.AppNavigator
 import com.vie.mit.data.model.domain.map.TransitStopsGeoJsonLoad
 import com.vie.mit.data.model.remote.request.map.TransitStopBoundsRequest
 import com.vie.mit.data.repository.map.MapRepository
+import com.vie.mit.green.navigation.main_graph.SettingRoute
 import com.vie.mit.green.ui.home.homesheet.HomeSheetUiState
 import com.vie.mit.green.ui.home.nearbytransitsheet.NearbyStopItem
 import com.vie.mit.mapbox.model.LocationData
@@ -31,7 +33,7 @@ import kotlin.time.Duration.Companion.milliseconds
 
 @HiltViewModel
 class HomeContainerViewModel @Inject constructor(
-    private val mapRepository: MapRepository,
+    private val mapRepository: MapRepository, private val appNavigator: AppNavigator
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(
@@ -39,9 +41,11 @@ class HomeContainerViewModel @Inject constructor(
     )
     val uiState: StateFlow<HomeSheetUiState> = _uiState.asStateFlow()
 
-    // Smart caching state for camera viewport
-    private var cachedBounds: List<TransitViewportBounds>? = null
-    private var lastLoadedZoom: Double = 0.0
+    // Smart caching state per transit type for camera viewport
+    private val cachedBoundsByType = mutableMapOf<String, List<TransitViewportBounds>>()
+    private val lastLoadedZoomByType = mutableMapOf<String, Double>()
+    private val cachedGeoJsonByType = mutableMapOf<String, String>()
+
     private var debounceLoadJob: Job? = null
     private var fetchTransitDataJob: Job? = null
     private var computeNearbyStopsJob: Job? = null
@@ -51,8 +55,8 @@ class HomeContainerViewModel @Inject constructor(
     private var isNearbySheetVisible: Boolean = false
 
     companion object {
-        private const val MIN_ZOOM_THRESHOLD = 11.0
-        private const val BOUNDS_BUFFER_FACTOR = 0.35 // 35% buffer to reduce reload frequency
+        private const val MIN_ZOOM_THRESHOLD = 8.0
+        private const val BOUNDS_BUFFER_FACTOR = 0.25 // 35% buffer to reduce reload frequency
         private const val DEBOUNCE_DELAY_MS = 400L
     }
 
@@ -92,6 +96,17 @@ class HomeContainerViewModel @Inject constructor(
         }
     }
 
+    private fun shouldFetchForType(typeId: String, viewport: TransitMapViewportInfo): Boolean {
+        val cached = cachedBoundsByType[typeId] ?: return true
+        val lastZoom = lastLoadedZoomByType[typeId] ?: 0.0
+        val isZoomingIn = viewport.zoom >= lastZoom
+        val isWithinCachedBounds =
+            viewport.bufferedRequestBounds(bufferFactor = 0.0).all { visibleBounds ->
+                cached.any { cachedBound -> visibleBounds.isInside(cachedBound) }
+        }
+        return !(isWithinCachedBounds && isZoomingIn)
+    }
+
     /**
      * Evaluates camera movement and determines whether new data is needed.
      * Prevents unnecessary reloads when zooming in or panning within cached bounds.
@@ -108,26 +123,19 @@ class HomeContainerViewModel @Inject constructor(
             Timber.d("Skip load: current zoom (${viewport.zoom}) is below threshold ($MIN_ZOOM_THRESHOLD)")
             return
         }
+        val typesNeedingFetch = _uiState.value.transitConfigs.map { it.typeId }
+            .filter { shouldFetchForType(it, viewport) }
 
-        val cached = cachedBounds
-        if (cached != null) {
-            // Rule 1: If zooming in within cached bounds, do NOT reload!
-            val isZoomingIn = viewport.zoom >= lastLoadedZoom
-            val isWithinCachedBounds = viewport.bufferedRequestBounds(bufferFactor = 0.0).all { visibleBounds ->
-                cached.any { cachedBound -> visibleBounds.isInside(cachedBound) }
-            }
-
-            if (isWithinCachedBounds && isZoomingIn) {
-                cancelTransitDataLoad()
-                Timber.d("Skip load: viewport is within cached bounds and user is zooming in")
-                return
-            }
+        if (typesNeedingFetch.isEmpty()) {
+            cancelTransitDataLoad()
+            Timber.d("PhucTH: LoadStopDebug: skipped — all transit types cached for this viewport")
+            return
         }
 
         // Debounce camera movements before fetching
         debounceLoadJob = viewModelScope.launch {
             delay(DEBOUNCE_DELAY_MS.milliseconds)
-            loadTransitStopsData(viewport)
+            loadTransitStopsData(viewport, typesNeedingFetch.toSet())
         }
     }
 
@@ -148,12 +156,25 @@ class HomeContainerViewModel @Inject constructor(
             Timber.d("Skip load on gesture release: current zoom (${viewport.zoom}) is below threshold ($MIN_ZOOM_THRESHOLD)")
             return
         }
+        val typesNeedingFetch = _uiState.value.transitConfigs.map { it.typeId }
+            .filter { shouldFetchForType(it, viewport) }
+
+        if (typesNeedingFetch.isEmpty()) {
+            Timber.d("Skip load on gesture release: all transit types cached for this viewport")
+            return
+        }
+
         debounceLoadJob?.cancel()
-        loadTransitStopsData(viewport)
+        loadTransitStopsData(viewport, typesNeedingFetch.toSet())
     }
 
-    private fun loadTransitStopsData(viewport: TransitMapViewportInfo) {
-        val bufferedBounds:List<TransitViewportBounds> = viewport.bufferedRequestBounds(BOUNDS_BUFFER_FACTOR)
+    private fun loadTransitStopsData(
+        viewport: TransitMapViewportInfo,
+        typeIdsToFetch: Set<String> = _uiState.value.transitConfigs.map { it.typeId }.toSet(),
+    ) {
+        if (typeIdsToFetch.isEmpty()) return
+        val bufferedBounds: List<TransitViewportBounds> =
+            viewport.bufferedRequestBounds(BOUNDS_BUFFER_FACTOR)
         val requestBounds = bufferedBounds.map {
             TransitStopBoundsRequest(
                 minLat = it.minLatitude,
@@ -167,22 +188,30 @@ class HomeContainerViewModel @Inject constructor(
         fetchTransitDataJob = viewModelScope.launch {
             _uiState.update { it.copy(isLoadingTransit = true, errorMessage = null) }
 
-            mapRepository.getTransitStopsGeoJson(requestBounds).onSuccess { load: TransitStopsGeoJsonLoad ->
-                val geoJsonMap = load.geoJsonByType
+            mapRepository.getTransitStopsGeoJson(requestBounds, typeIdsToFetch)
+                .onSuccess { load: TransitStopsGeoJsonLoad ->
+                    val fetchedGeoJsonMap = load.geoJsonByType
+
+                    typeIdsToFetch.forEach { typeId ->
+                        if (!load.failedTypeIds.contains(typeId)) {
+                            val geoJson = fetchedGeoJsonMap[typeId].orEmpty()
+                            cachedGeoJsonByType[typeId] = geoJson
+                            cachedBoundsByType[typeId] = bufferedBounds
+                            lastLoadedZoomByType[typeId] = viewport.zoom
+                        }
+                    }
+
+                    if (load.failedTypeIds.isNotEmpty()) {
+                        Timber.w("Transit stop load was partial; failed types: ${load.failedTypeIds}")
+                    }
+
                 val activeTypes = _uiState.value.activeTransitTypes
                 val sources = _uiState.value.transitConfigs.map { config ->
                     TransitSourceData(
                         typeId = config.typeId,
-                        geoJson = geoJsonMap.getValue(config.typeId),
+                        geoJson = cachedGeoJsonByType[config.typeId].orEmpty(),
                         isVisible = activeTypes.contains(config.typeId),
                     )
-                }
-                if (load.failedTypeIds.isEmpty()) {
-                    cachedBounds = bufferedBounds
-                    lastLoadedZoom = viewport.zoom
-                } else {
-                    cachedBounds = null
-                    Timber.w("Transit stop load was partial; will retry failed types: ${load.failedTypeIds}")
                 }
                 _uiState.update { currentState ->
                     currentState.copy(
@@ -190,10 +219,11 @@ class HomeContainerViewModel @Inject constructor(
                         isLoadingTransit = false,
                     )
                 }
-//                if (isNearbySheetVisible) {
-//                    computeNearbyStopsForSheet(_uiState.value.currentMapCenter)
-//                }
-                Timber.d("Successfully loaded GTFS data for ${sources.size} transit types")
+
+                    if (isNearbySheetVisible) {
+                        computeNearbyStopsForSheet()
+                    }
+                    Timber.d("Successfully loaded GTFS data for ${typeIdsToFetch.size - load.failedTypeIds.size} fetched transit types")
             }.onFailure { error ->
                 Timber.e(error, "Failed to load GTFS transit stops")
                 _uiState.update {
@@ -289,40 +319,6 @@ class HomeContainerViewModel @Inject constructor(
         computeNearbyStopsForSheet()
     }
 
-    /**
-     * Called when the map is clicked.
-     * Sets map focus to true and updates clicked map location as center.
-     */
-    fun onMapClick(lat: Double? = null, lon: Double? = null) {
-        _uiState.update { currentState ->
-            currentState.copy(
-                isMapFocused = true,
-            )
-        }
-    }
-
-    fun showHomeBottomSheet() {
-        _uiState.update { currentState ->
-            currentState.copy(
-                isMapFocused = false,
-            )
-        }
-    }
-
-    fun showNearbyStopsBottomSheet() {
-        _uiState.update { currentState ->
-            currentState.copy(
-                isMapFocused = false,
-            )
-        }
-    }
-
-    fun setMapFocused(isFocused: Boolean) {
-        _uiState.update { currentState ->
-            currentState.copy(isMapFocused = isFocused)
-        }
-    }
-
     private fun computeNearbyStops(
         sources: List<TransitSourceData>,
         centerLocation: LocationData?,
@@ -404,6 +400,10 @@ class HomeContainerViewModel @Inject constructor(
             Timber.e(e, "Error parsing GeoJSON for nearby stops")
         }
         return result
+    }
+
+    fun navigateToSettingScreen() {
+        appNavigator.navigateTo(SettingRoute)
     }
 }
 

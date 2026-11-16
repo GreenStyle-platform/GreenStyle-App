@@ -72,16 +72,19 @@ fun setupTransitSourcesAndLayers(
             } else {
                 val newSource = geoJsonSource(sourceId) {
                     data(sourceData.geoJson)
-                    cluster(true)
-                    clusterRadius(clusterConfig.clusterRadius)
-                    clusterMaxZoom(clusterConfig.clusterMaxZoom)
+                    cluster(clusterConfig.isEnabled)
+                    if (clusterConfig.isEnabled) {
+                        clusterRadius(clusterConfig.clusterRadius)
+                        clusterMaxZoom(clusterConfig.clusterMaxZoom)
+                    }
                 }
                 style.addSource(newSource)
-                Timber.d("TransitMapStyleManager: added GeoJsonSource '$sourceId' with clustering")
+                Timber.d("TransitMapStyleManager: added GeoJsonSource '$sourceId' (clustering=${clusterConfig.isEnabled})")
             }
         }
 
         val targetVisibility = if (sourceData.isVisible) Visibility.VISIBLE else Visibility.NONE
+        val clusterVisibility = if (sourceData.isVisible && clusterConfig.isEnabled) Visibility.VISIBLE else Visibility.NONE
 
         // 2. Add Cluster Circle Layer (if not exists)
         if (!style.styleLayerExists(clusterCircleLayerId)) {
@@ -96,11 +99,11 @@ fun setupTransitSourcesAndLayers(
                 circleStrokeWidth(2.5)
                 circleStrokeColor("#FFFFFF")
                 circleOpacity(0.9)
-                visibility(targetVisibility)
+                visibility(clusterVisibility)
             }
             style.addLayer(circleLayer)
         } else {
-            style.getLayer(clusterCircleLayerId)?.visibility(targetVisibility)
+            style.getLayer(clusterCircleLayerId)?.visibility(clusterVisibility)
         }
 
         // 3. Add Cluster Text Count Layer (if not exists)
@@ -112,7 +115,7 @@ fun setupTransitSourcesAndLayers(
                 textColor(config.clusterTextColor)
                 textIgnorePlacement(true)
                 textAllowOverlap(true)
-                visibility(targetVisibility)
+                visibility(clusterVisibility)
             }
             style.addLayer(countLayer)
         } else {
@@ -124,7 +127,11 @@ fun setupTransitSourcesAndLayers(
             val stopSymbolLayer = symbolLayer(stopSymbolLayerId, sourceId) {
                 filter(Expression.fromRaw("""["!", ["has", "point_count"]]"""))
                 iconImage(config.iconName)
-                iconSize(config.iconSize)
+                iconSize(
+                    Expression.fromRaw(
+                        """["interpolate", ["linear"], ["zoom"], 10.0, ${0.3 * config.iconSize}, 13.0, ${0.75 * config.iconSize}, 15.0, ${1.0 * config.iconSize}, 18.0, ${1.3 * config.iconSize}]"""
+                    )
+                )
                 iconAllowOverlap(true)
                 iconIgnorePlacement(false)
                 visibility(targetVisibility)

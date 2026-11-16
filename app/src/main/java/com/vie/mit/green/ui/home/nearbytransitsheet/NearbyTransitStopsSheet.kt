@@ -40,6 +40,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.vie.mit.common.theme.AppTheme
+import com.vie.mit.data.model.common.map.PublicTransportType
+import com.vie.mit.data.model.common.map.TravelMode
 import java.util.Locale
 
 /**
@@ -228,10 +230,10 @@ private fun NearbyStopItemCard(
     modifier: Modifier = Modifier,
 ) {
     val (icon, badgeColor) = when (stop.typeId.uppercase()) {
-        "BUS" -> Icons.Default.DirectionsBus to Color(0xFF1E88E5)
-        "METRO" -> Icons.Default.Subway to Color(0xFFE53935)
-        "TRAIN" -> Icons.Default.Train to Color(0xFF8E24AA)
-        "BIKE" -> Icons.AutoMirrored.Filled.DirectionsBike to Color(0xFF43A047)
+        PublicTransportType.BUS.name -> Icons.Default.DirectionsBus to Color(0xFF1E88E5)
+        PublicTransportType.SUBWAY.name -> Icons.Default.Subway to Color(0xFFE53935)
+        PublicTransportType.RAIL.name -> Icons.Default.Train to Color(0xFF8E24AA)
+        TravelMode.BICYCLE_RENT.name -> Icons.AutoMirrored.Filled.DirectionsBike to Color(0xFF43A047)
         else -> Icons.Default.DirectionsTransit to AppTheme.colors.navyBlue
     }
 

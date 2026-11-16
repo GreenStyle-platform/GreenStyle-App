@@ -1,3 +1,12 @@
 package com.vie.mit.green.ui.transitroutepath
 
-class TransitRoutePathScreen
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
+
+@Composable
+fun TransitRoutePathScreen(
+    viewModel: TransitRoutePathViewModel,
+    modifier: Modifier = Modifier,
+) {
+
+}

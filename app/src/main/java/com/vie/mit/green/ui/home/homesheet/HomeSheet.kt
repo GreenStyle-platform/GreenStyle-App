@@ -33,7 +33,6 @@ import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Map
-import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Subway
@@ -60,6 +59,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.vie.mit.common.theme.AppTheme
+import com.vie.mit.data.model.common.map.PublicTransportType
+import com.vie.mit.data.model.common.map.TravelMode
 import com.vie.mit.mapbox.model.StopFeatureClick
 
 // ======================================================================================
@@ -414,8 +415,8 @@ private fun TransitModesGrid(
             CitymapperGridButton(
                 icon = Icons.AutoMirrored.Filled.DirectionsBike,
                 label = "Bike",
-                isActive = activeTransitTypes.contains("BIKE"),
-                onClick = { onToggleTransitType("BIKE") },
+                isActive = activeTransitTypes.contains(TravelMode.BICYCLE_RENT.name),
+                onClick = { onToggleTransitType(TravelMode.BICYCLE_RENT.name) },
                 modifier = Modifier.weight(1f),
             )
             CitymapperGridButton(
@@ -433,7 +434,7 @@ private fun TransitModesGrid(
             )
         }
 
-        // Row 2: e-Scooter | Bus | Tube | Rail | More
+        // Row 2: e-Scooter | Bus | Metro | Rail | More
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -447,22 +448,22 @@ private fun TransitModesGrid(
             CitymapperGridButton(
                 icon = Icons.Default.DirectionsBus,
                 label = "Bus",
-                isActive = activeTransitTypes.contains("BUS"),
-                onClick = { onToggleTransitType("BUS") },
+                isActive = activeTransitTypes.contains(PublicTransportType.BUS.name),
+                onClick = { onToggleTransitType(PublicTransportType.BUS.name) },
                 modifier = Modifier.weight(1f),
             )
             CitymapperGridButton(
                 icon = Icons.Default.Subway,
-                label = "Tube",
-                isActive = activeTransitTypes.contains("METRO"),
-                onClick = { onToggleTransitType("METRO") },
+                label = "Metro",
+                isActive = activeTransitTypes.contains(PublicTransportType.SUBWAY.name),
+                onClick = { onToggleTransitType(PublicTransportType.SUBWAY.name) },
                 modifier = Modifier.weight(1f),
             )
             CitymapperGridButton(
                 icon = Icons.Default.Train,
                 label = "Rail",
-                isActive = activeTransitTypes.contains("TRAIN"),
-                onClick = { onToggleTransitType("TRAIN") },
+                isActive = activeTransitTypes.contains(PublicTransportType.RAIL.name),
+                onClick = { onToggleTransitType(PublicTransportType.RAIL.name) },
                 modifier = Modifier.weight(1f),
             )
             CitymapperGridButton(

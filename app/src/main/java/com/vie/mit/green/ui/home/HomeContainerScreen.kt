@@ -196,7 +196,7 @@ fun HomeContainerScreen(
 
                 // 2. Top-Left Floating Settings Button
                 Surface(
-                    onClick = { /* TODO: Navigate to Settings */ },
+                    onClick = homeContainerViewModel::navigateToSettingScreen,
                     shape = CircleShape,
                     color = Color.White,
                     shadowElevation = 6.dp,

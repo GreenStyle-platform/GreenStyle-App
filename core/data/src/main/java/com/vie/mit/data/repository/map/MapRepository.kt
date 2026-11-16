@@ -25,6 +25,7 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
 import kotlinx.serialization.json.putJsonObject
+import timber.log.Timber
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -71,12 +72,14 @@ class MapRepository @Inject constructor(
 
     suspend fun getTransitStopsGeoJson(
         bounds: List<TransitStopBoundsRequest>,
+        typeIdsToFetch: Set<String> = defaultConfigs.map { it.typeId }.toSet(),
     ): Result<TransitStopsGeoJsonLoad> = withContext(Dispatchers.IO) {
         try {
             require(bounds.isNotEmpty()) { "At least one viewport bound is required" }
+            val configsToFetch = defaultConfigs.filter { it.typeId in typeIdsToFetch }
             val stopResults: Map<String, Result<List<TransitStopMarkerResponse>>> =
                 supervisorScope {
-                    defaultConfigs.associate { config ->
+                    configsToFetch.associate { config ->
                         config.typeId to async {
                             loadStopsResult(config.typeId, bounds)
                         }
@@ -85,7 +88,7 @@ class MapRepository @Inject constructor(
 
             Result.success(
                 TransitStopsGeoJsonLoad(
-                    geoJsonByType = defaultConfigs.associate { config ->
+                    geoJsonByType = configsToFetch.associate { config ->
                         val stops = stopResults[config.typeId]?.getOrDefault(emptyList()).orEmpty()
                         config.typeId to stops.toFeatureCollectionGeoJson(config.typeId)
                     },
@@ -108,6 +111,7 @@ class MapRepository @Inject constructor(
                 async { loadStops(typeId, bound) }
             }.awaitAll().flatten().distinctBy(TransitStopMarkerResponse::id)
         }
+        Timber.d("PhucTH: LoadStopDebug: loadStopResult called")
         Result.success(stops)
     } catch (exception: CancellationException) {
         throw exception
@@ -119,8 +123,8 @@ class MapRepository @Inject constructor(
         typeId: String,
         bounds: TransitStopBoundsRequest,
     ): List<TransitStopMarkerResponse> = when (typeId) {
-        PublicTransportType.BUS.name -> mapApi.searchBusStopsInBounds(bounds)
-        PublicTransportType.SUBWAY.name -> mapApi.searchMetroStopsInBounds(bounds)
+        PublicTransportType.BUS.name -> mapApi.searchBusStopsInBounds(bounds = bounds)
+        PublicTransportType.SUBWAY.name -> mapApi.searchMetroStopsInBounds(bounds = bounds)
         else -> emptyList()
     }
 

@@ -39,14 +39,14 @@ data class TransitSourceData(
 /**
  * Clustering configurations for transit sources.
  *
+ * @param isEnabled Whether clustering is enabled for transit stops.
  * @param clusterRadius Radius of each cluster if clustering is enabled. A cluster will include all points within this radius.
  * @param clusterMaxZoom Max zoom level to cluster points on. Cluster points will break into individual points above this zoom.
- * @param minZoomToDisplay Minimum zoom level for stops to begin loading/displaying on the map.
  */
 data class TransitClusterConfig(
-    val clusterRadius: Long = 24L,
-    val clusterMaxZoom: Long = 14L,
-    val minZoomToDisplay: Double = 12.0,
+    val isEnabled: Boolean = true,
+    val clusterRadius: Long = 28L,
+    val clusterMaxZoom: Long = 12L,
 )
 
 /**
