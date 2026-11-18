@@ -13,6 +13,12 @@ import com.mapbox.geojson.Point
  * @param clusterColor Primary color of the cluster circle bubble.
  * @param clusterTextColor Color of the number of stops text inside the cluster bubble.
  * @param iconSize Scaling factor for the symbol icon on the map.
+ * @param showStopName Whether to display the stop's name below the icon when zoomed in.
+ * @param textMinZoom Minimum zoom level to start displaying the stop name.
+ * @param textSize Font size for the stop name text.
+ * @param textColor Color of the stop name text. If null, resolved dynamically from AppColors.
+ * @param textHaloColor Color of the halo outline around text for readability.
+ * @param textHaloWidth Width of the halo outline around text.
  */
 data class TransitTypeConfig(
     val typeId: String,
@@ -21,6 +27,12 @@ data class TransitTypeConfig(
     @param:ColorInt val clusterColor: Int,
     @param:ColorInt val clusterTextColor: Int = 0xFFFFFFFF.toInt(),
     val iconSize: Double = 1.0,
+    val showStopName: Boolean = true,
+    val textMinZoom: Double = 15.0,
+    val textSize: Double = 11.0,
+    @param:ColorInt val textColor: Int? = null,
+    @param:ColorInt val textHaloColor: Int = 0xFFFFFFFF.toInt(),
+    val textHaloWidth: Double = 1.2,
 )
 
 /**

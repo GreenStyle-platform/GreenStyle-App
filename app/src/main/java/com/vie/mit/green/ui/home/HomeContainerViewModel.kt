@@ -3,6 +3,8 @@ package com.vie.mit.green.ui.home
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.vie.mit.common.navigation.AppNavigator
+import com.vie.mit.data.model.common.map.PublicTransportType
+import com.vie.mit.data.model.common.map.TravelMode
 import com.vie.mit.data.model.domain.map.TransitStopsGeoJsonLoad
 import com.vie.mit.data.model.remote.request.map.TransitStopBoundsRequest
 import com.vie.mit.data.repository.map.MapRepository
@@ -51,6 +53,7 @@ class HomeContainerViewModel @Inject constructor(
     private var computeNearbyStopsJob: Job? = null
     private var lastKnownLocation: LocationData? = null
     private var currentMapCenter: LocationData? = null
+    private var currentViewport: TransitMapViewportInfo? = null
     private var hasLoadedInitialLocation: Boolean = false
     private var isNearbySheetVisible: Boolean = false
 
@@ -115,6 +118,7 @@ class HomeContainerViewModel @Inject constructor(
     fun onViewportChanged(viewport: TransitMapViewportInfo) {
         // Cập nhật tâm bản đồ trực tiếp từ MapView (SSOT)
         currentMapCenter = LocationData(viewport.centerLatitude, viewport.centerLongitude)
+        currentViewport = viewport
         debounceLoadJob?.cancel()
         debounceLoadJob = null
 
@@ -123,8 +127,15 @@ class HomeContainerViewModel @Inject constructor(
             Timber.d("Skip load: current zoom (${viewport.zoom}) is below threshold ($MIN_ZOOM_THRESHOLD)")
             return
         }
-        val typesNeedingFetch = _uiState.value.transitConfigs.map { it.typeId }
-            .filter { shouldFetchForType(it, viewport) }
+
+        // Khi đang ở Sheet chuyên biệt (selectedTransitTypeId != null), CHỈ fetch đúng loại phương tiện đó
+        val focusedType = _uiState.value.selectedTransitTypeId
+        val typesNeedingFetch = if (focusedType != null) {
+            if (shouldFetchForType(focusedType, viewport)) listOf(focusedType) else emptyList()
+        } else {
+            _uiState.value.transitConfigs.map { it.typeId }
+                .filter { shouldFetchForType(it, viewport) }
+        }
 
         if (typesNeedingFetch.isEmpty()) {
             cancelTransitDataLoad()
@@ -146,6 +157,7 @@ class HomeContainerViewModel @Inject constructor(
     fun onCameraGestureRelease(viewport: TransitMapViewportInfo) {
         val centerLocation = LocationData(viewport.centerLatitude, viewport.centerLongitude)
         currentMapCenter = centerLocation
+        currentViewport = viewport
 
         // Tự động tính toán lại trạm theo tâm bản đồ mới khi kéo và nhả tay (nếu NearbyTransitSheet đang hiển thị)
         if (isNearbySheetVisible) {
@@ -156,8 +168,15 @@ class HomeContainerViewModel @Inject constructor(
             Timber.d("Skip load on gesture release: current zoom (${viewport.zoom}) is below threshold ($MIN_ZOOM_THRESHOLD)")
             return
         }
-        val typesNeedingFetch = _uiState.value.transitConfigs.map { it.typeId }
-            .filter { shouldFetchForType(it, viewport) }
+
+        // Khi đang ở Sheet chuyên biệt (selectedTransitTypeId != null), CHỈ fetch đúng loại phương tiện đó
+        val focusedType = _uiState.value.selectedTransitTypeId
+        val typesNeedingFetch = if (focusedType != null) {
+            if (shouldFetchForType(focusedType, viewport)) listOf(focusedType) else emptyList()
+        } else {
+            _uiState.value.transitConfigs.map { it.typeId }
+                .filter { shouldFetchForType(it, viewport) }
+        }
 
         if (typesNeedingFetch.isEmpty()) {
             Timber.d("Skip load on gesture release: all transit types cached for this viewport")
@@ -206,11 +225,16 @@ class HomeContainerViewModel @Inject constructor(
                     }
 
                 val activeTypes = _uiState.value.activeTransitTypes
+                val selectedType = _uiState.value.selectedTransitTypeId
                 val sources = _uiState.value.transitConfigs.map { config ->
                     TransitSourceData(
                         typeId = config.typeId,
                         geoJson = cachedGeoJsonByType[config.typeId].orEmpty(),
-                        isVisible = activeTypes.contains(config.typeId),
+                        isVisible = if (selectedType != null) {
+                            config.typeId == selectedType
+                        } else {
+                            activeTypes.contains(config.typeId)
+                        },
                     )
                 }
                 _uiState.update { currentState ->
@@ -259,6 +283,105 @@ class HomeContainerViewModel @Inject constructor(
 
             currentState.copy(
                 activeTransitTypes = updatedActive,
+                transitSources = updatedSources,
+            )
+        }
+    }
+
+    /**
+     * Loads bus stops specifically for the current or specified viewport.
+     * Prevents fetching other transit modes to avoid unnecessary network calls.
+     */
+    fun loadBusStopsData(viewport: TransitMapViewportInfo? = currentViewport) {
+        val vp = viewport ?: return
+        if (shouldFetchForType(PublicTransportType.BUS.name, vp)) {
+            loadTransitStopsData(vp, setOf(PublicTransportType.BUS.name))
+        } else if (isNearbySheetVisible) {
+            computeNearbyStopsForSheet()
+        }
+    }
+
+    /**
+     * Loads subway / metro stations specifically for the current or specified viewport.
+     * Prevents fetching other transit modes to avoid unnecessary network calls.
+     */
+    fun loadSubwayStationsData(viewport: TransitMapViewportInfo? = currentViewport) {
+        val vp = viewport ?: return
+        if (shouldFetchForType(PublicTransportType.SUBWAY.name, vp)) {
+            loadTransitStopsData(vp, setOf(PublicTransportType.SUBWAY.name))
+        } else if (isNearbySheetVisible) {
+            computeNearbyStopsForSheet()
+        }
+    }
+
+    /**
+     * Loads bicycle rental stations specifically for the current or specified viewport.
+     * Prevents fetching other transit modes to avoid unnecessary network calls.
+     */
+    fun loadBikeStationsData(viewport: TransitMapViewportInfo? = currentViewport) {
+        val vp = viewport ?: return
+        if (shouldFetchForType(TravelMode.BICYCLE_RENT.name, vp)) {
+            loadTransitStopsData(vp, setOf(TravelMode.BICYCLE_RENT.name))
+        } else if (isNearbySheetVisible) {
+            computeNearbyStopsForSheet()
+        }
+    }
+
+    /**
+     * Loads all configured transit stop data for the current viewport (used on the main Home screen).
+     */
+    fun loadAllTransitStopsData(viewport: TransitMapViewportInfo? = currentViewport) {
+        val vp = viewport ?: return
+        val typesNeedingFetch = _uiState.value.transitConfigs.map { it.typeId }
+            .filter { shouldFetchForType(it, vp) }
+        if (typesNeedingFetch.isNotEmpty()) {
+            loadTransitStopsData(vp, typesNeedingFetch.toSet())
+        }
+    }
+
+    /**
+     * Called when user taps a transit type tile in HomeSheet to open the dedicated nearby sheet.
+     * - Filters the map to only show [typeId] layer (hides all other types).
+     * - Triggers individual loading method for [typeId] if not already cached.
+     * - Sets [HomeSheetUiState.selectedTransitTypeId] so downstream sheets can filter appropriately.
+     */
+    fun selectTransitType(typeId: String) {
+        _uiState.update { state ->
+            val updatedSources = state.transitSources.map { src ->
+                src.copy(isVisible = src.typeId == typeId)
+            }
+            state.copy(
+                selectedTransitTypeId = typeId,
+                transitSources = updatedSources,
+            )
+        }
+
+        val vp = currentViewport
+        when (typeId) {
+            PublicTransportType.BUS.name -> loadBusStopsData(vp)
+            PublicTransportType.SUBWAY.name -> loadSubwayStationsData(vp)
+            TravelMode.BICYCLE_RENT.name -> loadBikeStationsData(vp)
+            else -> {
+                if (vp != null && shouldFetchForType(typeId, vp)) {
+                    loadTransitStopsData(vp, typeIdsToFetch = setOf(typeId))
+                } else if (isNearbySheetVisible) {
+                    computeNearbyStopsForSheet()
+                }
+            }
+        }
+    }
+
+    /**
+     * Restores the map to show all active transit types.
+     * Called when user navigates back from NearbyBusStopsSheet / NearbyTransitStopsSheet.
+     */
+    fun clearTransitTypeSelection() {
+        _uiState.update { state ->
+            val updatedSources = state.transitSources.map { src ->
+                src.copy(isVisible = state.activeTransitTypes.contains(src.typeId))
+            }
+            state.copy(
+                selectedTransitTypeId = null,
                 transitSources = updatedSources,
             )
         }

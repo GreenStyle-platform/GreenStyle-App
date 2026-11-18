@@ -4,6 +4,7 @@ import com.vie.mit.data.model.common.map.PublicTransportType
 import com.vie.mit.data.model.common.map.TravelMode
 import com.vie.mit.data.model.domain.map.Location
 import com.vie.mit.data.model.domain.map.PublicTransportSuggestion
+import com.vie.mit.data.model.domain.map.StopArrival
 import com.vie.mit.data.model.domain.map.TransitStopsGeoJsonLoad
 import com.vie.mit.data.model.mapper.toDomain
 import com.vie.mit.data.model.mapper.toLocationRequest
@@ -70,6 +71,17 @@ class MapRepository @Inject constructor(
         mapApi.getPublicTransportSuggestions(location.toLocationRequest()).map { it.toDomain() }
     }
 
+    /**
+     * Fetches scheduled arrivals for a specific bus stop.
+     * Returns arrivals sorted by ETA (ascending).
+     * Falls back to empty list if network/server error.
+     */
+    suspend fun getBusStopArrivals(stopId: String): Result<List<StopArrival>> = handleApiCall {
+        mapApi.getBusStopArrivals(stopId = stopId)
+            .map { it.toDomain() }
+            .sortedBy { it.etaMinutes }
+    }
+
     suspend fun getTransitStopsGeoJson(
         bounds: List<TransitStopBoundsRequest>,
         typeIdsToFetch: Set<String> = defaultConfigs.map { it.typeId }.toSet(),
@@ -125,6 +137,12 @@ class MapRepository @Inject constructor(
     ): List<TransitStopMarkerResponse> = when (typeId) {
         PublicTransportType.BUS.name -> mapApi.searchBusStopsInBounds(bounds = bounds)
         PublicTransportType.SUBWAY.name -> mapApi.searchMetroStopsInBounds(bounds = bounds)
+        TravelMode.BICYCLE_RENT.name -> try {
+            mapApi.searchBikeStopsInBounds(bounds = bounds)
+        } catch (e: Exception) {
+            Timber.w(e, "searchBikeStopsInBounds endpoint failed or not yet deployed")
+            emptyList()
+        }
         else -> emptyList()
     }
 

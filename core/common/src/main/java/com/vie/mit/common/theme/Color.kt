@@ -20,4 +20,5 @@ val OverlayColor = Color(0x33000000)
 val GreenBackgroundCard = Color(0xFF019B10)
 val BlueBusColor = Color(0xFF0369D8)
 val GreenMetroColor = Color(0xFF2C9F00)
+val BlueBikeColor = Color(0xFF148ED0)
 

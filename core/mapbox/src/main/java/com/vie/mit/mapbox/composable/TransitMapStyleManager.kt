@@ -12,16 +12,19 @@ import com.mapbox.maps.extension.style.layers.addLayer
 import com.mapbox.maps.extension.style.layers.generated.circleLayer
 import com.mapbox.maps.extension.style.layers.generated.symbolLayer
 import com.mapbox.maps.extension.style.layers.getLayer
+import com.mapbox.maps.extension.style.layers.properties.generated.TextAnchor
 import com.mapbox.maps.extension.style.layers.properties.generated.Visibility
 import com.mapbox.maps.extension.style.sources.addSource
 import com.mapbox.maps.extension.style.sources.generated.GeoJsonSource
 import com.mapbox.maps.extension.style.sources.generated.geoJsonSource
 import com.mapbox.maps.extension.style.sources.getSourceAs
+import com.vie.mit.common.theme.AppColors
 import com.vie.mit.mapbox.model.StopFeatureClick
 import com.vie.mit.mapbox.model.TransitClusterConfig
 import com.vie.mit.mapbox.model.TransitSourceData
 import com.vie.mit.mapbox.model.TransitTypeConfig
 import com.vie.mit.mapbox.util.bitmapFromDrawableRes
+import com.vie.mit.mapbox.util.getTransitTextColor
 import timber.log.Timber
 
 /**
@@ -53,6 +56,7 @@ fun setupTransitSourcesAndLayers(
     transitSources: List<TransitSourceData>,
     transitConfigs: List<TransitTypeConfig>,
     clusterConfig: TransitClusterConfig,
+    appColors: AppColors? = null,
 ) {
     val configMap = transitConfigs.associateBy { it.typeId }
 
@@ -124,6 +128,10 @@ fun setupTransitSourcesAndLayers(
 
         // 4. Add Unclustered Stop Symbol Layer (if not exists)
         if (!style.styleLayerExists(stopSymbolLayerId)) {
+            val resolvedTextColor = config.textColor
+                ?: appColors?.getTransitTextColor(config.typeId)
+                ?: 0xFF0369D8.toInt()
+
             val stopSymbolLayer = symbolLayer(stopSymbolLayerId, sourceId) {
                 filter(Expression.fromRaw("""["!", ["has", "point_count"]]"""))
                 iconImage(config.iconName)
@@ -134,6 +142,24 @@ fun setupTransitSourcesAndLayers(
                 )
                 iconAllowOverlap(true)
                 iconIgnorePlacement(false)
+
+                if (config.showStopName) {
+                    textField(Expression.fromRaw("""["get", "name"]"""))
+                    textSize(
+                        Expression.fromRaw(
+                            """["step", ["zoom"], 0.0, ${config.textMinZoom}, ${config.textSize}]"""
+                        )
+                    )
+                    textAnchor(TextAnchor.TOP)
+                    textOffset(listOf(0.0, 1.1))
+                    textColor(resolvedTextColor)
+                    textHaloColor(config.textHaloColor)
+                    textHaloWidth(config.textHaloWidth)
+                    textMaxWidth(9.0)
+                    textAllowOverlap(false)
+                    textOptional(true)
+                }
+
                 visibility(targetVisibility)
             }
             style.addLayer(stopSymbolLayer)

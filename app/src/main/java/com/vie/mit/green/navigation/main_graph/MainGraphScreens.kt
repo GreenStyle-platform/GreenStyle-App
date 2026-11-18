@@ -15,6 +15,24 @@ object HomeSheetRoute
 @Serializable
 data object NearbyTransitStopsSheetRoute
 
+/**
+ * Route to NearbyBusStopsSheet — dedicated screen for nearby bus stops with arrival info.
+ */
+@Serializable
+data object NearbyBusStopsSheetRoute
+
+/**
+ * Route to NearbySubwayStationsSheet — dedicated screen for nearby metro / subway stations.
+ */
+@Serializable
+data object NearbySubwayStationsSheetRoute
+
+/**
+ * Route to NearbyBikeStationsSheet — dedicated screen for nearby bicycle rental stations.
+ */
+@Serializable
+data object NearbyBikeStationsSheetRoute
+
 @Serializable
 data class StopDetailSheetRoute(
     val stopId: String,

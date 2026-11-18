@@ -19,18 +19,13 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.DirectionsBike
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DirectionsBus
 import androidx.compose.material.icons.filled.DirectionsTransit
-import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Subway
 import androidx.compose.material.icons.filled.Train
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -42,13 +37,17 @@ import androidx.compose.ui.unit.dp
 import com.vie.mit.common.theme.AppTheme
 import com.vie.mit.data.model.common.map.PublicTransportType
 import com.vie.mit.data.model.common.map.TravelMode
-import java.util.Locale
+import com.vie.mit.green.ui.home.common.NearbyEmptyStateCard
+import com.vie.mit.green.ui.home.common.NearbyLocationInfoCard
+import com.vie.mit.green.ui.home.common.NearbySheetHeader
+import com.vie.mit.green.ui.home.common.RadiusFilterChipsRow
+import com.vie.mit.green.ui.home.common.formatDistance
 
 /**
  * NearbyTransitSheet: BottomSheet content for displaying public transit stops
  * within radius [selectedRadiusKm] around the current map center location.
  *
- * @param nearbyStops List of transit stops located within [selectedRadiusKm] km
+ * @param nearbyStops List of transit stops located within [selectedRadiusKm] km (sorted by distance ascending)
  * @param selectedRadiusKm Radius parameter in kilometers (e.g. 0.5, 1.0, 2.0, 5.0)
  * @param onRadiusSelected Callback when user changes search radius parameter
  * @param onBack Callback to close sheet and return to HomeSheet
@@ -63,144 +62,46 @@ fun NearbyTransitSheet(
     onRadiusSelected: (Double) -> Unit = {},
     onStopClick: (NearbyStopItem) -> Unit = {},
 ) {
-    val availableRadii = listOf(0.5, 1.0, 2.0, 5.0)
-
     Column(
         modifier = modifier
             .fillMaxSize()
             .padding(horizontal = 16.dp, vertical = 8.dp)
     ) {
         // 1. Header with title and close/back button
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Text(
-                text = "Trạm dừng xung quanh",
-                style = MaterialTheme.typography.titleMedium.copy(
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White
-                )
-            )
-            IconButton(
-                onClick = onBack,
-                modifier = Modifier
-                    .size(32.dp)
-                    .background(AppTheme.colors.overlayColor, CircleShape)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Close,
-                    contentDescription = "Trở về Trang chủ",
-                    tint = Color.White,
-                    modifier = Modifier.size(18.dp)
-                )
-            }
-        }
+        NearbySheetHeader(
+            title = "Trạm dừng xung quanh",
+            icon = Icons.Default.DirectionsTransit,
+            accentColor = AppTheme.colors.navyBlue,
+            onBack = onBack,
+        )
 
         Spacer(modifier = Modifier.height(10.dp))
 
         // 2. Radius Filter Chips Row (x km parameter selection)
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Text(
-                text = "Bán kính:",
-                style = MaterialTheme.typography.bodySmall.copy(
-                    fontWeight = FontWeight.SemiBold,
-                    color = Color.White.copy(alpha = 0.85f)
-                )
-            )
-
-            availableRadii.forEach { radius ->
-                val isSelected = selectedRadiusKm == radius
-                FilterChip(
-                    selected = isSelected,
-                    onClick = { onRadiusSelected(radius) },
-                    label = {
-                        Text(
-                            text = "${radius} km",
-                            style = MaterialTheme.typography.labelSmall.copy(
-                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
-                            )
-                        )
-                    },
-                    colors = FilterChipDefaults.filterChipColors(
-                        containerColor = Color.White.copy(alpha = 0.15f),
-                        labelColor = Color.White,
-                        selectedContainerColor = AppTheme.colors.navyBlue,
-                        selectedLabelColor = Color.White,
-                    ),
-                    shape = RoundedCornerShape(12.dp)
-                )
-            }
-        }
+        RadiusFilterChipsRow(
+            selectedRadiusKm = selectedRadiusKm,
+            onRadiusSelected = onRadiusSelected,
+            accentColor = AppTheme.colors.navyBlue,
+        )
 
         Spacer(modifier = Modifier.height(10.dp))
 
         // 3. Info card showing location status and found count
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = Color.White),
-            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(14.dp)
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector = Icons.Default.MyLocation,
-                        contentDescription = null,
-                        tint = AppTheme.colors.navyBlue,
-                        modifier = Modifier.size(20.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = "Vị trí tâm bản đồ hiện tại",
-                        style = MaterialTheme.typography.titleSmall.copy(
-                            fontWeight = FontWeight.Bold,
-                            color = Color(0xFF374151)
-                        )
-                    )
-                }
-                Spacer(modifier = Modifier.height(6.dp))
-                Text(
-                    text = "Tìm thấy ${nearbyStops.size} trạm dừng trong bán kính $selectedRadiusKm km quanh vị trí này.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = Color(0xFF6B7280)
-                )
-            }
-        }
+        NearbyLocationInfoCard(
+            itemCount = nearbyStops.size,
+            itemTypeName = "trạm dừng",
+            selectedRadiusKm = selectedRadiusKm,
+            accentColor = AppTheme.colors.navyBlue,
+        )
 
         Spacer(modifier = Modifier.height(12.dp))
 
         // 4. List of nearby stops or Empty State
         if (nearbyStops.isEmpty()) {
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 12.dp),
-                shape = RoundedCornerShape(14.dp),
-                colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.9f))
-            ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(24.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = "Không tìm thấy trạm dừng nào trong bán kính $selectedRadiusKm km quanh khu vực này.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = Color(0xFF4B5563)
-                    )
-                }
-            }
+            NearbyEmptyStateCard(
+                icon = Icons.Default.DirectionsTransit,
+                message = "Không tìm thấy trạm dừng nào trong bán kính $selectedRadiusKm km quanh khu vực này.",
+            )
         } else {
             LazyColumn(
                 modifier = Modifier.fillMaxWidth(),
@@ -230,18 +131,14 @@ private fun NearbyStopItemCard(
     modifier: Modifier = Modifier,
 ) {
     val (icon, badgeColor) = when (stop.typeId.uppercase()) {
-        PublicTransportType.BUS.name -> Icons.Default.DirectionsBus to Color(0xFF1E88E5)
-        PublicTransportType.SUBWAY.name -> Icons.Default.Subway to Color(0xFFE53935)
+        PublicTransportType.BUS.name -> Icons.Default.DirectionsBus to AppTheme.colors.busColor
+        PublicTransportType.SUBWAY.name -> Icons.Default.Subway to AppTheme.colors.metroColor
         PublicTransportType.RAIL.name -> Icons.Default.Train to Color(0xFF8E24AA)
-        TravelMode.BICYCLE_RENT.name -> Icons.AutoMirrored.Filled.DirectionsBike to Color(0xFF43A047)
+        TravelMode.BICYCLE_RENT.name -> Icons.AutoMirrored.Filled.DirectionsBike to AppTheme.colors.bikeColor
         else -> Icons.Default.DirectionsTransit to AppTheme.colors.navyBlue
     }
 
-    val formattedDistance = if (stop.distanceMeters < 1000) {
-        "${stop.distanceMeters.toInt()}m"
-    } else {
-        String.format(Locale.getDefault(), "%.1f km", stop.distanceMeters / 1000f)
-    }
+    val formattedDistance = formatDistance(stop.distanceMeters)
 
     Card(
         modifier = modifier
@@ -292,7 +189,7 @@ private fun NearbyStopItemCard(
                 text = formattedDistance,
                 style = MaterialTheme.typography.labelMedium.copy(
                     fontWeight = FontWeight.SemiBold,
-                    color = AppTheme.colors.navyBlue
+                    color = badgeColor
                 )
             )
         }

@@ -43,6 +43,9 @@ import com.vie.mit.common.screenbottomsheet.CustomBottomSheetValue
 import com.vie.mit.common.screenbottomsheet.rememberCustomBottomSheetState
 import com.vie.mit.common.theme.AppTheme
 import com.vie.mit.green.navigation.main_graph.HomeSheetRoute
+import com.vie.mit.green.navigation.main_graph.NearbyBikeStationsSheetRoute
+import com.vie.mit.green.navigation.main_graph.NearbyBusStopsSheetRoute
+import com.vie.mit.green.navigation.main_graph.NearbySubwayStationsSheetRoute
 import com.vie.mit.green.navigation.main_graph.NearbyTransitStopsSheetRoute
 import com.vie.mit.green.navigation.main_graph.StopDetailSheetRoute
 import com.vie.mit.green.ui.home.homesheet.StopDetailFloatingCard
@@ -78,7 +81,7 @@ fun HomeContainerScreen(
                 partiallyExpandedRatio = 0.65f,
                 expandedRatio = 0.90f,
             )
-            currentDestination?.hasRoute<NearbyTransitStopsSheetRoute>() == true -> BottomSheetConfig(
+            currentDestination?.hasRoute<NearbyTransitStopsSheetRoute>() == true || currentDestination?.hasRoute<NearbyBusStopsSheetRoute>() == true || currentDestination?.hasRoute<NearbySubwayStationsSheetRoute>() == true || currentDestination?.hasRoute<NearbyBikeStationsSheetRoute>() == true -> BottomSheetConfig(
                 peekedRatio = 0.20f,
                 partiallyExpandedRatio = 0.65f,
                 expandedRatio = 0.90f,

@@ -24,4 +24,11 @@ data class HomeSheetUiState(
     val isLoadingTransit: Boolean = false,
     val errorMessage: String? = null,
     val isMapFocused: Boolean = false,
-    )
+    /**
+     * The transit type currently focused/selected by the user (e.g. "BUS").
+     * null = show all types on map.
+     * When non-null, the map only renders layers for this typeId,
+     * and NearbyStops list is filtered to this type only.
+     */
+    val selectedTransitTypeId: String? = null,
+)

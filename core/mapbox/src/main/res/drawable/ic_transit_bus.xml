@@ -1,7 +1,7 @@
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
 
     <!-- Background rectangle -->
-    <item android:id="@+id/background">
+    <item android:id="@+id/busIconBackground">
         <shape android:shape="rectangle">
             <solid android:color="#0369D8" />
             <corners android:radius="4dp" />
