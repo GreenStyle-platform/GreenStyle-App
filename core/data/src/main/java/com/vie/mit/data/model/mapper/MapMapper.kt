@@ -4,8 +4,10 @@ import com.vie.mit.data.model.domain.map.Location
 import com.vie.mit.data.model.domain.map.PublicTransportSuggestion
 import com.vie.mit.data.model.domain.map.StopArrival
 import com.vie.mit.data.model.domain.map.TransitStopMarker
+import com.vie.mit.data.model.domain.map.VehicleArrival
 import com.vie.mit.data.model.remote.request.map.LocationRequest
 import com.vie.mit.data.model.remote.response.map.PublicTransportSuggestionResponse
+import com.vie.mit.data.model.remote.response.map.RouteVehicleArrivalResponse
 import com.vie.mit.data.model.remote.response.map.StopArrivalResponse
 import com.vie.mit.data.model.remote.response.map.TransitStopMarkerResponse
 
@@ -31,10 +33,17 @@ fun TransitStopMarkerResponse.toDomain(): TransitStopMarker = TransitStopMarker(
 )
 
 fun StopArrivalResponse.toDomain(): StopArrival = StopArrival(
+    stopId = stopId,
     routeId = routeId,
     routeShortName = routeShortName,
     routeLongName = routeLongName,
     headsign = headsign,
-    etaMinutes = (arrivalTimeSeconds / 60).coerceAtLeast(0),
+    arrivals = (arrivals.ifEmpty { arrivalTimes })
+        .map { it.toDomain() }
+        .sortedBy { it.etaMinutes },
+)
+
+fun RouteVehicleArrivalResponse.toDomain(): VehicleArrival = VehicleArrival(
+    etaMinutes = etaMinutes ?: ((arrivalTimeSeconds ?: 0) / 60).coerceAtLeast(0),
     vehicleId = vehicleId,
 )

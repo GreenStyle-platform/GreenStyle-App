@@ -8,6 +8,7 @@ import com.vie.mit.data.model.domain.map.StopArrival
 import com.vie.mit.data.model.domain.map.TransitStopsGeoJsonLoad
 import com.vie.mit.data.model.mapper.toDomain
 import com.vie.mit.data.model.mapper.toLocationRequest
+import com.vie.mit.data.model.remote.request.map.BusStopArrivalsRequest
 import com.vie.mit.data.model.remote.request.map.TransitStopBoundsRequest
 import com.vie.mit.data.model.remote.response.map.TransitStopMarkerResponse
 import com.vie.mit.data.network.api.map.MapApi
@@ -72,15 +73,18 @@ class MapRepository @Inject constructor(
     }
 
     /**
-     * Fetches scheduled arrivals for a specific bus stop.
-     * Returns arrivals sorted by ETA (ascending).
+     * Fetches scheduled route arrivals for multiple bus stops.
      * Falls back to empty list if network/server error.
      */
-    suspend fun getBusStopArrivals(stopId: String): Result<List<StopArrival>> = handleApiCall {
-        mapApi.getBusStopArrivals(stopId = stopId)
-            .map { it.toDomain() }
-            .sortedBy { it.etaMinutes }
-    }
+    suspend fun getBusStopArrivals(stopIds: List<String>): Result<List<StopArrival>> =
+        if (stopIds.isEmpty()) {
+            Result.success(emptyList())
+        } else {
+            handleApiCall {
+                mapApi.getBusStopArrivals(BusStopArrivalsRequest(stopIds = stopIds))
+                    .map { it.toDomain() }
+            }
+        }
 
     suspend fun getTransitStopsGeoJson(
         bounds: List<TransitStopBoundsRequest>,
@@ -143,6 +147,7 @@ class MapRepository @Inject constructor(
             Timber.w(e, "searchBikeStopsInBounds endpoint failed or not yet deployed")
             emptyList()
         }
+
         else -> emptyList()
     }
 

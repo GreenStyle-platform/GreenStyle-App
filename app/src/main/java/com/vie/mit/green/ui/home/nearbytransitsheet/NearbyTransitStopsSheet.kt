@@ -32,11 +32,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.vie.mit.common.theme.AppTheme
 import com.vie.mit.data.model.common.map.PublicTransportType
 import com.vie.mit.data.model.common.map.TravelMode
+import com.vie.mit.green.R
 import com.vie.mit.green.ui.home.common.NearbyEmptyStateCard
 import com.vie.mit.green.ui.home.common.NearbyLocationInfoCard
 import com.vie.mit.green.ui.home.common.NearbySheetHeader
@@ -69,9 +71,8 @@ fun NearbyTransitSheet(
     ) {
         // 1. Header with title and close/back button
         NearbySheetHeader(
-            title = "Trạm dừng xung quanh",
-            icon = Icons.Default.DirectionsTransit,
-            accentColor = AppTheme.colors.navyBlue,
+            title = stringResource(R.string.nearby_transit_stops),
+            icon = null,
             onBack = onBack,
         )
 

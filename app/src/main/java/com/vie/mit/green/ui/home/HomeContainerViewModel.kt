@@ -183,8 +183,8 @@ class HomeContainerViewModel @Inject constructor(
             return
         }
 
-        debounceLoadJob?.cancel()
-        loadTransitStopsData(viewport, typesNeedingFetch.toSet())
+//        debounceLoadJob?.cancel()
+//        loadTransitStopsData(viewport, typesNeedingFetch.toSet())
     }
 
     private fun loadTransitStopsData(
