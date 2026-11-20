@@ -1,7 +1,7 @@
 <resources>
     <string name="app_name">GreGo</string>
-    <string name="home">Home</string>
-    <string name="ride">Ride</string>
-    <string name="map">Map</string>
-    <string name="chat">Chat</string>
+    <string name="nearby_bus_title">Bus stops</string>
+    <string name="nearby_subway_title">Subway stations</string>
+    <string name="nearby_bike_title">Bike share stations</string>
+    <string name="nearby_transit_stops">Nearby Transit Stops</string>
 </resources>

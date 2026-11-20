@@ -7,7 +7,7 @@ import com.vie.mit.mapbox.model.LocationData
  *
  * @param stopId Unique identifier of the stop
  * @param name Name of the stop
- * @param typeId Type identifier (e.g., "BUS", "METRO", "TRAIN", "BIKE")
+ * @param typeId Type identifier matching domain enum name (e.g., PublicTransportType.BUS.name, PublicTransportType.SUBWAY.name)
  * @param location Coordinates of the stop
  * @param distanceMeters Distance from current reference location/map center in meters
  * @param routesOrInfo Information text such as bus routes, metro line, or available bikes

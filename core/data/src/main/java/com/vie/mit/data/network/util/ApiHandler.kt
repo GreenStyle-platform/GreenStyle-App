@@ -13,6 +13,6 @@ suspend fun <T> handleApiCall(call: suspend () -> T): Result<T> = try {
     throw e
 } catch (e: Exception) {
     val appException = e.toAppException()
-    Timber.d("PhucTH: handleApiCall: $appException")
+    Timber.d("PhucTH: handleApiCall: $appException: e: $e")
     Result.failure(appException)
 }

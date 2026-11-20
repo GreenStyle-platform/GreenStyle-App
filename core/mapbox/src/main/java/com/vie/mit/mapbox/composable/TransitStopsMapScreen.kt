@@ -36,6 +36,8 @@ import com.mapbox.maps.plugin.gestures.OnMoveListener
 import com.mapbox.maps.plugin.gestures.gestures
 import com.mapbox.maps.plugin.locationcomponent.OnIndicatorPositionChangedListener
 import com.mapbox.maps.plugin.locationcomponent.location
+import com.vie.mit.common.theme.AppColors
+import com.vie.mit.common.theme.AppTheme
 import com.vie.mit.mapbox.model.LocationData
 import com.vie.mit.mapbox.model.StopFeatureClick
 import com.vie.mit.mapbox.model.TransitClusterConfig
@@ -68,12 +70,13 @@ fun TransitStopsMapScreen(
     transitSources: List<TransitSourceData>,
     transitConfigs: List<TransitTypeConfig>,
     mapViewportState: MapViewportState = rememberMapViewportState(),
-    clusterConfig: TransitClusterConfig = remember { TransitClusterConfig() },
+    clusterConfig: TransitClusterConfig = remember { TransitClusterConfig(isEnabled = false) },
     showUserLocation: Boolean = true,
     showCenterPin: Boolean = true,
     cameraBottomPadding: Float = 0f,
     minZoom: Double? = null,
     maxZoom: Double? = null,
+    appColors: AppColors = AppTheme.colors,
     centerPinContent: (@Composable () -> Unit)? = null,
     onLocationUpdate: ((LocationData) -> Unit)? = null,
     onStopClick: ((StopFeatureClick) -> Unit)? = null,
@@ -149,11 +152,11 @@ fun TransitStopsMapScreen(
                 }
 
                 // 2. Configure GTFS Icons, Sources & Layers (chỉ cập nhật data layer, không đụng tới listeners)
-                MapEffect(transitSources, transitConfigs, clusterConfig) { mapView ->
+                MapEffect(transitSources, transitConfigs, clusterConfig, appColors) { mapView ->
                     val mapboxMap = mapView.mapboxMap
                     mapboxMap.getStyle { style ->
                         setupTransitIcons(context, style, transitConfigs)
-                        setupTransitSourcesAndLayers(style, transitSources, transitConfigs, clusterConfig)
+                        setupTransitSourcesAndLayers(style, transitSources, transitConfigs, clusterConfig, appColors)
                     }
                 }
 
@@ -290,11 +293,11 @@ fun MapboxMap.getCurrentViewportInfo(): TransitMapViewportInfo {
     val cameraOpts = cameraOptions {
         center(currentCamera.center)
         zoom(currentCamera.zoom)
-        pitch(0.0)
+        pitch(currentCamera.pitch)
         bearing(currentCamera.bearing)
         padding(currentCamera.padding)
     }
-    val bounds = this.coordinateBoundsForCamera(cameraOpts)
+    val bounds = this.coordinateBoundsForCameraUnwrapped(cameraOpts)
     return TransitMapViewportInfo(
         minLatitude = bounds.south(),
         minLongitude = bounds.west(),

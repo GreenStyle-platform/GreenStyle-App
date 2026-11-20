@@ -9,18 +9,30 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.toRoute
+import com.vie.mit.data.model.common.map.PublicTransportType
+import com.vie.mit.data.model.common.map.TravelMode
 import com.vie.mit.green.navigation.main_graph.HomeSheetRoute
+import com.vie.mit.green.navigation.main_graph.NearbyBikeStationsSheetRoute
+import com.vie.mit.green.navigation.main_graph.NearbyBusStopsSheetRoute
+import com.vie.mit.green.navigation.main_graph.NearbySubwayStationsSheetRoute
 import com.vie.mit.green.navigation.main_graph.NearbyTransitStopsSheetRoute
 import com.vie.mit.green.navigation.main_graph.StopDetailSheetRoute
 import com.vie.mit.green.ui.home.homesheet.HomeSheet
+import com.vie.mit.green.ui.home.nearbybikestations.NearbyBikeStationsSheet
+import com.vie.mit.green.ui.home.nearbybusstops.NearbyBusStopViewModel
+import com.vie.mit.green.ui.home.nearbybusstops.NearbyBusStopsSheet
+import com.vie.mit.green.ui.home.nearbysubwaystations.NearbySubwayStationsSheet
 import com.vie.mit.green.ui.home.nearbytransitsheet.NearbyTransitSheet
+import timber.log.Timber
 
 /**
  * SheetNavHost: Nested NavHost nằm bên trong BottomSheet.
@@ -68,6 +80,109 @@ fun SheetNavHost(
             HomeSheet(
                 activeTransitTypes = uiState.activeTransitTypes,
                 onToggleTransitType = homeContainerViewModel::toggleTransitType,
+                onTransitTypeClick = { typeId ->
+                    homeContainerViewModel.selectTransitType(typeId)
+                    when {
+                        typeId.equals(PublicTransportType.BUS.name, ignoreCase = true) -> {
+                            sheetNavController.navigate(NearbyBusStopsSheetRoute)
+                        }
+                        typeId.equals(PublicTransportType.SUBWAY.name, ignoreCase = true) -> {
+                            sheetNavController.navigate(NearbySubwayStationsSheetRoute)
+                        }
+                        typeId.equals(TravelMode.BICYCLE_RENT.name, ignoreCase = true) -> {
+                            sheetNavController.navigate(NearbyBikeStationsSheetRoute)
+                        }
+                        else -> {
+                            sheetNavController.navigate(NearbyTransitStopsSheetRoute)
+                        }
+                    }
+                },
+            )
+        }
+
+        composable<NearbyBusStopsSheetRoute> {
+            val homeUiState by homeContainerViewModel.uiState.collectAsStateWithLifecycle()
+            val nearbyBusViewModel: NearbyBusStopViewModel = hiltViewModel()
+            val busUiState by nearbyBusViewModel.uiState.collectAsStateWithLifecycle()
+
+            DisposableEffect(Unit) {
+                homeContainerViewModel.setNearbySheetVisible(true)
+                onDispose {
+                    homeContainerViewModel.setNearbySheetVisible(false)
+                    homeContainerViewModel.clearTransitTypeSelection()
+                }
+            }
+
+            LaunchedEffect(homeUiState.nearbyStops) {
+                // homeUiState.nearbyStops đã được ViewModel lọc và sắp xếp theo khoảng cách cho riêng Bus
+                Timber.d("PhucTH: loadBusStop: called")
+
+                nearbyBusViewModel.loadBusStops(homeUiState.nearbyStops)
+            }
+
+            NearbyBusStopsSheet(
+                uiState = busUiState,
+                selectedRadiusKm = homeUiState.selectedRadiusKm,
+                onRadiusSelected = homeContainerViewModel::setSelectedRadiusKm,
+                onBack = { sheetNavController.popBackStack() },
+                onRefresh = nearbyBusViewModel::refresh,
+                onFindBusRouteClick = homeContainerViewModel::navigateToBusRouteSearch,
+            )
+        }
+
+        composable<NearbySubwayStationsSheetRoute> {
+            val homeUiState by homeContainerViewModel.uiState.collectAsStateWithLifecycle()
+
+            DisposableEffect(Unit) {
+                homeContainerViewModel.setNearbySheetVisible(true)
+                onDispose {
+                    homeContainerViewModel.setNearbySheetVisible(false)
+                    homeContainerViewModel.clearTransitTypeSelection()
+                }
+            }
+
+            NearbySubwayStationsSheet(
+                nearbyStops = homeUiState.nearbyStops,
+                selectedRadiusKm = homeUiState.selectedRadiusKm,
+                onRadiusSelected = homeContainerViewModel::setSelectedRadiusKm,
+                onBack = { sheetNavController.popBackStack() },
+                onStopClick = { stop ->
+                    sheetNavController.navigate(
+                        StopDetailSheetRoute(
+                            stopId = stop.stopId,
+                            typeId = stop.typeId,
+                            name = stop.name,
+                        )
+                    )
+                },
+            )
+        }
+
+        composable<NearbyBikeStationsSheetRoute> {
+            val homeUiState by homeContainerViewModel.uiState.collectAsStateWithLifecycle()
+
+            DisposableEffect(Unit) {
+                homeContainerViewModel.setNearbySheetVisible(true)
+                onDispose {
+                    homeContainerViewModel.setNearbySheetVisible(false)
+                    homeContainerViewModel.clearTransitTypeSelection()
+                }
+            }
+
+            NearbyBikeStationsSheet(
+                nearbyStops = homeUiState.nearbyStops,
+                selectedRadiusKm = homeUiState.selectedRadiusKm,
+                onRadiusSelected = homeContainerViewModel::setSelectedRadiusKm,
+                onBack = { sheetNavController.popBackStack() },
+                onStopClick = { stop ->
+                    sheetNavController.navigate(
+                        StopDetailSheetRoute(
+                            stopId = stop.stopId,
+                            typeId = stop.typeId,
+                            name = stop.name,
+                        )
+                    )
+                },
             )
         }
 
@@ -79,6 +194,7 @@ fun SheetNavHost(
                 homeContainerViewModel.setNearbySheetVisible(true)
                 onDispose {
                     homeContainerViewModel.setNearbySheetVisible(false)
+                    homeContainerViewModel.clearTransitTypeSelection()
                 }
             }
 

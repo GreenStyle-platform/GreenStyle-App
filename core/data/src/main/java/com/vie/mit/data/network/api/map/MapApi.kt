@@ -1,36 +1,68 @@
 package com.vie.mit.data.network.api.map
 
-import com.vie.mit.data.network.model.map.Location
-import com.vie.mit.data.network.model.map.PublicTransportSuggestion
+import com.vie.mit.data.model.remote.request.map.BusRouteSearchRequest
+import com.vie.mit.data.model.remote.request.map.BusStopArrivalsRequest
+import com.vie.mit.data.model.remote.request.map.LocationRequest
+import com.vie.mit.data.model.remote.request.map.TransitStopBoundsRequest
+import com.vie.mit.data.model.remote.request.map.TransitStopDetailRequest
+import com.vie.mit.data.model.remote.response.map.BusRouteResponse
+import com.vie.mit.data.model.remote.response.map.PublicTransportSuggestionResponse
+import com.vie.mit.data.model.remote.response.map.RouteArrivalResponse
+import com.vie.mit.data.model.remote.response.map.TransitStopDetailResponse
+import com.vie.mit.data.model.remote.response.map.TransitStopMarkerResponse
 import retrofit2.http.Body
-import retrofit2.http.GET
 import retrofit2.http.POST
-import retrofit2.http.Query
+import retrofit2.http.Path
 
 interface MapApi {
     @POST("map/public-transports")
     suspend fun getPublicTransportSuggestions(
-        @Body location: Location,
-    ): List<PublicTransportSuggestion>
+        @Body location: LocationRequest,
+    ): List<PublicTransportSuggestionResponse>
+
+    @POST("transits/bus/search-in-bounds")
+    suspend fun searchBusStopsInBounds(
+        @Body bounds: TransitStopBoundsRequest,
+    ): List<TransitStopMarkerResponse>
+
+    @POST("transits/subway/search-in-bounds")
+    suspend fun searchMetroStopsInBounds(
+        @Body bounds: TransitStopBoundsRequest,
+    ): List<TransitStopMarkerResponse>
+
+    @POST("bike-rental-stations/search-in-bounds")
+    suspend fun searchBikeStopsInBounds(
+        @Body bounds: TransitStopBoundsRequest,
+    ): List<TransitStopMarkerResponse>
 
     /**
-     * Retrieves GTFS transit stops grouped by transit type in GeoJSON format.
-     *
-     * @param minLat South latitude
-     * @param minLon West longitude
-     * @param maxLat North latitude
-     * @param maxLon East longitude
-     * @param zoom Current camera zoom level
-     * @param types Optional comma-separated filter for types (e.g. "BUS,METRO,TRAIN,BIKE")
-     * @return Map of transit type ID to raw GeoJSON FeatureCollection string
+     * Fetch scheduled arrivals for transit stops by stop IDs.
+     * Returns a Map where key is stopId and value is list of route arrivals.
      */
-    @GET("map/gtfs/stops")
-    suspend fun getTransitStopsGeoJson(
-        @Query("minLat") minLat: Double,
-        @Query("minLon") minLon: Double,
-        @Query("maxLat") maxLat: Double,
-        @Query("maxLon") maxLon: Double,
-        @Query("zoom") zoom: Double,
-        @Query("types") types: String? = null,
-    ): Map<String, String>
+    @POST("transits/{mode}/search-by-ids")
+    suspend fun getStopArrivals(
+        @Path("mode") mode: String = "bus",
+        @Body request: BusStopArrivalsRequest,
+    ): Map<String, List<RouteArrivalResponse>>
+
+    /**
+     * Fetch detailed information for a specific transit stop by its ID.
+     * Returns stop info along with routes passing through and their scheduled arrivals.
+     *
+     * NOTE: This endpoint is not yet available on the backend.
+     * Currently [MapRepository] uses [getStopArrivals] as a fallback.
+     */
+    @POST("transits/{mode}/stop-detail")
+    suspend fun getTransitStopDetail(
+        @Path("mode") mode: String = "bus",
+        @Body request: TransitStopDetailRequest,
+    ): TransitStopDetailResponse
+
+    /**
+     * Search bus routes by query string or route number.
+     */
+    @POST("transits/bus/search-routes")
+    suspend fun searchBusRoutes(
+        @Body request: BusRouteSearchRequest,
+    ): List<BusRouteResponse>
 }

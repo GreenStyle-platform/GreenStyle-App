@@ -13,6 +13,12 @@ import com.mapbox.geojson.Point
  * @param clusterColor Primary color of the cluster circle bubble.
  * @param clusterTextColor Color of the number of stops text inside the cluster bubble.
  * @param iconSize Scaling factor for the symbol icon on the map.
+ * @param showStopName Whether to display the stop's name below the icon when zoomed in.
+ * @param textMinZoom Minimum zoom level to start displaying the stop name.
+ * @param textSize Font size for the stop name text.
+ * @param textColor Color of the stop name text. If null, resolved dynamically from AppColors.
+ * @param textHaloColor Color of the halo outline around text for readability.
+ * @param textHaloWidth Width of the halo outline around text.
  */
 data class TransitTypeConfig(
     val typeId: String,
@@ -21,6 +27,12 @@ data class TransitTypeConfig(
     @param:ColorInt val clusterColor: Int,
     @param:ColorInt val clusterTextColor: Int = 0xFFFFFFFF.toInt(),
     val iconSize: Double = 1.0,
+    val showStopName: Boolean = true,
+    val textMinZoom: Double = 15.0,
+    val textSize: Double = 11.0,
+    @param:ColorInt val textColor: Int? = null,
+    @param:ColorInt val textHaloColor: Int = 0xFFFFFFFF.toInt(),
+    val textHaloWidth: Double = 1.2,
 )
 
 /**
@@ -39,14 +51,14 @@ data class TransitSourceData(
 /**
  * Clustering configurations for transit sources.
  *
+ * @param isEnabled Whether clustering is enabled for transit stops.
  * @param clusterRadius Radius of each cluster if clustering is enabled. A cluster will include all points within this radius.
  * @param clusterMaxZoom Max zoom level to cluster points on. Cluster points will break into individual points above this zoom.
- * @param minZoomToDisplay Minimum zoom level for stops to begin loading/displaying on the map.
  */
 data class TransitClusterConfig(
-    val clusterRadius: Long = 24L,
-    val clusterMaxZoom: Long = 14L,
-    val minZoomToDisplay: Double = 12.0,
+    val isEnabled: Boolean = true,
+    val clusterRadius: Long = 28L,
+    val clusterMaxZoom: Long = 12L,
 )
 
 /**

@@ -12,16 +12,19 @@ import com.mapbox.maps.extension.style.layers.addLayer
 import com.mapbox.maps.extension.style.layers.generated.circleLayer
 import com.mapbox.maps.extension.style.layers.generated.symbolLayer
 import com.mapbox.maps.extension.style.layers.getLayer
+import com.mapbox.maps.extension.style.layers.properties.generated.TextAnchor
 import com.mapbox.maps.extension.style.layers.properties.generated.Visibility
 import com.mapbox.maps.extension.style.sources.addSource
 import com.mapbox.maps.extension.style.sources.generated.GeoJsonSource
 import com.mapbox.maps.extension.style.sources.generated.geoJsonSource
 import com.mapbox.maps.extension.style.sources.getSourceAs
+import com.vie.mit.common.theme.AppColors
 import com.vie.mit.mapbox.model.StopFeatureClick
 import com.vie.mit.mapbox.model.TransitClusterConfig
 import com.vie.mit.mapbox.model.TransitSourceData
 import com.vie.mit.mapbox.model.TransitTypeConfig
 import com.vie.mit.mapbox.util.bitmapFromDrawableRes
+import com.vie.mit.mapbox.util.getTransitTextColor
 import timber.log.Timber
 
 /**
@@ -53,6 +56,7 @@ fun setupTransitSourcesAndLayers(
     transitSources: List<TransitSourceData>,
     transitConfigs: List<TransitTypeConfig>,
     clusterConfig: TransitClusterConfig,
+    appColors: AppColors? = null,
 ) {
     val configMap = transitConfigs.associateBy { it.typeId }
 
@@ -72,16 +76,19 @@ fun setupTransitSourcesAndLayers(
             } else {
                 val newSource = geoJsonSource(sourceId) {
                     data(sourceData.geoJson)
-                    cluster(true)
-                    clusterRadius(clusterConfig.clusterRadius)
-                    clusterMaxZoom(clusterConfig.clusterMaxZoom)
+                    cluster(clusterConfig.isEnabled)
+                    if (clusterConfig.isEnabled) {
+                        clusterRadius(clusterConfig.clusterRadius)
+                        clusterMaxZoom(clusterConfig.clusterMaxZoom)
+                    }
                 }
                 style.addSource(newSource)
-                Timber.d("TransitMapStyleManager: added GeoJsonSource '$sourceId' with clustering")
+                Timber.d("TransitMapStyleManager: added GeoJsonSource '$sourceId' (clustering=${clusterConfig.isEnabled})")
             }
         }
 
         val targetVisibility = if (sourceData.isVisible) Visibility.VISIBLE else Visibility.NONE
+        val clusterVisibility = if (sourceData.isVisible && clusterConfig.isEnabled) Visibility.VISIBLE else Visibility.NONE
 
         // 2. Add Cluster Circle Layer (if not exists)
         if (!style.styleLayerExists(clusterCircleLayerId)) {
@@ -96,11 +103,11 @@ fun setupTransitSourcesAndLayers(
                 circleStrokeWidth(2.5)
                 circleStrokeColor("#FFFFFF")
                 circleOpacity(0.9)
-                visibility(targetVisibility)
+                visibility(clusterVisibility)
             }
             style.addLayer(circleLayer)
         } else {
-            style.getLayer(clusterCircleLayerId)?.visibility(targetVisibility)
+            style.getLayer(clusterCircleLayerId)?.visibility(clusterVisibility)
         }
 
         // 3. Add Cluster Text Count Layer (if not exists)
@@ -112,7 +119,7 @@ fun setupTransitSourcesAndLayers(
                 textColor(config.clusterTextColor)
                 textIgnorePlacement(true)
                 textAllowOverlap(true)
-                visibility(targetVisibility)
+                visibility(clusterVisibility)
             }
             style.addLayer(countLayer)
         } else {
@@ -121,12 +128,38 @@ fun setupTransitSourcesAndLayers(
 
         // 4. Add Unclustered Stop Symbol Layer (if not exists)
         if (!style.styleLayerExists(stopSymbolLayerId)) {
+            val resolvedTextColor = config.textColor
+                ?: appColors?.getTransitTextColor(config.typeId)
+                ?: 0xFF0369D8.toInt()
+
             val stopSymbolLayer = symbolLayer(stopSymbolLayerId, sourceId) {
                 filter(Expression.fromRaw("""["!", ["has", "point_count"]]"""))
                 iconImage(config.iconName)
-                iconSize(config.iconSize)
+                iconSize(
+                    Expression.fromRaw(
+                        """["interpolate", ["linear"], ["zoom"], 10.0, ${0.3 * config.iconSize}, 13.0, ${0.75 * config.iconSize}, 15.0, ${1.0 * config.iconSize}, 18.0, ${1.3 * config.iconSize}]"""
+                    )
+                )
                 iconAllowOverlap(true)
                 iconIgnorePlacement(false)
+
+                if (config.showStopName) {
+                    textField(Expression.fromRaw("""["get", "name"]"""))
+                    textSize(
+                        Expression.fromRaw(
+                            """["step", ["zoom"], 0.0, ${config.textMinZoom}, ${config.textSize}]"""
+                        )
+                    )
+                    textAnchor(TextAnchor.TOP)
+                    textOffset(listOf(0.0, 1.1))
+                    textColor(resolvedTextColor)
+                    textHaloColor(config.textHaloColor)
+                    textHaloWidth(config.textHaloWidth)
+                    textMaxWidth(9.0)
+                    textAllowOverlap(false)
+                    textOptional(true)
+                }
+
                 visibility(targetVisibility)
             }
             style.addLayer(stopSymbolLayer)

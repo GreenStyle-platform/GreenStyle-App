@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -33,7 +34,6 @@ import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Map
-import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Subway
@@ -60,6 +60,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.vie.mit.common.theme.AppTheme
+import com.vie.mit.data.model.common.map.PublicTransportType
+import com.vie.mit.data.model.common.map.TravelMode
 import com.vie.mit.mapbox.model.StopFeatureClick
 
 // ======================================================================================
@@ -81,11 +83,17 @@ internal fun HomeSheet(
     onPlacesClick: () -> Unit = {},
     onTicketClick: () -> Unit = {},
     onHistoryClick: () -> Unit = {},
+    /**
+     * Called when user taps on a transit type tile (single click to navigate to that type's nearby sheet).
+     * Separate from [onToggleTransitType] which handles map visibility toggling.
+     */
+    onTransitTypeClick: (typeId: String) -> Unit = {},
 ) {
     Column(
         modifier = modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
+            .navigationBarsPadding()
             .padding(horizontal = 16.dp, vertical = 8.dp)
     ) {
         // 1. White Navigation Card ("Get Me Somewhere", "Get Me Home", "Work", "Places")
@@ -112,6 +120,7 @@ internal fun HomeSheet(
         TransitModesGrid(
             activeTransitTypes = activeTransitTypes,
             onToggleTransitType = onToggleTransitType,
+            onTransitTypeClick = onTransitTypeClick,
         )
 
         Spacer(modifier = Modifier.height(20.dp))
@@ -389,6 +398,7 @@ private fun TransitModesGrid(
     activeTransitTypes: Set<String>,
     onToggleTransitType: (String) -> Unit,
     modifier: Modifier = Modifier,
+    onTransitTypeClick: (typeId: String) -> Unit = {},
 ) {
     Column(
         modifier = modifier.fillMaxWidth(),
@@ -402,7 +412,7 @@ private fun TransitModesGrid(
             CitymapperGridButton(
                 icon = Icons.Default.DirectionsTransit,
                 label = "All",
-                onClick = { /* All mode action */ },
+                onClick = { onTransitTypeClick("ALL") },
                 modifier = Modifier.weight(1f),
             )
             CitymapperGridButton(
@@ -414,8 +424,8 @@ private fun TransitModesGrid(
             CitymapperGridButton(
                 icon = Icons.AutoMirrored.Filled.DirectionsBike,
                 label = "Bike",
-                isActive = activeTransitTypes.contains("BIKE"),
-                onClick = { onToggleTransitType("BIKE") },
+                isActive = activeTransitTypes.contains(TravelMode.BICYCLE_RENT.name),
+                onClick = { onTransitTypeClick(TravelMode.BICYCLE_RENT.name) },
                 modifier = Modifier.weight(1f),
             )
             CitymapperGridButton(
@@ -433,7 +443,7 @@ private fun TransitModesGrid(
             )
         }
 
-        // Row 2: e-Scooter | Bus | Tube | Rail | More
+        // Row 2: e-Scooter | Bus | Metro | Rail | More
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -444,25 +454,26 @@ private fun TransitModesGrid(
                 onClick = { /* e-Scooter action */ },
                 modifier = Modifier.weight(1f),
             )
+            // Bus: single click → navigate to NearbyBusStopsSheet
             CitymapperGridButton(
                 icon = Icons.Default.DirectionsBus,
                 label = "Bus",
-                isActive = activeTransitTypes.contains("BUS"),
-                onClick = { onToggleTransitType("BUS") },
+                isActive = activeTransitTypes.contains(PublicTransportType.BUS.name),
+                onClick = { onTransitTypeClick(PublicTransportType.BUS.name) },
                 modifier = Modifier.weight(1f),
             )
             CitymapperGridButton(
                 icon = Icons.Default.Subway,
-                label = "Tube",
-                isActive = activeTransitTypes.contains("METRO"),
-                onClick = { onToggleTransitType("METRO") },
+                label = "Metro",
+                isActive = activeTransitTypes.contains(PublicTransportType.SUBWAY.name),
+                onClick = { onTransitTypeClick(PublicTransportType.SUBWAY.name) },
                 modifier = Modifier.weight(1f),
             )
             CitymapperGridButton(
                 icon = Icons.Default.Train,
                 label = "Rail",
-                isActive = activeTransitTypes.contains("TRAIN"),
-                onClick = { onToggleTransitType("TRAIN") },
+                isActive = activeTransitTypes.contains(PublicTransportType.RAIL.name),
+                onClick = { onTransitTypeClick(PublicTransportType.RAIL.name) },
                 modifier = Modifier.weight(1f),
             )
             CitymapperGridButton(
@@ -473,9 +484,7 @@ private fun TransitModesGrid(
             )
         }
     }
-}
-
-@Composable
+}@Composable
 private fun UtilitiesGrid(
     onTicketClick: () -> Unit,
     onHistoryClick: () -> Unit,
