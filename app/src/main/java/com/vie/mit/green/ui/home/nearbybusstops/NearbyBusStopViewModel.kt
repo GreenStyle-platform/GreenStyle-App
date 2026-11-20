@@ -38,6 +38,7 @@ class NearbyBusStopViewModel @Inject constructor(
      * @param busStops Nearby bus stops filtered from the transit data.
      */
     fun loadBusStops(busStops: List<NearbyStopItem>) {
+        Timber.d("PhucTH: loadBusStops called")
         if (busStops.isEmpty()) {
             _uiState.value = NearbyBusStopsUiState()
             return
@@ -131,6 +132,7 @@ class NearbyBusStopViewModel @Inject constructor(
      * Called when user manually refreshes or when the screen re-appears.
      */
     fun refresh() {
+        Timber.d("PhucTH: refresh called")
         val currentStops = _uiState.value.busStopsWithArrivals.map { it.stop }
         loadBusStops(currentStops)
     }

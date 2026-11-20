@@ -32,6 +32,7 @@ import com.vie.mit.green.ui.home.nearbybusstops.NearbyBusStopViewModel
 import com.vie.mit.green.ui.home.nearbybusstops.NearbyBusStopsSheet
 import com.vie.mit.green.ui.home.nearbysubwaystations.NearbySubwayStationsSheet
 import com.vie.mit.green.ui.home.nearbytransitsheet.NearbyTransitSheet
+import timber.log.Timber
 
 /**
  * SheetNavHost: Nested NavHost nằm bên trong BottomSheet.
@@ -114,6 +115,8 @@ fun SheetNavHost(
 
             LaunchedEffect(homeUiState.nearbyStops) {
                 // homeUiState.nearbyStops đã được ViewModel lọc và sắp xếp theo khoảng cách cho riêng Bus
+                Timber.d("PhucTH: loadBusStop: called")
+
                 nearbyBusViewModel.loadBusStops(homeUiState.nearbyStops)
             }
 
@@ -123,6 +126,7 @@ fun SheetNavHost(
                 onRadiusSelected = homeContainerViewModel::setSelectedRadiusKm,
                 onBack = { sheetNavController.popBackStack() },
                 onRefresh = nearbyBusViewModel::refresh,
+                onFindBusRouteClick = homeContainerViewModel::navigateToBusRouteSearch,
             )
         }
 

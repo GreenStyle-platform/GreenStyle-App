@@ -2,12 +2,15 @@ package com.vie.mit.data.repository.map
 
 import com.vie.mit.data.model.common.map.PublicTransportType
 import com.vie.mit.data.model.common.map.TravelMode
+import com.vie.mit.data.model.domain.map.BusRoute
 import com.vie.mit.data.model.domain.map.Location
 import com.vie.mit.data.model.domain.map.PublicTransportSuggestion
 import com.vie.mit.data.model.domain.map.StopArrival
+import com.vie.mit.data.model.domain.map.TransitStopDetail
 import com.vie.mit.data.model.domain.map.TransitStopsGeoJsonLoad
 import com.vie.mit.data.model.mapper.toDomain
 import com.vie.mit.data.model.mapper.toLocationRequest
+import com.vie.mit.data.model.remote.request.map.BusRouteSearchRequest
 import com.vie.mit.data.model.remote.request.map.BusStopArrivalsRequest
 import com.vie.mit.data.model.remote.request.map.TransitStopBoundsRequest
 import com.vie.mit.data.model.remote.response.map.TransitStopMarkerResponse
@@ -80,11 +83,84 @@ class MapRepository @Inject constructor(
         if (stopIds.isEmpty()) {
             Result.success(emptyList())
         } else {
+            Timber.d("PhucTH: getBusStopArrivals: $stopIds")
             handleApiCall {
-                mapApi.getBusStopArrivals(BusStopArrivalsRequest(stopIds = stopIds))
-                    .map { it.toDomain() }
+                mapApi.getStopArrivals(
+                    mode = "bus",
+                    request = BusStopArrivalsRequest(stopIds = stopIds),
+                ).toDomain()
             }
         }
+
+    /**
+     * Fetches scheduled route arrivals for a specific transit stop with mode support.
+     * Uses [getStopArrivals] API which works for all transit modes.
+     *
+     * @param stopId The unique ID of the transit stop.
+     * @param mode Transit mode: "bus", "subway", "rail", etc.
+     * @return A [Result] containing a list of [StopArrival] for the stop.
+     */
+    suspend fun getStopArrivalsForMode(
+        stopId: String,
+        mode: String = "bus",
+    ): Result<List<StopArrival>> =
+        if (stopId.isEmpty()) {
+            Result.success(emptyList())
+        } else {
+            handleApiCall {
+                mapApi.getStopArrivals(
+                    mode = mode,
+                    request = BusStopArrivalsRequest(stopIds = listOf(stopId)),
+                ).toDomain()
+            }
+        }
+
+    /**
+     * Fetches detailed information for a specific transit stop.
+     *
+     * Currently uses [getStopArrivals] API as the backend stop-detail endpoint
+     * is not yet available. When the backend is ready, switch to [mapApi.getTransitStopDetail].
+     *
+     * @param stopId The unique ID of the transit stop.
+     * @param mode Transit mode: "bus", "subway", "rail", etc.
+     * @return A [Result] containing a [TransitStopDetail] with route arrivals.
+     */
+    suspend fun getTransitStopDetail(
+        stopId: String,
+        mode: String = "bus",
+    ): Result<TransitStopDetail> = handleApiCall {
+        // TODO: Replace with direct API call when backend stop-detail endpoint is ready:
+        // mapApi.getTransitStopDetail(
+        //     mode = mode,
+        //     request = TransitStopDetailRequest(stopId = stopId),
+        // ).toDomain()
+
+        // Temporary: use existing getStopArrivals to get route/arrival data
+        val arrivalsMap = mapApi.getStopArrivals(
+            mode = mode,
+            request = BusStopArrivalsRequest(stopIds = listOf(stopId)),
+        )
+        val arrivals = arrivalsMap.toDomain()
+
+        TransitStopDetail(
+            id = stopId,
+            name = "",       // Populated from navigation args in ViewModel
+            latitude = 0.0,  // Populated from navigation args in ViewModel
+            longitude = 0.0, // Populated from navigation args in ViewModel
+            type = mode.uppercase(),
+            routeArrivals = arrivals,
+        )
+    }
+
+    /**
+     * Searches bus routes by query keyword or route number.
+     *
+     * @param query Search query string (e.g. "01", "Bến Thành")
+     * @return A [Result] containing a list of matching [BusRoute] domain objects.
+     */
+    suspend fun searchBusRoutes(query: String): Result<List<BusRoute>> = handleApiCall {
+        mapApi.searchBusRoutes(BusRouteSearchRequest(query = query)).map { it.toDomain() }
+    }
 
     suspend fun getTransitStopsGeoJson(
         bounds: List<TransitStopBoundsRequest>,

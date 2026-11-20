@@ -44,6 +44,9 @@ data class StopDetailSheetRoute(
 object SettingRoute
 
 @Serializable
+object BusRouteSearchRoute
+
+@Serializable
 object JourneyDetailRoute
 
 @Serializable
@@ -53,4 +56,10 @@ object JourneyNavigationRoute
 object TransitRoutePathRoute
 
 @Serializable
-object TransitStopDetailRoute
+data class TransitStopDetailRoute(
+    val stopId: String,
+    val typeId: String = "",
+    val name: String = "",
+    val latitude: Double = 0.0,
+    val longitude: Double = 0.0,
+)

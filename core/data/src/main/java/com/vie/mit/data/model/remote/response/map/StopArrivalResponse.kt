@@ -4,26 +4,28 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 /**
- * Arrival information for a single vehicle/trip of a route.
+ * Stop time response representing a vehicle scheduled arrival/departure at a stop.
  */
 @Serializable
-data class RouteVehicleArrivalResponse(
-    @SerialName("arrivalTimeSeconds") val arrivalTimeSeconds: Int? = null,
-    @SerialName("etaMinutes") val etaMinutes: Int? = null,
-    @SerialName("vehicleId") val vehicleId: String? = null,
+data class StopTimeResponse(
+    @SerialName("arrivalTime") val arrivalTime: String,
+    @SerialName("departureTime") val departureTime: String? = null,
+    @SerialName("timepoint") val timepoint: Int? = null,
 )
 
 /**
- * API response model for a route passing through a bus stop,
- * containing a list of upcoming arrival times for that route at that stop.
+ * Route response representing a transit route passing through a stop,
+ * containing its scheduled stop times.
  */
 @Serializable
-data class StopArrivalResponse(
-    @SerialName("stopId") val stopId: String,
-    @SerialName("routeId") val routeId: String = "",
-    @SerialName("routeShortName") val routeShortName: String = "",
-    @SerialName("routeLongName") val routeLongName: String = "",
-    @SerialName("headsign") val headsign: String = "",
-    @SerialName("arrivals") val arrivals: List<RouteVehicleArrivalResponse> = emptyList(),
-    @SerialName("arrivalTimes") val arrivalTimes: List<RouteVehicleArrivalResponse> = emptyList(),
+data class RouteArrivalResponse(
+    @SerialName("routeId") val routeId: String,
+    @SerialName("routeShortName") val routeShortName: String? = null,
+    @SerialName("routeLongName") val routeLongName: String? = null,
+    @SerialName("routeDesc") val routeDesc: String? = null,
+    @SerialName("routeType") val routeType: Int? = null,
+    @SerialName("routeUrl") val routeUrl: String? = null,
+    @SerialName("routeColor") val routeColor: String? = null,
+    @SerialName("routeTextColor") val routeTextColor: String? = null,
+    @SerialName("stopTimeResponses") val stopTimeResponses: List<StopTimeResponse> = emptyList(),
 )

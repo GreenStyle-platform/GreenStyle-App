@@ -4,6 +4,8 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.compose.composable
 import androidx.navigation.navigation
+import com.vie.mit.green.ui.busroutesearch.BusRouteSearchScreen
+import com.vie.mit.green.ui.busroutesearch.BusRouteSearchViewModel
 import com.vie.mit.green.ui.home.HomeContainerScreen
 import com.vie.mit.green.ui.home.HomeContainerViewModel
 import com.vie.mit.green.ui.journeydetail.JourneyDetailScreen
@@ -30,6 +32,12 @@ fun NavGraphBuilder.mainGraph() {
         composable<SettingRoute> {
             SettingScreen(
                 viewModel = hiltViewModel<SettingViewModel>(),
+            )
+        }
+
+        composable<BusRouteSearchRoute> {
+            BusRouteSearchScreen(
+                viewModel = hiltViewModel<BusRouteSearchViewModel>(),
             )
         }
 

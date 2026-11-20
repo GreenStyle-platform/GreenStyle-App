@@ -1,13 +1,18 @@
 package com.vie.mit.data.network.api.map
 
+import com.vie.mit.data.model.remote.request.map.BusRouteSearchRequest
 import com.vie.mit.data.model.remote.request.map.BusStopArrivalsRequest
 import com.vie.mit.data.model.remote.request.map.LocationRequest
 import com.vie.mit.data.model.remote.request.map.TransitStopBoundsRequest
+import com.vie.mit.data.model.remote.request.map.TransitStopDetailRequest
+import com.vie.mit.data.model.remote.response.map.BusRouteResponse
 import com.vie.mit.data.model.remote.response.map.PublicTransportSuggestionResponse
-import com.vie.mit.data.model.remote.response.map.StopArrivalResponse
+import com.vie.mit.data.model.remote.response.map.RouteArrivalResponse
+import com.vie.mit.data.model.remote.response.map.TransitStopDetailResponse
 import com.vie.mit.data.model.remote.response.map.TransitStopMarkerResponse
 import retrofit2.http.Body
 import retrofit2.http.POST
+import retrofit2.http.Path
 
 interface MapApi {
     @POST("map/public-transports")
@@ -15,12 +20,12 @@ interface MapApi {
         @Body location: LocationRequest,
     ): List<PublicTransportSuggestionResponse>
 
-    @POST("transit-trips/bus/search-in-bounds")
+    @POST("transits/bus/search-in-bounds")
     suspend fun searchBusStopsInBounds(
         @Body bounds: TransitStopBoundsRequest,
     ): List<TransitStopMarkerResponse>
 
-    @POST("transit-trips/subway/search-in-bounds")
+    @POST("transits/subway/search-in-bounds")
     suspend fun searchMetroStopsInBounds(
         @Body bounds: TransitStopBoundsRequest,
     ): List<TransitStopMarkerResponse>
@@ -31,11 +36,33 @@ interface MapApi {
     ): List<TransitStopMarkerResponse>
 
     /**
-     * Fetch scheduled arrivals for bus stops.
-     * Returns list of route arrivals with upcoming arrival times.
+     * Fetch scheduled arrivals for transit stops by stop IDs.
+     * Returns a Map where key is stopId and value is list of route arrivals.
      */
-    @POST("transit-stops/bus/arrivals")
-    suspend fun getBusStopArrivals(
+    @POST("transits/{mode}/search-by-ids")
+    suspend fun getStopArrivals(
+        @Path("mode") mode: String = "bus",
         @Body request: BusStopArrivalsRequest,
-    ): List<StopArrivalResponse>
+    ): Map<String, List<RouteArrivalResponse>>
+
+    /**
+     * Fetch detailed information for a specific transit stop by its ID.
+     * Returns stop info along with routes passing through and their scheduled arrivals.
+     *
+     * NOTE: This endpoint is not yet available on the backend.
+     * Currently [MapRepository] uses [getStopArrivals] as a fallback.
+     */
+    @POST("transits/{mode}/stop-detail")
+    suspend fun getTransitStopDetail(
+        @Path("mode") mode: String = "bus",
+        @Body request: TransitStopDetailRequest,
+    ): TransitStopDetailResponse
+
+    /**
+     * Search bus routes by query string or route number.
+     */
+    @POST("transits/bus/search-routes")
+    suspend fun searchBusRoutes(
+        @Body request: BusRouteSearchRequest,
+    ): List<BusRouteResponse>
 }

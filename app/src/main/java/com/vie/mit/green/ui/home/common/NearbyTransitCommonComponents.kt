@@ -1,5 +1,8 @@
 package com.vie.mit.green.ui.home.common
 
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import androidx.annotation.DrawableRes
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -12,6 +15,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MyLocation
@@ -23,18 +28,62 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.painter.BitmapPainter
+import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
+import com.vie.mit.common.theme.AppTheme
 import java.util.Locale
+
+/**
+ * Converts any Android Drawable resource ID (including VectorDrawable, rasterized asset,
+ * LayerDrawable, shape, etc.) into a Compose [Painter] safely.
+ */
+@Composable
+fun rememberDrawablePainter(@DrawableRes id: Int?): Painter? {
+    if (id == null || id == 0) return null
+    val context = LocalContext.current
+    val density = LocalDensity.current
+    return remember(id, context, density) {
+        try {
+            val drawable = ContextCompat.getDrawable(context, id) ?: return@remember null
+            val width =
+                if (drawable.intrinsicWidth > 0) drawable.intrinsicWidth else (24 * density.density).toInt()
+            val height =
+                if (drawable.intrinsicHeight > 0) drawable.intrinsicHeight else (24 * density.density).toInt()
+            val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+            val canvas = Canvas(bitmap)
+            drawable.setBounds(0, 0, canvas.width, canvas.height)
+            drawable.draw(canvas)
+            BitmapPainter(bitmap.asImageBitmap())
+        } catch (_: Exception) {
+            null
+        }
+    }
+}
 
 /**
  * Standard Header for Nearby Transit Sheets (Bus, Subway, Bike, etc.).
  */
+@Composable
+@Preview
+fun NearbySheetHeaderPreview(
+) {
+    NearbySheetHeader(
+        modifier = Modifier.fillMaxWidth(), title = "Bus", icon = null, onBack = {})
+}
+
 @Composable
 fun NearbySheetHeader(
     modifier: Modifier = Modifier,
@@ -45,22 +94,31 @@ fun NearbySheetHeader(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp),
+            .padding(8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.Start,
     ) {
-        icon?.let {
+        val iconPainter: Painter? = rememberDrawablePainter(icon)
+        if (iconPainter != null) {
             Image(
-                painter = painterResource(icon), contentDescription = "transit icon"
+                painter = iconPainter,
+                contentDescription = "transit icon",
+                modifier = Modifier.size(32.dp)
             )
+            Spacer(modifier = Modifier.width(8.dp))
         }
 
-        Spacer(modifier = Modifier.width(8.dp))
-        Text(text = title)
+        Text(
+            text = title, style = AppTheme.typography.headlineMedium.copy(
+                color = AppTheme.colors.white, fontSize = 20.sp
+            )
+        )
         Spacer(modifier = Modifier.weight(1f))
 
         Image(
-            modifier = Modifier.clickable(enabled = true, onClick = onBack),
+            modifier = Modifier
+                .size(12.dp)
+                .clickable(enabled = true, onClick = onBack),
             painter = painterResource(com.vie.mit.common.R.drawable.ic_close),
             contentDescription = "Close"
         )
@@ -78,29 +136,26 @@ fun RadiusFilterChipsRow(
     modifier: Modifier = Modifier,
     availableRadii: List<Double> = listOf(0.5, 1.0, 2.0, 5.0),
 ) {
-    Row(
+    LazyRow(
         modifier = modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Text(
-            text = "Bán kính:",
-            style = MaterialTheme.typography.bodySmall.copy(
-                fontWeight = FontWeight.SemiBold,
-                color = Color.White.copy(alpha = 0.85f),
-            ),
-        )
-        availableRadii.forEach { radius ->
+        item {
+            Text(
+                text = "Bán kính:",
+                style = AppTheme.typography.titleMedium,
+            )
+        }
+        items(availableRadii) { radius ->
             val isSelected = selectedRadiusKm == radius
             FilterChip(
                 selected = isSelected,
                 onClick = { onRadiusSelected(radius) },
                 label = {
                     Text(
-                        text = "${radius} km",
-                        style = MaterialTheme.typography.labelSmall.copy(
-                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                        ),
+                        text = "$radius km",
+                        style = AppTheme.typography.bodyMedium,
                     )
                 },
                 colors = FilterChipDefaults.filterChipColors(
@@ -125,7 +180,6 @@ fun NearbyLocationInfoCard(
     selectedRadiusKm: Double,
     accentColor: Color,
     modifier: Modifier = Modifier,
-    title: String = "Vị trí tâm bản đồ hiện tại",
 ) {
     Card(
         modifier = modifier.fillMaxWidth(),
@@ -146,21 +200,11 @@ fun NearbyLocationInfoCard(
                 modifier = Modifier.size(20.dp),
             )
             Spacer(modifier = Modifier.width(10.dp))
-            Column {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.titleSmall.copy(
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFF374151),
-                    ),
-                )
-                Spacer(modifier = Modifier.height(2.dp))
-                Text(
-                    text = "Tìm thấy $itemCount $itemTypeName trong bán kính $selectedRadiusKm km",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = Color(0xFF6B7280),
-                )
-            }
+            Text(
+                text = "Tìm thấy $itemCount $itemTypeName trong bán kính $selectedRadiusKm km",
+                style = AppTheme.typography.bodyMedium,
+                color = AppTheme.colors.secondaryText,
+            )
         }
     }
 }

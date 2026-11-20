@@ -8,6 +8,7 @@ import com.vie.mit.data.model.common.map.TravelMode
 import com.vie.mit.data.model.domain.map.TransitStopsGeoJsonLoad
 import com.vie.mit.data.model.remote.request.map.TransitStopBoundsRequest
 import com.vie.mit.data.repository.map.MapRepository
+import com.vie.mit.green.navigation.main_graph.BusRouteSearchRoute
 import com.vie.mit.green.navigation.main_graph.SettingRoute
 import com.vie.mit.green.ui.home.homesheet.HomeSheetUiState
 import com.vie.mit.green.ui.home.nearbytransitsheet.NearbyStopItem
@@ -527,6 +528,10 @@ class HomeContainerViewModel @Inject constructor(
 
     fun navigateToSettingScreen() {
         appNavigator.navigateTo(SettingRoute)
+    }
+
+    fun navigateToBusRouteSearch() {
+        appNavigator.navigateTo(BusRouteSearchRoute)
     }
 }
 

@@ -6,26 +6,32 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DirectionsBus
 import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -43,8 +49,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.vie.mit.common.theme.AppTheme
 import com.vie.mit.data.model.domain.map.StopArrival
@@ -83,6 +91,7 @@ fun NearbyBusStopsSheet(
     selectedRadiusKm: Double = 1.0,
     onRadiusSelected: (Double) -> Unit = {},
     onRefresh: () -> Unit = {},
+    onFindBusRouteClick: () -> Unit = {},
 ) {
     val busColor = AppTheme.colors.busColor
 
@@ -97,6 +106,75 @@ fun NearbyBusStopsSheet(
             icon = com.vie.mit.mapbox.R.drawable.ic_transit_bus,
             onBack = onBack,
         )
+
+        Spacer(modifier = Modifier.height(10.dp))
+
+        // ── 1.5 Mode Switcher Buttons (Stops / Find Bus Route) ─────────────
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 4.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Surface(
+                modifier = Modifier
+                    .weight(1f)
+                    .height(40.dp),
+                shape = RoundedCornerShape(12.dp),
+                color = busColor,
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxSize(),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.DirectionsBus,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(18.dp),
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = "Trạm dừng",
+                        style = AppTheme.typography.bodyMedium.copy(
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White,
+                        ),
+                    )
+                }
+            }
+
+            Surface(
+                onClick = onFindBusRouteClick,
+                modifier = Modifier
+                    .weight(1f)
+                    .height(40.dp),
+                shape = RoundedCornerShape(12.dp),
+                color = Color.White.copy(alpha = 0.2f),
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxSize(),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Search,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(18.dp),
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = "Tìm tuyến xe",
+                        style = AppTheme.typography.bodyMedium.copy(
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White,
+                        ),
+                    )
+                }
+            }
+        }
 
         Spacer(modifier = Modifier.height(10.dp))
 
@@ -127,7 +205,12 @@ fun NearbyBusStopsSheet(
             )
         } else {
             LazyColumn(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
+                contentPadding = PaddingValues(
+                    bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 16.dp
+                ),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 items(
@@ -138,9 +221,6 @@ fun NearbyBusStopsSheet(
                         stopWithArrivals = stopWithArrivals,
                         busColor = busColor,
                     )
-                }
-                item {
-                    Spacer(modifier = Modifier.height(32.dp))
                 }
             }
         }
@@ -180,25 +260,16 @@ private fun BusStopCard(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 // Bus icon badge
-                Box(
-                    modifier = Modifier
-                        .size(42.dp)
-                        .background(busColor, CircleShape),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.DirectionsBus,
+                    Image(
+                       painter = painterResource(R.drawable.ic_bus_stop),
                         contentDescription = "Xe buýt",
-                        tint = Color.White,
-                        modifier = Modifier.size(24.dp),
+                        modifier = Modifier.size(32.dp),
                     )
-                }
 
                 Spacer(modifier = Modifier.width(12.dp))
 
-                // Stop name + subtitle
-                Column(modifier = Modifier.weight(1f)) {
                     Text(
+                        modifier = Modifier.weight(1f),
                         text = stopWithArrivals.stop.name,
                         style = MaterialTheme.typography.bodyMedium.copy(
                             fontWeight = FontWeight.Bold,
@@ -206,16 +277,6 @@ private fun BusStopCard(
                         ),
                         maxLines = 2,
                     )
-                    if (stopWithArrivals.stop.routesOrInfo.isNotBlank()) {
-                        Spacer(modifier = Modifier.height(2.dp))
-                        Text(
-                            text = stopWithArrivals.stop.routesOrInfo,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = Color(0xFF6B7280),
-                            maxLines = 1,
-                        )
-                    }
-                }
 
                 Spacer(modifier = Modifier.width(8.dp))
 
@@ -332,9 +393,9 @@ private fun ArrivalsContent(
             else -> {
                 Text(
                     text = "Các tuyến xe sẽ đến",
-                    style = MaterialTheme.typography.labelSmall.copy(
+                    style = AppTheme.typography.titleSmall.copy(
                         fontWeight = FontWeight.SemiBold,
-                        color = Color(0xFF6B7280),
+                        color = AppTheme.colors.primaryText,
                     ),
                 )
                 stopWithArrivals.routes.forEach { route ->
@@ -353,22 +414,17 @@ private fun RouteArrivalRow(
     busColor: Color,
     modifier: Modifier = Modifier,
 ) {
-    Surface(
-        shape = RoundedCornerShape(10.dp),
-        color = Color(0xFFF9FAFB),
-        modifier = modifier.fillMaxWidth(),
-    ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 10.dp, vertical = 8.dp),
+                .padding(horizontal = 4.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             // Route number badge
             Box(
                 modifier = Modifier
                     .background(busColor, RoundedCornerShape(6.dp))
-                    .padding(horizontal = 8.dp, vertical = 4.dp),
+                    .padding( horizontal = 4.dp, vertical = 4.dp),
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
@@ -383,26 +439,16 @@ private fun RouteArrivalRow(
             Spacer(modifier = Modifier.width(10.dp))
 
             // Route info
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = route.headsign.ifBlank { route.routeLongName },
-                    style = MaterialTheme.typography.bodySmall.copy(
-                        fontWeight = FontWeight.SemiBold,
-                        color = Color(0xFF374151),
-                    ),
-                    maxLines = 1,
+            if (route.routeLongName.isNotBlank()) {
+                Text(modifier = Modifier.fillMaxWidth(0.5f),
+                    text = route.routeLongName,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = AppTheme.colors.primaryText,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
                 )
-                if (route.routeLongName.isNotBlank() && route.headsign.isNotBlank()) {
-                    Text(
-                        text = route.routeLongName,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = Color(0xFF9CA3AF),
-                        maxLines = 1,
-                    )
-                }
             }
-
-            Spacer(modifier = Modifier.width(8.dp))
+            Spacer(modifier = Modifier.width(4.dp))
 
             // Arrival times list
             if (route.arrivals.isEmpty()) {
@@ -419,13 +465,12 @@ private fun RouteArrivalRow(
                     )
                 }
             } else {
-                Row(
+                LazyRow(
                     horizontalArrangement = Arrangement.spacedBy(4.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    val displayArrivals = route.arrivals.take(3)
-                    val isSingle = displayArrivals.size == 1
-                    displayArrivals.forEach { arrival ->
+                    val isSingle = route.arrivals.size == 1
+                    items(route.arrivals) { arrival ->
                         val (etaText, etaColor) = when {
                             arrival.etaMinutes <= 1 -> "Sắp đến" to EtaRed
                             arrival.etaMinutes <= 5 -> (if (isSingle) "${arrival.etaMinutes} phút" else "${arrival.etaMinutes}p") to EtaOrange
@@ -450,5 +495,4 @@ private fun RouteArrivalRow(
                 }
             }
         }
-    }
 }
