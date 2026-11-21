@@ -1,18 +1,19 @@
 package com.vie.mit.data.network.api.map
 
-import com.vie.mit.data.model.remote.request.map.BusRouteSearchRequest
 import com.vie.mit.data.model.remote.request.map.BusStopArrivalsRequest
 import com.vie.mit.data.model.remote.request.map.LocationRequest
 import com.vie.mit.data.model.remote.request.map.TransitStopBoundsRequest
 import com.vie.mit.data.model.remote.request.map.TransitStopDetailRequest
-import com.vie.mit.data.model.remote.response.map.BusRouteResponse
+import com.vie.mit.data.model.remote.response.map.BusRoutePageResponse
 import com.vie.mit.data.model.remote.response.map.PublicTransportSuggestionResponse
 import com.vie.mit.data.model.remote.response.map.RouteArrivalResponse
 import com.vie.mit.data.model.remote.response.map.TransitStopDetailResponse
 import com.vie.mit.data.model.remote.response.map.TransitStopMarkerResponse
 import retrofit2.http.Body
+import retrofit2.http.GET
 import retrofit2.http.POST
 import retrofit2.http.Path
+import retrofit2.http.Query
 
 interface MapApi {
     @POST("map/public-transports")
@@ -61,8 +62,9 @@ interface MapApi {
     /**
      * Search bus routes by query string or route number.
      */
-    @POST("transits/bus/search-routes")
+    @GET("transits/bus/search-routes")
     suspend fun searchBusRoutes(
-        @Body request: BusRouteSearchRequest,
-    ): List<BusRouteResponse>
+        @Query("query") query: String,
+        @Query("page") page: Int = 1,
+    ): BusRoutePageResponse
 }

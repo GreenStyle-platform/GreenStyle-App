@@ -1,5 +1,8 @@
 package com.vie.mit.data.repository.map
 
+import androidx.paging.Pager
+import androidx.paging.PagingConfig
+import androidx.paging.PagingData
 import com.vie.mit.data.model.common.map.PublicTransportType
 import com.vie.mit.data.model.common.map.TravelMode
 import com.vie.mit.data.model.domain.map.BusRoute
@@ -10,18 +13,19 @@ import com.vie.mit.data.model.domain.map.TransitStopDetail
 import com.vie.mit.data.model.domain.map.TransitStopsGeoJsonLoad
 import com.vie.mit.data.model.mapper.toDomain
 import com.vie.mit.data.model.mapper.toLocationRequest
-import com.vie.mit.data.model.remote.request.map.BusRouteSearchRequest
 import com.vie.mit.data.model.remote.request.map.BusStopArrivalsRequest
 import com.vie.mit.data.model.remote.request.map.TransitStopBoundsRequest
 import com.vie.mit.data.model.remote.response.map.TransitStopMarkerResponse
 import com.vie.mit.data.network.api.map.MapApi
 import com.vie.mit.data.network.util.handleApiCall
+import com.vie.mit.data.paging.BusRoutePagingSource
 import com.vie.mit.mapbox.model.TransitTypeConfig
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.supervisorScope
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.add
@@ -153,13 +157,19 @@ class MapRepository @Inject constructor(
     }
 
     /**
-     * Searches bus routes by query keyword or route number.
+     * Searches bus routes by query keyword or route number with Paging 3 pagination.
      *
      * @param query Search query string (e.g. "01", "Bến Thành")
-     * @return A [Result] containing a list of matching [BusRoute] domain objects.
+     * @return A [Flow] of [PagingData] containing matching [BusRoute] domain objects.
      */
-    suspend fun searchBusRoutes(query: String): Result<List<BusRoute>> = handleApiCall {
-        mapApi.searchBusRoutes(BusRouteSearchRequest(query = query)).map { it.toDomain() }
+    fun getBusRoutesStream(query: String): Flow<PagingData<BusRoute>> {
+        return Pager(
+            config = PagingConfig(
+                pageSize = 20,
+                enablePlaceholders = false,
+            ),
+            pagingSourceFactory = { BusRoutePagingSource(mapApi, query) },
+        ).flow
     }
 
     suspend fun getTransitStopsGeoJson(

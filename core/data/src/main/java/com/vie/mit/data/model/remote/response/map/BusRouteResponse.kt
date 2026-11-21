@@ -12,6 +12,9 @@ data class BusRouteResponse(
     @SerialName("routeShortName") val routeShortName: String? = null,
     @SerialName("routeLongName") val routeLongName: String? = null,
     @SerialName("routeDesc") val routeDesc: String? = null,
+    @SerialName("routeType") val routeType: Int? = null,
+    @SerialName("routeUrl") val routeUrl: String? = null,
     @SerialName("routeColor") val routeColor: String? = null,
     @SerialName("routeTextColor") val routeTextColor: String? = null,
+    @SerialName("stopTimeResponses") val stopTimeResponses: List<StopTimeResponse>? = null,
 )
