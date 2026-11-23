@@ -3,7 +3,6 @@ package com.vie.mit.data.network.api.map
 import com.vie.mit.data.model.remote.request.map.BusStopArrivalsRequest
 import com.vie.mit.data.model.remote.request.map.LocationRequest
 import com.vie.mit.data.model.remote.request.map.TransitStopBoundsRequest
-import com.vie.mit.data.model.remote.request.map.TransitStopDetailRequest
 import com.vie.mit.data.model.remote.response.map.BusRoutePageResponse
 import com.vie.mit.data.model.remote.response.map.PublicTransportSuggestionResponse
 import com.vie.mit.data.model.remote.response.map.RouteArrivalResponse
@@ -53,10 +52,9 @@ interface MapApi {
      * NOTE: This endpoint is not yet available on the backend.
      * Currently [MapRepository] uses [getStopArrivals] as a fallback.
      */
-    @POST("transits/{mode}/stop-detail")
+    @GET("transits/{mode}/search-stop/{stopId}/routes")
     suspend fun getTransitStopDetail(
-        @Path("mode") mode: String = "bus",
-        @Body request: TransitStopDetailRequest,
+        @Path("mode") mode: String = "bus", @Path("stopId") stopId: String
     ): TransitStopDetailResponse
 
     /**

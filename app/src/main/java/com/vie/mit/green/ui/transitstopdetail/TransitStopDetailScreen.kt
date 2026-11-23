@@ -16,10 +16,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.DirectionsBus
 import androidx.compose.material.icons.filled.DirectionsSubway
 import androidx.compose.material.icons.filled.Refresh
@@ -32,7 +30,6 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -53,11 +50,12 @@ import com.vie.mit.common.screenbottomsheet.CommonScreenBottomSheet
 import com.vie.mit.common.screenbottomsheet.CustomBottomSheetValue
 import com.vie.mit.common.screenbottomsheet.rememberCustomBottomSheetState
 import com.vie.mit.common.theme.AppTheme
+import com.vie.mit.common.ui.button.FloatingBackButton
 import com.vie.mit.data.model.common.map.PublicTransportType
+import com.vie.mit.data.model.common.map.toTransitTypeConfig
 import com.vie.mit.data.model.domain.map.StopArrival
 import com.vie.mit.data.model.domain.map.VehicleArrival
 import com.vie.mit.mapbox.composable.TransitStopFocusMap
-import com.vie.mit.mapbox.model.TransitTypeConfig
 
 /**
  * Screen displaying the details of a transit stop/station.
@@ -101,32 +99,7 @@ fun TransitStopDetailScreen(
     }
 
     val transitTypeConfig = remember(uiState.type) {
-        when (uiState.type) {
-            PublicTransportType.SUBWAY, PublicTransportType.MONORAIL -> TransitTypeConfig(
-                typeId = "SUBWAY",
-                iconResId = com.vie.mit.mapbox.R.drawable.ic_transit_metro,
-                clusterColor = 0xFFE53935.toInt(),
-                iconSize = 1.2,
-            )
-            PublicTransportType.RAIL, PublicTransportType.TRAM, PublicTransportType.CABLE_TRAM, PublicTransportType.AERIAL_LIFT -> TransitTypeConfig(
-                typeId = "RAIL",
-                iconResId = com.vie.mit.mapbox.R.drawable.ic_transit_train,
-                clusterColor = 0xFF8E24AA.toInt(),
-                iconSize = 1.2,
-            )
-            PublicTransportType.FERRY -> TransitTypeConfig(
-                typeId = "FERRY",
-                iconResId = com.vie.mit.mapbox.R.drawable.ic_transit_bus,
-                clusterColor = 0xFF00ACC1.toInt(),
-                iconSize = 1.2,
-            )
-            else -> TransitTypeConfig(
-                typeId = "BUS",
-                iconResId = com.vie.mit.mapbox.R.drawable.ic_transit_bus,
-                clusterColor = 0xFF1E88E5.toInt(),
-                iconSize = 1.2,
-            )
-        }
+        uiState.type.toTransitTypeConfig(iconSize = 1.2)
     }
 
     CommonScreenBottomSheet(
@@ -143,35 +116,21 @@ fun TransitStopDetailScreen(
                     transitTypeConfig = transitTypeConfig,
                     cameraBottomPadding = cameraBottomPadding,
                     showUserLocation = true,
-                    zoom = 22.0,
+                    zoom = 16.0,
                 )
 
                 // Top-Left Floating Back Button
-                Surface(
+                FloatingBackButton(
                     onClick = viewModel::navigateBack,
-                    shape = CircleShape,
-                    color = Color.White,
-                    shadowElevation = 6.dp,
                     modifier = Modifier
                         .align(Alignment.TopStart)
-                        .padding(top = 48.dp, start = 16.dp)
-                        .size(40.dp)
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Quay lại",
-                            tint = AppTheme.colors.black,
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
-                }
+                        .padding(top = 48.dp, start = 16.dp),
+                )
             }
         },
         sheetContent = {
             TransitStopDetailSheetContent(
                 uiState = uiState,
-                onBack = viewModel::navigateBack,
                 onRetry = viewModel::loadStopDetail,
             )
         }
@@ -181,7 +140,6 @@ fun TransitStopDetailScreen(
 @Composable
 private fun TransitStopDetailSheetContent(
     uiState: TransitStopDetailUiState,
-    onBack: () -> Unit,
     onRetry: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -200,54 +158,17 @@ private fun TransitStopDetailSheetContent(
         )
 
         // Header: Back icon + Title
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 4.dp, bottom = 8.dp)
-        ) {
-            IconButton(
-                onClick = onBack,
-                modifier = Modifier.size(32.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = "Quay lại",
-                    tint = Color.White,
-                )
-            }
-            Spacer(modifier = Modifier.width(8.dp))
-            Column(modifier = Modifier.weight(1f)) {
                 Text(
+                    modifier = Modifier.padding(top = 8.dp),
                     text = uiState.stopName.ifEmpty { "Chi tiết trạm dừng" },
                     style = AppTheme.typography.headlineMedium.copy(
                         fontWeight = FontWeight.Bold,
                         color = Color.White,
                         fontSize = 18.sp,
                     ),
-                    maxLines = 1,
+                    maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.padding(top = 2.dp)
-                ) {
-                    Icon(
-                        imageVector = getTransitIcon(uiState.type),
-                        contentDescription = null,
-                        tint = Color.White.copy(alpha = 0.85f),
-                        modifier = Modifier.size(14.dp)
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(
-                        text = "Mã trạm: ${uiState.stopId}",
-                        style = AppTheme.typography.bodySmall.copy(
-                            color = Color.White.copy(alpha = 0.85f)
-                        ),
-                    )
-                }
-            }
-        }
 
         // Optional address
         if (!uiState.address.isNullOrBlank()) {

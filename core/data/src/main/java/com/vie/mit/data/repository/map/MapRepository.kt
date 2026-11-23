@@ -5,6 +5,7 @@ import androidx.paging.PagingConfig
 import androidx.paging.PagingData
 import com.vie.mit.data.model.common.map.PublicTransportType
 import com.vie.mit.data.model.common.map.TravelMode
+import com.vie.mit.data.model.common.map.toTransitTypeConfig
 import com.vie.mit.data.model.domain.map.BusRoute
 import com.vie.mit.data.model.domain.map.Location
 import com.vie.mit.data.model.domain.map.PublicTransportSuggestion
@@ -15,7 +16,6 @@ import com.vie.mit.data.model.mapper.toDomain
 import com.vie.mit.data.model.mapper.toLocationRequest
 import com.vie.mit.data.model.remote.request.map.BusStopArrivalsRequest
 import com.vie.mit.data.model.remote.request.map.TransitStopBoundsRequest
-import com.vie.mit.data.model.remote.request.map.TransitStopDetailRequest
 import com.vie.mit.data.model.remote.response.map.TransitStopMarkerResponse
 import com.vie.mit.data.network.api.map.MapApi
 import com.vie.mit.data.network.util.handleApiCall
@@ -44,27 +44,9 @@ class MapRepository @Inject constructor(
     private val mapApi: MapApi,
 ) {
     val defaultConfigs: List<TransitTypeConfig> = listOf(
-        TransitTypeConfig(
-            typeId = PublicTransportType.BUS.name,
-            iconResId = com.vie.mit.mapbox.R.drawable.ic_transit_bus,
-            clusterColor = 0xFF1E88E5.toInt(),
-            clusterTextColor = 0xFFFFFFFF.toInt(),
-            iconSize = 1.0,
-        ),
-        TransitTypeConfig(
-            typeId = PublicTransportType.SUBWAY.name,
-            iconResId = com.vie.mit.mapbox.R.drawable.ic_transit_metro,
-            clusterColor = 0xFFE53935.toInt(),
-            clusterTextColor = 0xFFFFFFFF.toInt(),
-            iconSize = 1.0,
-        ),
-        TransitTypeConfig(
-            typeId = PublicTransportType.RAIL.name,
-            iconResId = com.vie.mit.mapbox.R.drawable.ic_transit_train,
-            clusterColor = 0xFF8E24AA.toInt(),
-            clusterTextColor = 0xFFFFFFFF.toInt(),
-            iconSize = 1.0,
-        ),
+        PublicTransportType.BUS.toTransitTypeConfig(iconSize = 1.0),
+        PublicTransportType.SUBWAY.toTransitTypeConfig(iconSize = 1.0),
+        PublicTransportType.RAIL.toTransitTypeConfig(iconSize = 1.0),
         TransitTypeConfig(
             typeId = TravelMode.BICYCLE_RENT.name,
             iconResId = com.vie.mit.mapbox.R.drawable.ic_transit_bike,
@@ -108,17 +90,16 @@ class MapRepository @Inject constructor(
     suspend fun getStopArrivalsForMode(
         stopId: String,
         mode: String = "bus",
-    ): Result<List<StopArrival>> =
-        if (stopId.isEmpty()) {
-            Result.success(emptyList())
-        } else {
-            handleApiCall {
-                mapApi.getStopArrivals(
-                    mode = mode,
-                    request = BusStopArrivalsRequest(stopIds = listOf(stopId)),
-                ).toDomain()
-            }
+    ): Result<List<StopArrival>> = if (stopId.isEmpty()) {
+        Result.success(emptyList())
+    } else {
+        handleApiCall {
+            mapApi.getStopArrivals(
+                mode = mode,
+                request = BusStopArrivalsRequest(stopIds = listOf(stopId)),
+            ).toDomain()
         }
+    }
 
     /**
      * Fetches detailed information for a specific transit stop.
@@ -145,11 +126,14 @@ class MapRepository @Inject constructor(
         try {
             mapApi.getTransitStopDetail(
                 mode = mode,
-                request = TransitStopDetailRequest(stopId = stopId),
+                stopId = stopId,
             ).toDomain()
         } catch (e: Exception) {
             if (e is CancellationException) throw e
-            timber.log.Timber.w(e, "getTransitStopDetail endpoint failed, falling back to getStopArrivals for stopId: $stopId")
+            Timber.w(
+                e,
+                "getTransitStopDetail endpoint failed, falling back to getStopArrivals for stopId: $stopId"
+            )
             val arrivalsMap = mapApi.getStopArrivals(
                 mode = mode,
                 request = BusStopArrivalsRequest(stopIds = listOf(stopId)),

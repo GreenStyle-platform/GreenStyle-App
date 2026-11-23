@@ -93,7 +93,7 @@ fun TransitStopDetailResponse.toDomain(): TransitStopDetail {
             .map { if (it.etaMinutes < 0) it.copy(etaMinutes = 0) else it }
 
         StopArrival(
-            stopId = id,
+            stopId = resolvedId,
             routeId = route.routeId,
             routeShortName = route.routeShortName.orEmpty(),
             routeLongName = route.routeLongName.orEmpty(),
@@ -104,8 +104,8 @@ fun TransitStopDetailResponse.toDomain(): TransitStopDetail {
     }
 
     return TransitStopDetail(
-        id = id,
-        name = name,
+        id = resolvedId,
+        name = resolvedName,
         latitude = latitude,
         longitude = longitude,
         address = address,

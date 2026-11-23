@@ -70,7 +70,7 @@ fun TransitStopFocusMap(
     transitTypeConfig: TransitTypeConfig? = null,
     showUserLocation: Boolean = true,
     cameraBottomPadding: Float = 0f,
-    zoom: Double = 20.0,
+    zoom: Double = 16.0,
     mapViewportState: MapViewportState = rememberMapViewportState(),
 ) {
     val context = LocalContext.current
