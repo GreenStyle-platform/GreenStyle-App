@@ -3,14 +3,17 @@ package com.vie.mit.data.repository.map
 import androidx.paging.Pager
 import androidx.paging.PagingConfig
 import androidx.paging.PagingData
-import com.vie.mit.data.model.common.map.PublicTransportType
+import com.vie.mit.data.model.common.map.TransitMode
 import com.vie.mit.data.model.common.map.TravelMode
 import com.vie.mit.data.model.common.map.toTransitTypeConfig
 import com.vie.mit.data.model.domain.map.BusRoute
 import com.vie.mit.data.model.domain.map.Location
 import com.vie.mit.data.model.domain.map.PublicTransportSuggestion
+import com.vie.mit.data.model.domain.map.RouteTrip
+import com.vie.mit.data.model.domain.map.ShapePoint
 import com.vie.mit.data.model.domain.map.StopArrival
 import com.vie.mit.data.model.domain.map.TransitStopDetail
+import com.vie.mit.data.model.domain.map.TransitStopMarker
 import com.vie.mit.data.model.domain.map.TransitStopsGeoJsonLoad
 import com.vie.mit.data.model.mapper.toDomain
 import com.vie.mit.data.model.mapper.toLocationRequest
@@ -44,9 +47,9 @@ class MapRepository @Inject constructor(
     private val mapApi: MapApi,
 ) {
     val defaultConfigs: List<TransitTypeConfig> = listOf(
-        PublicTransportType.BUS.toTransitTypeConfig(iconSize = 1.0),
-        PublicTransportType.SUBWAY.toTransitTypeConfig(iconSize = 1.0),
-        PublicTransportType.RAIL.toTransitTypeConfig(iconSize = 1.0),
+        TransitMode.BUS.toTransitTypeConfig(iconSize = 1.0),
+        TransitMode.SUBWAY.toTransitTypeConfig(iconSize = 1.0),
+        TransitMode.RAIL.toTransitTypeConfig(iconSize = 1.0),
         TransitTypeConfig(
             typeId = TravelMode.BICYCLE_RENT.name,
             iconResId = com.vie.mit.mapbox.R.drawable.ic_transit_bike,
@@ -114,13 +117,13 @@ class MapRepository @Inject constructor(
      */
     suspend fun getTransitStopDetail(
         stopId: String,
-        type: PublicTransportType = PublicTransportType.BUS,
+        type: TransitMode = TransitMode.BUS,
     ): Result<TransitStopDetail> = handleApiCall {
         val mode = when (type) {
-            PublicTransportType.BUS, PublicTransportType.TROLLEYBUS -> "bus"
-            PublicTransportType.SUBWAY, PublicTransportType.MONORAIL -> "subway"
-            PublicTransportType.RAIL, PublicTransportType.TRAM, PublicTransportType.CABLE_TRAM, PublicTransportType.AERIAL_LIFT -> "rail"
-            PublicTransportType.FERRY -> "ferry"
+            TransitMode.BUS, TransitMode.TROLLEYBUS -> "bus"
+            TransitMode.SUBWAY, TransitMode.MONORAIL -> "subway"
+            TransitMode.RAIL, TransitMode.TRAM, TransitMode.CABLE_TRAM, TransitMode.AERIAL_LIFT -> "rail"
+            TransitMode.FERRY -> "ferry"
         }
 
         try {
@@ -154,11 +157,11 @@ class MapRepository @Inject constructor(
         mode: String,
     ): Result<TransitStopDetail> {
         val type = when (mode.lowercase()) {
-            "subway", "metro" -> PublicTransportType.SUBWAY
-            "rail", "train" -> PublicTransportType.RAIL
-            "tram" -> PublicTransportType.TRAM
-            "ferry" -> PublicTransportType.FERRY
-            else -> PublicTransportType.BUS
+            "subway", "metro" -> TransitMode.SUBWAY
+            "rail", "train" -> TransitMode.RAIL
+            "tram" -> TransitMode.TRAM
+            "ferry" -> TransitMode.FERRY
+            else -> TransitMode.BUS
         }
         return getTransitStopDetail(stopId = stopId, type = type)
     }
@@ -177,6 +180,45 @@ class MapRepository @Inject constructor(
             ),
             pagingSourceFactory = { BusRoutePagingSource(mapApi, query) },
         ).flow
+    }
+
+    /**
+     * Fetches GTFS trips for a route.
+     *
+     * @param mode Transit mode (default: "bus").
+     * @param routeId Route identifier (e.g. "r12997260").
+     */
+    suspend fun getRouteTrips(
+        mode: String = "bus",
+        routeId: String,
+    ): Result<List<RouteTrip>> = handleApiCall {
+        mapApi.getRouteTrips(mode = mode, routeId = routeId).map { it.toDomain() }
+    }
+
+    /**
+     * Fetches shape points for a specific trip.
+     *
+     * @param mode Transit mode (default: "bus").
+     * @param tripId Trip identifier.
+     */
+    suspend fun getTripShape(
+        mode: String = "bus",
+        tripId: String,
+    ): Result<List<ShapePoint>> = handleApiCall {
+        mapApi.getTripShape(mode = mode, tripId = tripId).mapNotNull { it.toDomain() }
+    }
+
+    /**
+     * Fetches transit stops for a specific trip.
+     *
+     * @param mode Transit mode (default: "bus").
+     * @param tripId Trip identifier.
+     */
+    suspend fun getTripStops(
+        mode: String = "bus",
+        tripId: String,
+    ): Result<List<TransitStopMarker>> = handleApiCall {
+        mapApi.getTripStops(mode = mode, tripId = tripId).map { it.toDomain() }
     }
 
     suspend fun getTransitStopsGeoJson(
@@ -232,8 +274,8 @@ class MapRepository @Inject constructor(
         typeId: String,
         bounds: TransitStopBoundsRequest,
     ): List<TransitStopMarkerResponse> = when (typeId) {
-        PublicTransportType.BUS.name -> mapApi.searchBusStopsInBounds(bounds = bounds)
-        PublicTransportType.SUBWAY.name -> mapApi.searchMetroStopsInBounds(bounds = bounds)
+        TransitMode.BUS.name -> mapApi.searchBusStopsInBounds(bounds = bounds)
+        TransitMode.SUBWAY.name -> mapApi.searchMetroStopsInBounds(bounds = bounds)
         TravelMode.BICYCLE_RENT.name -> try {
             mapApi.searchBikeStopsInBounds(bounds = bounds)
         } catch (e: Exception) {

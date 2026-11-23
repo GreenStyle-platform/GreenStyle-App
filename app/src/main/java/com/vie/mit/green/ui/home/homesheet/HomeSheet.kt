@@ -60,7 +60,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.vie.mit.common.theme.AppTheme
-import com.vie.mit.data.model.common.map.PublicTransportType
+import com.vie.mit.data.model.common.map.TransitMode
 import com.vie.mit.data.model.common.map.TravelMode
 import com.vie.mit.mapbox.model.StopFeatureClick
 
@@ -458,22 +458,22 @@ private fun TransitModesGrid(
             CitymapperGridButton(
                 icon = Icons.Default.DirectionsBus,
                 label = "Bus",
-                isActive = activeTransitTypes.contains(PublicTransportType.BUS.name),
-                onClick = { onTransitTypeClick(PublicTransportType.BUS.name) },
+                isActive = activeTransitTypes.contains(TransitMode.BUS.name),
+                onClick = { onTransitTypeClick(TransitMode.BUS.name) },
                 modifier = Modifier.weight(1f),
             )
             CitymapperGridButton(
                 icon = Icons.Default.Subway,
                 label = "Metro",
-                isActive = activeTransitTypes.contains(PublicTransportType.SUBWAY.name),
-                onClick = { onTransitTypeClick(PublicTransportType.SUBWAY.name) },
+                isActive = activeTransitTypes.contains(TransitMode.SUBWAY.name),
+                onClick = { onTransitTypeClick(TransitMode.SUBWAY.name) },
                 modifier = Modifier.weight(1f),
             )
             CitymapperGridButton(
                 icon = Icons.Default.Train,
                 label = "Rail",
-                isActive = activeTransitTypes.contains(PublicTransportType.RAIL.name),
-                onClick = { onTransitTypeClick(PublicTransportType.RAIL.name) },
+                isActive = activeTransitTypes.contains(TransitMode.RAIL.name),
+                onClick = { onTransitTypeClick(TransitMode.RAIL.name) },
                 modifier = Modifier.weight(1f),
             )
             CitymapperGridButton(

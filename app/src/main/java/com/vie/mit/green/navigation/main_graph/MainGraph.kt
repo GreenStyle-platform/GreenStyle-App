@@ -14,8 +14,8 @@ import com.vie.mit.green.ui.journeynavigation.JourneyNavigationScreen
 import com.vie.mit.green.ui.journeynavigation.JourneyNavigationViewModel
 import com.vie.mit.green.ui.setting.SettingScreen
 import com.vie.mit.green.ui.setting.SettingViewModel
-import com.vie.mit.green.ui.transitroutepath.TransitRoutePathScreen
-import com.vie.mit.green.ui.transitroutepath.TransitRoutePathViewModel
+import com.vie.mit.green.ui.transitroutedetail.TransitRouteDetailViewModel
+import com.vie.mit.green.ui.transitroutedetail.TransitRoutePathScreen
 import com.vie.mit.green.ui.transitstopdetail.TransitStopDetailScreen
 import com.vie.mit.green.ui.transitstopdetail.TransitStopDetailViewModel
 
@@ -53,9 +53,15 @@ fun NavGraphBuilder.mainGraph() {
             )
         }
 
+        composable<TransitRouteDetailRoute> {
+            TransitRoutePathScreen(
+                viewModel = hiltViewModel<TransitRouteDetailViewModel>(),
+            )
+        }
+
         composable<TransitRoutePathRoute> {
             TransitRoutePathScreen(
-                viewModel = hiltViewModel<TransitRoutePathViewModel>(),
+                viewModel = hiltViewModel<TransitRouteDetailViewModel>(),
             )
         }
 

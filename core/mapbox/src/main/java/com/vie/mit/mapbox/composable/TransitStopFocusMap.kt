@@ -23,8 +23,10 @@ import com.mapbox.maps.extension.compose.MapEffect
 import com.mapbox.maps.extension.compose.MapboxMap
 import com.mapbox.maps.extension.compose.animation.viewport.MapViewportState
 import com.mapbox.maps.extension.compose.animation.viewport.rememberMapViewportState
+import com.mapbox.maps.extension.style.expressions.generated.Expression
 import com.mapbox.maps.extension.style.layers.addLayer
 import com.mapbox.maps.extension.style.layers.generated.symbolLayer
+import com.mapbox.maps.extension.style.layers.properties.generated.TextAnchor
 import com.mapbox.maps.extension.style.sources.addSource
 import com.mapbox.maps.extension.style.sources.generated.GeoJsonSource
 import com.mapbox.maps.extension.style.sources.generated.geoJsonSource
@@ -176,11 +178,36 @@ fun TransitStopFocusMap(
                         if (!style.styleLayerExists(FOCUS_STOP_LAYER_ID)) {
                             val iconName =
                                 transitTypeConfig?.iconName ?: "transit_icon_default"
+                            val iconSizeVal = transitTypeConfig?.iconSize ?: 1.2
+                            val showStopName = transitTypeConfig?.showStopName ?: true
+                            val textMinZoom = transitTypeConfig?.textMinZoom ?: 15.0
+                            val textSize = transitTypeConfig?.textSize ?: 11.0
+                            val textColor = transitTypeConfig?.textColor ?: 0xFF0369D8.toInt()
+                            val textHaloColor = transitTypeConfig?.textHaloColor ?: 0xFFFFFFFF.toInt()
+                            val textHaloWidth = transitTypeConfig?.textHaloWidth ?: 1.2
+
                             val layer = symbolLayer(FOCUS_STOP_LAYER_ID, FOCUS_STOP_SOURCE_ID) {
                                 iconImage(iconName)
-                                iconSize(1.2)
+                                iconSize(iconSizeVal)
                                 iconAllowOverlap(true)
                                 iconIgnorePlacement(true)
+
+                                if (showStopName) {
+                                    textField(Expression.fromRaw("""["get", "name"]"""))
+                                    textSize(
+                                        Expression.fromRaw(
+                                            """["step", ["zoom"], 0.0, $textMinZoom, $textSize]"""
+                                        )
+                                    )
+                                    textAnchor(TextAnchor.TOP)
+                                    textOffset(listOf(0.0, 1.1))
+                                    textColor(textColor)
+                                    textHaloColor(textHaloColor)
+                                    textHaloWidth(textHaloWidth)
+                                    textMaxWidth(9.0)
+                                    textAllowOverlap(false)
+                                    textOptional(true)
+                                }
                             }
                             style.addLayer(layer)
                         }

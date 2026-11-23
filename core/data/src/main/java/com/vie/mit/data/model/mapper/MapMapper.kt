@@ -3,6 +3,8 @@ package com.vie.mit.data.model.mapper
 import com.vie.mit.data.model.domain.map.BusRoute
 import com.vie.mit.data.model.domain.map.Location
 import com.vie.mit.data.model.domain.map.PublicTransportSuggestion
+import com.vie.mit.data.model.domain.map.RouteTrip
+import com.vie.mit.data.model.domain.map.ShapePoint
 import com.vie.mit.data.model.domain.map.StopArrival
 import com.vie.mit.data.model.domain.map.TransitStopDetail
 import com.vie.mit.data.model.domain.map.TransitStopMarker
@@ -11,9 +13,12 @@ import com.vie.mit.data.model.remote.request.map.LocationRequest
 import com.vie.mit.data.model.remote.response.map.BusRouteResponse
 import com.vie.mit.data.model.remote.response.map.PublicTransportSuggestionResponse
 import com.vie.mit.data.model.remote.response.map.RouteArrivalResponse
+import com.vie.mit.data.model.remote.response.map.RouteTripResponse
+import com.vie.mit.data.model.remote.response.map.ShapePointResponse
 import com.vie.mit.data.model.remote.response.map.StopTimeResponse
 import com.vie.mit.data.model.remote.response.map.TransitStopDetailResponse
 import com.vie.mit.data.model.remote.response.map.TransitStopMarkerResponse
+import com.vie.mit.data.model.remote.response.map.TripStopResponse
 import java.time.LocalTime
 import java.util.Locale
 
@@ -138,3 +143,35 @@ fun StopTimeResponse.toDomain(nowSeconds: Int = LocalTime.now().toSecondOfDay())
         null
     }
 }
+
+fun RouteTripResponse.toDomain(): RouteTrip = RouteTrip(
+    tripId = tripId,
+    tripHeadsign = tripHeadsign.orEmpty(),
+    directionId = directionId ?: 0,
+    serviceId = serviceId.orEmpty(),
+    shapeId = shapeId,
+    routeId = routeId.orEmpty(),
+    routeShortName = routeShortName.orEmpty(),
+    routeLongName = routeLongName.orEmpty(),
+    routeType = routeType ?: 3,
+)
+
+fun ShapePointResponse.toDomain(): ShapePoint? {
+    val lat = shapePtLat ?: return null
+    val lon = shapePtLon ?: return null
+    return ShapePoint(
+        shapeId = shapeId,
+        sequence = shapePtSequence ?: 0,
+        latitude = lat,
+        longitude = lon,
+        distTraveled = shapeDistTraveled,
+    )
+}
+
+fun TripStopResponse.toDomain(): TransitStopMarker = TransitStopMarker(
+    id = id,
+    name = name.orEmpty(),
+    latitude = latitude,
+    longitude = longitude,
+)
+

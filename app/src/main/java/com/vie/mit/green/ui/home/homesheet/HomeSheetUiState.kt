@@ -1,6 +1,6 @@
 package com.vie.mit.green.ui.home.homesheet
 
-import com.vie.mit.data.model.common.map.PublicTransportType
+import com.vie.mit.data.model.common.map.TransitMode
 import com.vie.mit.data.model.common.map.TravelMode
 import com.vie.mit.green.ui.home.nearbytransitsheet.NearbyStopItem
 import com.vie.mit.mapbox.model.LocationData
@@ -15,9 +15,9 @@ data class HomeSheetUiState(
     val transitSources: List<TransitSourceData> = emptyList(),
     val transitConfigs: List<TransitTypeConfig> = emptyList(),
     val activeTransitTypes: Set<String> = setOf(
-        PublicTransportType.BUS.name,
-        PublicTransportType.SUBWAY.name,
-        PublicTransportType.RAIL.name,
+        TransitMode.BUS.name,
+        TransitMode.SUBWAY.name,
+        TransitMode.RAIL.name,
         TravelMode.BICYCLE_RENT.name,
     ),
     val selectedStop: StopFeatureClick? = null,

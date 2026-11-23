@@ -1,8 +1,6 @@
 package com.vie.mit.data.model.domain.map
 
-data class TransitStopMarker(
-    val id: String,
-    val name: String,
-    val latitude: Double,
-    val longitude: Double
-)
+/**
+ * Typealias pointing to decoupled [com.vie.mit.mapbox.model.TransitStopMarker] in `:core:mapbox`.
+ */
+typealias TransitStopMarker = com.vie.mit.mapbox.model.TransitStopMarker

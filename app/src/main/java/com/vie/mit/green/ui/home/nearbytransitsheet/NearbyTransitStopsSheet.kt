@@ -40,7 +40,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.vie.mit.common.theme.AppTheme
-import com.vie.mit.data.model.common.map.PublicTransportType
+import com.vie.mit.data.model.common.map.TransitMode
 import com.vie.mit.data.model.common.map.TravelMode
 import com.vie.mit.green.R
 import com.vie.mit.green.ui.home.common.NearbyEmptyStateCard
@@ -138,9 +138,9 @@ private fun NearbyStopItemCard(
     modifier: Modifier = Modifier,
 ) {
     val (icon, badgeColor) = when (stop.typeId.uppercase()) {
-        PublicTransportType.BUS.name -> Icons.Default.DirectionsBus to AppTheme.colors.busColor
-        PublicTransportType.SUBWAY.name -> Icons.Default.Subway to AppTheme.colors.metroColor
-        PublicTransportType.RAIL.name -> Icons.Default.Train to Color(0xFF8E24AA)
+        TransitMode.BUS.name -> Icons.Default.DirectionsBus to AppTheme.colors.busColor
+        TransitMode.SUBWAY.name -> Icons.Default.Subway to AppTheme.colors.metroColor
+        TransitMode.RAIL.name -> Icons.Default.Train to Color(0xFF8E24AA)
         TravelMode.BICYCLE_RENT.name -> Icons.AutoMirrored.Filled.DirectionsBike to AppTheme.colors.bikeColor
         else -> Icons.Default.DirectionsTransit to AppTheme.colors.navyBlue
     }

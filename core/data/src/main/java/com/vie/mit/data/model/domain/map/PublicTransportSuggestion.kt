@@ -1,10 +1,10 @@
 package com.vie.mit.data.model.domain.map
 
-import com.vie.mit.data.model.common.map.PublicTransportType
+import com.vie.mit.data.model.common.map.TransitMode
 
 data class PublicTransportSuggestion(
     val name: String,
-    val type: PublicTransportType,
+    val type: TransitMode,
     val distance: Long,
     val availableIn: Int,
 )

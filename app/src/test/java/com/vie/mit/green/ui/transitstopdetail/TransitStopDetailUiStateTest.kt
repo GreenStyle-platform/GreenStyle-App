@@ -1,6 +1,6 @@
 package com.vie.mit.green.ui.transitstopdetail
 
-import com.vie.mit.data.model.common.map.PublicTransportType
+import com.vie.mit.data.model.common.map.TransitMode
 import com.vie.mit.data.model.domain.map.StopArrival
 import com.vie.mit.data.model.domain.map.VehicleArrival
 import org.junit.Assert.assertEquals
@@ -10,16 +10,15 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class TransitStopDetailUiStateTest {
-
     @Test
     fun defaultState_hasCorrectInitialValues() {
         val state = TransitStopDetailUiState(
             stopId = "stop_123",
-            type = PublicTransportType.BUS,
+            type = TransitMode.BUS,
         )
 
         assertEquals("stop_123", state.stopId)
-        assertEquals(PublicTransportType.BUS, state.type)
+        assertEquals(TransitMode.BUS, state.type)
         assertEquals("BUS", state.typeId)
         assertTrue(state.isLoading)
         assertNull(state.error)
@@ -40,10 +39,9 @@ class TransitStopDetailUiStateTest {
                 arrivals = listOf(VehicleArrival(etaMinutes = 5, arrivalTime = "12:30")),
             )
         )
-
         val state = TransitStopDetailUiState(
             stopId = "stop_123",
-            type = PublicTransportType.SUBWAY,
+            type = TransitMode.SUBWAY,
             stopName = "Ga Bến Thành",
             latitude = 10.772,
             longitude = 106.698,
@@ -54,7 +52,7 @@ class TransitStopDetailUiStateTest {
 
         assertFalse(state.isLoading)
         assertEquals("stop_123", state.stopId)
-        assertEquals(PublicTransportType.SUBWAY, state.type)
+        assertEquals(TransitMode.SUBWAY, state.type)
         assertEquals("SUBWAY", state.typeId)
         assertEquals("Ga Bến Thành", state.stopName)
         assertEquals(10.772, state.latitude, 0.0)

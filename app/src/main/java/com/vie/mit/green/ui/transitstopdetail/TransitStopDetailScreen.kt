@@ -51,7 +51,7 @@ import com.vie.mit.common.screenbottomsheet.CustomBottomSheetValue
 import com.vie.mit.common.screenbottomsheet.rememberCustomBottomSheetState
 import com.vie.mit.common.theme.AppTheme
 import com.vie.mit.common.ui.button.FloatingBackButton
-import com.vie.mit.data.model.common.map.PublicTransportType
+import com.vie.mit.data.model.common.map.TransitMode
 import com.vie.mit.data.model.common.map.toTransitTypeConfig
 import com.vie.mit.data.model.domain.map.StopArrival
 import com.vie.mit.data.model.domain.map.VehicleArrival
@@ -99,7 +99,7 @@ fun TransitStopDetailScreen(
     }
 
     val transitTypeConfig = remember(uiState.type) {
-        uiState.type.toTransitTypeConfig(iconSize = 1.2)
+        uiState.type.toTransitTypeConfig(iconSize = 1.2).copy(textMinZoom = 8.0)
     }
 
     CommonScreenBottomSheet(
@@ -116,7 +116,7 @@ fun TransitStopDetailScreen(
                     transitTypeConfig = transitTypeConfig,
                     cameraBottomPadding = cameraBottomPadding,
                     showUserLocation = true,
-                    zoom = 16.0,
+                    zoom = 14.2,
                 )
 
                 // Top-Left Floating Back Button
@@ -300,8 +300,9 @@ private fun RouteArrivalCard(
     routeArrival: StopArrival,
     modifier: Modifier = Modifier,
 ) {
-    val routeColor = remember(routeArrival.routeColor) {
-        parseHexColor(routeArrival.routeColor, defaultColor = Color(0xFF1E88E5))
+    val defaultBusColor = AppTheme.colors.busColor
+    val routeColor = remember(routeArrival.routeColor, defaultBusColor) {
+        parseHexColor(routeArrival.routeColor, defaultColor = defaultBusColor)
     }
 
     Card(
@@ -437,10 +438,10 @@ private fun ArrivalChip(
     }
 }
 
-private fun getTransitIcon(type: PublicTransportType): ImageVector {
+private fun getTransitIcon(type: TransitMode): ImageVector {
     return when (type) {
-        PublicTransportType.SUBWAY, PublicTransportType.MONORAIL -> Icons.Default.DirectionsSubway
-        PublicTransportType.RAIL, PublicTransportType.TRAM, PublicTransportType.CABLE_TRAM, PublicTransportType.AERIAL_LIFT -> Icons.Default.Train
+        TransitMode.SUBWAY, TransitMode.MONORAIL -> Icons.Default.DirectionsSubway
+        TransitMode.RAIL, TransitMode.TRAM, TransitMode.CABLE_TRAM, TransitMode.AERIAL_LIFT -> Icons.Default.Train
         else -> Icons.Default.DirectionsBus
     }
 }

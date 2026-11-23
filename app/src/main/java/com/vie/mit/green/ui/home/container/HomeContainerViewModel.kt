@@ -3,7 +3,7 @@ package com.vie.mit.green.ui.home.container
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.vie.mit.common.navigation.AppNavigator
-import com.vie.mit.data.model.common.map.PublicTransportType
+import com.vie.mit.data.model.common.map.TransitMode
 import com.vie.mit.data.model.common.map.TravelMode
 import com.vie.mit.data.model.domain.map.TransitStopsGeoJsonLoad
 import com.vie.mit.data.model.remote.request.map.TransitStopBoundsRequest
@@ -295,8 +295,8 @@ class HomeContainerViewModel @Inject constructor(
      */
     fun loadBusStopsData(viewport: TransitMapViewportInfo? = currentViewport) {
         val vp = viewport ?: return
-        if (shouldFetchForType(PublicTransportType.BUS.name, vp)) {
-            loadTransitStopsData(vp, setOf(PublicTransportType.BUS.name))
+        if (shouldFetchForType(TransitMode.BUS.name, vp)) {
+            loadTransitStopsData(vp, setOf(TransitMode.BUS.name))
         } else if (isNearbySheetVisible) {
             computeNearbyStopsForSheet()
         }
@@ -308,8 +308,8 @@ class HomeContainerViewModel @Inject constructor(
      */
     fun loadSubwayStationsData(viewport: TransitMapViewportInfo? = currentViewport) {
         val vp = viewport ?: return
-        if (shouldFetchForType(PublicTransportType.SUBWAY.name, vp)) {
-            loadTransitStopsData(vp, setOf(PublicTransportType.SUBWAY.name))
+        if (shouldFetchForType(TransitMode.SUBWAY.name, vp)) {
+            loadTransitStopsData(vp, setOf(TransitMode.SUBWAY.name))
         } else if (isNearbySheetVisible) {
             computeNearbyStopsForSheet()
         }
@@ -359,8 +359,8 @@ class HomeContainerViewModel @Inject constructor(
 
         val vp = currentViewport
         when (typeId) {
-            PublicTransportType.BUS.name -> loadBusStopsData(vp)
-            PublicTransportType.SUBWAY.name -> loadSubwayStationsData(vp)
+            TransitMode.BUS.name -> loadBusStopsData(vp)
+            TransitMode.SUBWAY.name -> loadSubwayStationsData(vp)
             TravelMode.BICYCLE_RENT.name -> loadBikeStationsData(vp)
             else -> {
                 if (vp != null && shouldFetchForType(typeId, vp)) {

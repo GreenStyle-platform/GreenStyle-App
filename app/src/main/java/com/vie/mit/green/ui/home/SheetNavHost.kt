@@ -17,7 +17,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
-import com.vie.mit.data.model.common.map.PublicTransportType
+import com.vie.mit.data.model.common.map.TransitMode
 import com.vie.mit.data.model.common.map.TravelMode
 import com.vie.mit.green.navigation.main_graph.HomeSheetRoute
 import com.vie.mit.green.navigation.main_graph.NearbyBikeStationsSheetRoute
@@ -83,10 +83,11 @@ fun SheetNavHost(
                 onTransitTypeClick = { typeId ->
                     homeContainerViewModel.selectTransitType(typeId)
                     when {
-                        typeId.equals(PublicTransportType.BUS.name, ignoreCase = true) -> {
+                        typeId.equals(TransitMode.BUS.name, ignoreCase = true) -> {
                             sheetNavController.navigate(NearbyBusStopsSheetRoute)
                         }
-                        typeId.equals(PublicTransportType.SUBWAY.name, ignoreCase = true) -> {
+
+                        typeId.equals(TransitMode.SUBWAY.name, ignoreCase = true) -> {
                             sheetNavController.navigate(NearbySubwayStationsSheetRoute)
                         }
                         typeId.equals(TravelMode.BICYCLE_RENT.name, ignoreCase = true) -> {

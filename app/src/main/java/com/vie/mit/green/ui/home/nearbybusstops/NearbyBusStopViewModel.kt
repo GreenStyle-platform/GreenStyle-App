@@ -3,7 +3,7 @@ package com.vie.mit.green.ui.home.nearbybusstops
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.vie.mit.common.navigation.AppNavigator
-import com.vie.mit.data.model.common.map.PublicTransportType
+import com.vie.mit.data.model.common.map.TransitMode
 import com.vie.mit.data.repository.map.MapRepository
 import com.vie.mit.green.navigation.main_graph.TransitStopDetailRoute
 import com.vie.mit.green.ui.home.nearbytransitsheet.NearbyStopItem
@@ -142,6 +142,6 @@ class NearbyBusStopViewModel @Inject constructor(
     }
 
     fun navigateToTransitStopDetail(stopId: String){
-        appNavigator.navigateTo(TransitStopDetailRoute(stopId = stopId, typeId = PublicTransportType.BUS))
+        appNavigator.navigateTo(TransitStopDetailRoute(stopId = stopId, typeId = TransitMode.BUS))
     }
 }
