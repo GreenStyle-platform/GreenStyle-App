@@ -2,7 +2,10 @@ package com.vie.mit.green.ui.home.nearbybusstops
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.vie.mit.common.navigation.AppNavigator
+import com.vie.mit.data.model.common.map.PublicTransportType
 import com.vie.mit.data.repository.map.MapRepository
+import com.vie.mit.green.navigation.main_graph.TransitStopDetailRoute
 import com.vie.mit.green.ui.home.nearbytransitsheet.NearbyStopItem
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
@@ -25,6 +28,7 @@ import javax.inject.Inject
  */
 @HiltViewModel
 class NearbyBusStopViewModel @Inject constructor(
+    private val appNavigator: AppNavigator,
     private val mapRepository: MapRepository,
 ) : ViewModel() {
 
@@ -135,5 +139,9 @@ class NearbyBusStopViewModel @Inject constructor(
         Timber.d("PhucTH: refresh called")
         val currentStops = _uiState.value.busStopsWithArrivals.map { it.stop }
         loadBusStops(currentStops)
+    }
+
+    fun navigateToTransitStopDetail(stopId: String){
+        appNavigator.navigateTo(TransitStopDetailRoute(stopId = stopId, typeId = PublicTransportType.BUS))
     }
 }

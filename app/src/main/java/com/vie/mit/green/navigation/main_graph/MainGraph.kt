@@ -6,8 +6,8 @@ import androidx.navigation.compose.composable
 import androidx.navigation.navigation
 import com.vie.mit.green.ui.busroutesearch.BusRouteSearchScreen
 import com.vie.mit.green.ui.busroutesearch.BusRouteSearchViewModel
-import com.vie.mit.green.ui.home.HomeContainerScreen
-import com.vie.mit.green.ui.home.HomeContainerViewModel
+import com.vie.mit.green.ui.home.container.HomeContainerScreen
+import com.vie.mit.green.ui.home.container.HomeContainerViewModel
 import com.vie.mit.green.ui.journeydetail.JourneyDetailScreen
 import com.vie.mit.green.ui.journeydetail.JourneyDetailViewModel
 import com.vie.mit.green.ui.journeynavigation.JourneyNavigationScreen

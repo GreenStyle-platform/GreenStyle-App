@@ -15,6 +15,7 @@ import com.vie.mit.data.model.mapper.toDomain
 import com.vie.mit.data.model.mapper.toLocationRequest
 import com.vie.mit.data.model.remote.request.map.BusStopArrivalsRequest
 import com.vie.mit.data.model.remote.request.map.TransitStopBoundsRequest
+import com.vie.mit.data.model.remote.request.map.TransitStopDetailRequest
 import com.vie.mit.data.model.remote.response.map.TransitStopMarkerResponse
 import com.vie.mit.data.network.api.map.MapApi
 import com.vie.mit.data.network.util.handleApiCall
@@ -122,38 +123,60 @@ class MapRepository @Inject constructor(
     /**
      * Fetches detailed information for a specific transit stop.
      *
-     * Currently uses [getStopArrivals] API as the backend stop-detail endpoint
-     * is not yet available. When the backend is ready, switch to [mapApi.getTransitStopDetail].
+     * Calls [mapApi.getTransitStopDetail] to retrieve stop details including coordinates,
+     * name, and routes with arrival schedules. Falls back to [getStopArrivals] if the
+     * detail endpoint is unreachable.
      *
      * @param stopId The unique ID of the transit stop.
-     * @param mode Transit mode: "bus", "subway", "rail", etc.
-     * @return A [Result] containing a [TransitStopDetail] with route arrivals.
+     * @param type Transit type: BUS, SUBWAY, RAIL, etc.
+     * @return A [Result] containing a [TransitStopDetail] with coordinates, stop info, and route arrivals.
      */
     suspend fun getTransitStopDetail(
         stopId: String,
-        mode: String = "bus",
+        type: PublicTransportType = PublicTransportType.BUS,
     ): Result<TransitStopDetail> = handleApiCall {
-        // TODO: Replace with direct API call when backend stop-detail endpoint is ready:
-        // mapApi.getTransitStopDetail(
-        //     mode = mode,
-        //     request = TransitStopDetailRequest(stopId = stopId),
-        // ).toDomain()
+        val mode = when (type) {
+            PublicTransportType.BUS, PublicTransportType.TROLLEYBUS -> "bus"
+            PublicTransportType.SUBWAY, PublicTransportType.MONORAIL -> "subway"
+            PublicTransportType.RAIL, PublicTransportType.TRAM, PublicTransportType.CABLE_TRAM, PublicTransportType.AERIAL_LIFT -> "rail"
+            PublicTransportType.FERRY -> "ferry"
+        }
 
-        // Temporary: use existing getStopArrivals to get route/arrival data
-        val arrivalsMap = mapApi.getStopArrivals(
-            mode = mode,
-            request = BusStopArrivalsRequest(stopIds = listOf(stopId)),
-        )
-        val arrivals = arrivalsMap.toDomain()
+        try {
+            mapApi.getTransitStopDetail(
+                mode = mode,
+                request = TransitStopDetailRequest(stopId = stopId),
+            ).toDomain()
+        } catch (e: Exception) {
+            if (e is CancellationException) throw e
+            timber.log.Timber.w(e, "getTransitStopDetail endpoint failed, falling back to getStopArrivals for stopId: $stopId")
+            val arrivalsMap = mapApi.getStopArrivals(
+                mode = mode,
+                request = BusStopArrivalsRequest(stopIds = listOf(stopId)),
+            )
+            TransitStopDetail(
+                id = stopId,
+                name = "",
+                latitude = 0.0,
+                longitude = 0.0,
+                type = type.name,
+                routeArrivals = arrivalsMap.toDomain(),
+            )
+        }
+    }
 
-        TransitStopDetail(
-            id = stopId,
-            name = "",       // Populated from navigation args in ViewModel
-            latitude = 0.0,  // Populated from navigation args in ViewModel
-            longitude = 0.0, // Populated from navigation args in ViewModel
-            type = mode.uppercase(),
-            routeArrivals = arrivals,
-        )
+    suspend fun getTransitStopDetail(
+        stopId: String,
+        mode: String,
+    ): Result<TransitStopDetail> {
+        val type = when (mode.lowercase()) {
+            "subway", "metro" -> PublicTransportType.SUBWAY
+            "rail", "train" -> PublicTransportType.RAIL
+            "tram" -> PublicTransportType.TRAM
+            "ferry" -> PublicTransportType.FERRY
+            else -> PublicTransportType.BUS
+        }
+        return getTransitStopDetail(stopId = stopId, type = type)
     }
 
     /**

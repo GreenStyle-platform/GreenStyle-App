@@ -20,11 +20,13 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MyLocation
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -89,12 +91,13 @@ fun NearbySheetHeader(
     modifier: Modifier = Modifier,
     title: String,
     icon: Int? = null,
+    onRefresh: (() -> Unit)? = null,
     onBack: () -> Unit,
 ) {
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .padding(8.dp),
+            .padding(horizontal = 8.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.Start,
     ) {
@@ -115,9 +118,25 @@ fun NearbySheetHeader(
         )
         Spacer(modifier = Modifier.weight(1f))
 
+        if (onRefresh != null) {
+            IconButton(
+                onClick = onRefresh,
+                modifier = Modifier.size(36.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Refresh,
+                    contentDescription = "Refresh",
+                    tint = AppTheme.colors.white,
+                    modifier = Modifier.size(24.dp)
+                )
+            }
+            Spacer(modifier = Modifier.width(12.dp))
+        }
+
         Image(
             modifier = Modifier
-                .size(12.dp)
+                .size(32.dp)
+                .padding(8.dp)
                 .clickable(enabled = true, onClick = onBack),
             painter = painterResource(com.vie.mit.common.R.drawable.ic_close),
             contentDescription = "Close"

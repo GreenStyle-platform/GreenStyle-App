@@ -22,9 +22,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.DirectionsBus
 import androidx.compose.material.icons.filled.DirectionsSubway
-import androidx.compose.material.icons.filled.PedalBike
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material.icons.filled.Train
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -53,6 +53,7 @@ import com.vie.mit.common.screenbottomsheet.CommonScreenBottomSheet
 import com.vie.mit.common.screenbottomsheet.CustomBottomSheetValue
 import com.vie.mit.common.screenbottomsheet.rememberCustomBottomSheetState
 import com.vie.mit.common.theme.AppTheme
+import com.vie.mit.data.model.common.map.PublicTransportType
 import com.vie.mit.data.model.domain.map.StopArrival
 import com.vie.mit.data.model.domain.map.VehicleArrival
 import com.vie.mit.mapbox.composable.TransitStopFocusMap
@@ -78,8 +79,8 @@ fun TransitStopDetailScreen(
     val sheetConfig = remember {
         BottomSheetConfig(
             peekedRatio = 0.20f,
-            partiallyExpandedRatio = 0.50f,
-            expandedRatio = 0.90f,
+            partiallyExpandedRatio = 0.72f,
+            expandedRatio = 0.80f,
         )
     }
 
@@ -99,24 +100,24 @@ fun TransitStopDetailScreen(
         }
     }
 
-    val transitTypeConfig = remember(uiState.typeId) {
-        when (uiState.typeId.uppercase()) {
-            "SUBWAY", "METRO" -> TransitTypeConfig(
+    val transitTypeConfig = remember(uiState.type) {
+        when (uiState.type) {
+            PublicTransportType.SUBWAY, PublicTransportType.MONORAIL -> TransitTypeConfig(
                 typeId = "SUBWAY",
                 iconResId = com.vie.mit.mapbox.R.drawable.ic_transit_metro,
                 clusterColor = 0xFFE53935.toInt(),
                 iconSize = 1.2,
             )
-            "BICYCLE", "BICYCLE_RENT", "BIKE" -> TransitTypeConfig(
-                typeId = "BICYCLE_RENT",
-                iconResId = com.vie.mit.mapbox.R.drawable.ic_transit_bike,
-                clusterColor = 0xFF43A047.toInt(),
-                iconSize = 1.2,
-            )
-            "RAIL", "TRAIN" -> TransitTypeConfig(
+            PublicTransportType.RAIL, PublicTransportType.TRAM, PublicTransportType.CABLE_TRAM, PublicTransportType.AERIAL_LIFT -> TransitTypeConfig(
                 typeId = "RAIL",
                 iconResId = com.vie.mit.mapbox.R.drawable.ic_transit_train,
                 clusterColor = 0xFF8E24AA.toInt(),
+                iconSize = 1.2,
+            )
+            PublicTransportType.FERRY -> TransitTypeConfig(
+                typeId = "FERRY",
+                iconResId = com.vie.mit.mapbox.R.drawable.ic_transit_bus,
+                clusterColor = 0xFF00ACC1.toInt(),
                 iconSize = 1.2,
             )
             else -> TransitTypeConfig(
@@ -142,7 +143,7 @@ fun TransitStopDetailScreen(
                     transitTypeConfig = transitTypeConfig,
                     cameraBottomPadding = cameraBottomPadding,
                     showUserLocation = true,
-                    zoom = 16.5,
+                    zoom = 22.0,
                 )
 
                 // Top-Left Floating Back Button
@@ -232,7 +233,7 @@ private fun TransitStopDetailSheetContent(
                     modifier = Modifier.padding(top = 2.dp)
                 ) {
                     Icon(
-                        imageVector = getTransitIcon(uiState.typeId),
+                        imageVector = getTransitIcon(uiState.type),
                         contentDescription = null,
                         tint = Color.White.copy(alpha = 0.85f),
                         modifier = Modifier.size(14.dp)
@@ -515,10 +516,10 @@ private fun ArrivalChip(
     }
 }
 
-private fun getTransitIcon(typeId: String): ImageVector {
-    return when (typeId.uppercase()) {
-        "SUBWAY", "METRO" -> Icons.Default.DirectionsSubway
-        "BICYCLE", "BICYCLE_RENT", "BIKE" -> Icons.Default.PedalBike
+private fun getTransitIcon(type: PublicTransportType): ImageVector {
+    return when (type) {
+        PublicTransportType.SUBWAY, PublicTransportType.MONORAIL -> Icons.Default.DirectionsSubway
+        PublicTransportType.RAIL, PublicTransportType.TRAM, PublicTransportType.CABLE_TRAM, PublicTransportType.AERIAL_LIFT -> Icons.Default.Train
         else -> Icons.Default.DirectionsBus
     }
 }

@@ -1,4 +1,4 @@
-package com.vie.mit.green.ui.home
+package com.vie.mit.green.ui.home.container
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -48,6 +48,7 @@ import com.vie.mit.green.navigation.main_graph.NearbyBusStopsSheetRoute
 import com.vie.mit.green.navigation.main_graph.NearbySubwayStationsSheetRoute
 import com.vie.mit.green.navigation.main_graph.NearbyTransitStopsSheetRoute
 import com.vie.mit.green.navigation.main_graph.StopDetailSheetRoute
+import com.vie.mit.green.ui.home.SheetNavHost
 import com.vie.mit.green.ui.home.homesheet.StopDetailFloatingCard
 import com.vie.mit.mapbox.composable.TransitStopsMapScreen
 import com.vie.mit.mapbox.util.focusUserLocationBoundingBox
@@ -84,7 +85,7 @@ fun HomeContainerScreen(
             currentDestination?.hasRoute<NearbyTransitStopsSheetRoute>() == true || currentDestination?.hasRoute<NearbyBusStopsSheetRoute>() == true || currentDestination?.hasRoute<NearbySubwayStationsSheetRoute>() == true || currentDestination?.hasRoute<NearbyBikeStationsSheetRoute>() == true -> BottomSheetConfig(
                 peekedRatio = 0.20f,
                 partiallyExpandedRatio = 0.65f,
-                expandedRatio = 0.90f,
+                expandedRatio = 1f,
             )
             currentDestination?.hasRoute<StopDetailSheetRoute>() == true -> BottomSheetConfig(
                 peekedRatio = 0.20f,
@@ -115,7 +116,7 @@ fun HomeContainerScreen(
         // 2. Dọn dẹp cache của các destination đã bị pop khỏi back stack
         @Suppress("RestrictedApi")
         val activeRouteKeys: Set<String> = sheetNavController.currentBackStack.value
-            .mapNotNull { it.destination.route ?: it.destination.id.toString() }
+            .map { it.destination.route ?: it.destination.id.toString() }
             .toSet()
         savedSheetStates.keys.retainAll(activeRouteKeys)
 

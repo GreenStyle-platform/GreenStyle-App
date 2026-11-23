@@ -1,7 +1,6 @@
 package com.vie.mit.green.ui.busroutesearch
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -18,9 +17,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.DirectionsBus
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -28,8 +25,6 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -45,6 +40,7 @@ import androidx.paging.LoadState
 import androidx.paging.compose.collectAsLazyPagingItems
 import androidx.paging.compose.itemKey
 import com.vie.mit.common.theme.AppTheme
+import com.vie.mit.common.ui.textfield.SearchTextFieldGre
 
 @Composable
 fun BusRouteSearchScreen(
@@ -94,43 +90,11 @@ fun BusRouteSearchScreen(
                 .padding(horizontal = 16.dp),
         ) {
             // Search Input Field
-            OutlinedTextField(
+            SearchTextFieldGre(
                 value = searchQuery,
                 onValueChange = viewModel::onSearchQueryChanged,
+                placeholder = "Nhập mã tuyến hoặc tên tuyến...",
                 modifier = Modifier.fillMaxWidth(),
-                placeholder = {
-                    Text(
-                        text = "Nhập mã tuyến hoặc tên tuyến...",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = Color(0xFF9CA3AF),
-                    )
-                },
-                leadingIcon = {
-                    Icon(
-                        imageVector = Icons.Default.Search,
-                        contentDescription = null,
-                        tint = busColor,
-                    )
-                },
-                trailingIcon = {
-                    if (searchQuery.isNotEmpty()) {
-                        IconButton(onClick = { viewModel.onSearchQueryChanged("") }) {
-                            Icon(
-                                imageVector = Icons.Default.Clear,
-                                contentDescription = "Xóa",
-                                tint = Color(0xFF9CA3AF),
-                            )
-                        }
-                    }
-                },
-                singleLine = true,
-                shape = RoundedCornerShape(12.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedContainerColor = Color.White,
-                    unfocusedContainerColor = Color.White,
-                    focusedBorderColor = busColor,
-                    unfocusedBorderColor = Color(0xFFE5E7EB),
-                ),
             )
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -212,9 +176,11 @@ fun BusRouteSearchScreen(
                             val route = lazyPagingItems[index]
                             if (route != null) {
                                 Card(
+                                    onClick = {
+                                        viewModel.navigateToDetailRoute(route.routeId)
+                                    },
                                     modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clickable { },
+                                        .fillMaxWidth(),
                                     shape = RoundedCornerShape(12.dp),
                                     colors = CardDefaults.cardColors(containerColor = Color.White),
                                     elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),

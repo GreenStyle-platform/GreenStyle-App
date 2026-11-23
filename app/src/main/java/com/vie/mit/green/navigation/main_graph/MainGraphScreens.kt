@@ -1,5 +1,6 @@
 package com.vie.mit.green.navigation.main_graph
 
+import com.vie.mit.data.model.common.map.PublicTransportType
 import kotlinx.serialization.Serializable
 
 @Serializable
@@ -58,8 +59,5 @@ object TransitRoutePathRoute
 @Serializable
 data class TransitStopDetailRoute(
     val stopId: String,
-    val typeId: String = "",
-    val name: String = "",
-    val latitude: Double = 0.0,
-    val longitude: Double = 0.0,
+    val typeId: PublicTransportType = PublicTransportType.BUS,
 )

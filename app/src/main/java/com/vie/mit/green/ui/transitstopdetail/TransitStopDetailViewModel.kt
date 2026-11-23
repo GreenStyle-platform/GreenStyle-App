@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.navigation.toRoute
 import com.vie.mit.common.navigation.AppNavigator
+import com.vie.mit.data.model.common.map.PublicTransportType
 import com.vie.mit.data.repository.map.MapRepository
 import com.vie.mit.green.navigation.main_graph.TransitStopDetailRoute
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -22,16 +23,12 @@ class TransitStopDetailViewModel @Inject constructor(
     private val mapRepository: MapRepository,
     private val appNavigator: AppNavigator,
 ) : ViewModel() {
-
     private val route: TransitStopDetailRoute = savedStateHandle.toRoute<TransitStopDetailRoute>()
-
     private val _uiState = MutableStateFlow(
         TransitStopDetailUiState(
             stopId = route.stopId,
-            stopName = route.name,
-            typeId = route.typeId,
-            latitude = route.latitude,
-            longitude = route.longitude,
+            type = route.typeId,
+            typeId = route.typeId.name,
             isLoading = true,
         )
     )
@@ -51,34 +48,27 @@ class TransitStopDetailViewModel @Inject constructor(
         _uiState.update { it.copy(isLoading = true, error = null) }
 
         viewModelScope.launch {
-            val mode = when (route.typeId.uppercase()) {
-                "SUBWAY", "METRO" -> "subway"
-                "RAIL", "TRAIN" -> "rail"
-                "BICYCLE", "BICYCLE_RENT", "BIKE" -> "bike"
-                else -> "bus"
+            mapRepository.getTransitStopDetail(stopId = stopId, type = route.typeId).onSuccess { detail ->
+                _uiState.update { current ->
+                    current.copy(
+                        isLoading = false,
+                        stopName = if (detail.name.isNotBlank()) detail.name else current.stopName,
+                        latitude = if (detail.latitude != 0.0) detail.latitude else current.latitude,
+                        longitude = if (detail.longitude != 0.0) detail.longitude else current.longitude,
+                        address = detail.address,
+                        routeArrivals = detail.routeArrivals,
+                        error = null,
+                    )
+                }
+            }.onFailure { error ->
+                Timber.e(error, "Failed to load transit stop detail for stopId: $stopId")
+                _uiState.update {
+                    it.copy(
+                        isLoading = false,
+                        error = error.message ?: "Không thể tải thông tin trạm dừng",
+                    )
+                }
             }
-
-            mapRepository.getTransitStopDetail(stopId = stopId, mode = mode)
-                .onSuccess { detail ->
-                    _uiState.update { current ->
-                        current.copy(
-                            isLoading = false,
-                            stopName = if (detail.name.isNotBlank()) detail.name else current.stopName,
-                            address = detail.address,
-                            routeArrivals = detail.routeArrivals,
-                            error = null,
-                        )
-                    }
-                }
-                .onFailure { error ->
-                    Timber.e(error, "Failed to load transit stop detail for stopId: $stopId")
-                    _uiState.update {
-                        it.copy(
-                            isLoading = false,
-                            error = error.message ?: "Không thể tải thông tin trạm dừng",
-                        )
-                    }
-                }
         }
     }
 

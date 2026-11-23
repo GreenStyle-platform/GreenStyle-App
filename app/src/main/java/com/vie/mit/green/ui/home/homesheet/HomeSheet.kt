@@ -525,7 +525,7 @@ private fun CitymapperGridButton(
     Surface(
         onClick = onClick,
         shape = RoundedCornerShape(14.dp),
-        color = if (isActive) AppTheme.colors.overlayColor else Color(0x18000000),
+        color = if (isActive) AppTheme.colors.blackOverlay20 else Color(0x18000000),
         modifier = modifier.aspectRatio(1f)
     ) {
         Column(

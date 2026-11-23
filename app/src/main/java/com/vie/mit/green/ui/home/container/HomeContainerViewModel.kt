@@ -1,4 +1,4 @@
-package com.vie.mit.green.ui.home
+package com.vie.mit.green.ui.home.container
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope

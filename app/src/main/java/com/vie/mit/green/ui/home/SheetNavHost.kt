@@ -17,7 +17,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
-import androidx.navigation.toRoute
 import com.vie.mit.data.model.common.map.PublicTransportType
 import com.vie.mit.data.model.common.map.TravelMode
 import com.vie.mit.green.navigation.main_graph.HomeSheetRoute
@@ -26,6 +25,7 @@ import com.vie.mit.green.navigation.main_graph.NearbyBusStopsSheetRoute
 import com.vie.mit.green.navigation.main_graph.NearbySubwayStationsSheetRoute
 import com.vie.mit.green.navigation.main_graph.NearbyTransitStopsSheetRoute
 import com.vie.mit.green.navigation.main_graph.StopDetailSheetRoute
+import com.vie.mit.green.ui.home.container.HomeContainerViewModel
 import com.vie.mit.green.ui.home.homesheet.HomeSheet
 import com.vie.mit.green.ui.home.nearbybikestations.NearbyBikeStationsSheet
 import com.vie.mit.green.ui.home.nearbybusstops.NearbyBusStopViewModel
@@ -127,6 +127,7 @@ fun SheetNavHost(
                 onBack = { sheetNavController.popBackStack() },
                 onRefresh = nearbyBusViewModel::refresh,
                 onFindBusRouteClick = homeContainerViewModel::navigateToBusRouteSearch,
+                onNavigateToTransitStopDetail = nearbyBusViewModel::navigateToTransitStopDetail
             )
         }
 
@@ -215,14 +216,5 @@ fun SheetNavHost(
             )
         }
 
-        composable<StopDetailSheetRoute> { entry ->
-            val route = entry.toRoute<StopDetailSheetRoute>()
-            StopDetailSheetContent(
-                stopId = route.stopId,
-                typeId = route.typeId,
-                name = route.name,
-                onBack = { sheetNavController.popBackStack() },
-            )
-        }
     }
 }

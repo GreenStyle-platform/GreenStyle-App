@@ -17,6 +17,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.flatMapLatest
 import javax.inject.Inject
+import kotlin.time.Duration.Companion.milliseconds
 
 @OptIn(ExperimentalCoroutinesApi::class, FlowPreview::class)
 @HiltViewModel
@@ -24,16 +25,12 @@ class BusRouteSearchViewModel @Inject constructor(
     private val appNavigator: AppNavigator,
     private val mapRepository: MapRepository,
 ) : ViewModel() {
-
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
-
-    val busRoutesState: Flow<PagingData<BusRoute>> = _searchQuery
-        .debounce(300L)
-        .flatMapLatest { query ->
-            mapRepository.getBusRoutesStream(query)
-        }
-        .cachedIn(viewModelScope)
+    val busRoutesState: Flow<PagingData<BusRoute>> =
+        _searchQuery.debounce(300L.milliseconds).flatMapLatest { query ->
+                mapRepository.getBusRoutesStream(query)
+            }.cachedIn(viewModelScope)
 
     fun onSearchQueryChanged(query: String) {
         _searchQuery.value = query
@@ -41,5 +38,9 @@ class BusRouteSearchViewModel @Inject constructor(
 
     fun navigateBack() {
         appNavigator.navigateUp()
+    }
+
+    fun navigateToDetailRoute(routeId: String) {
+//        appNavigator.navigateTo()
     }
 }

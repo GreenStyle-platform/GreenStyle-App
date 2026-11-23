@@ -1,11 +1,5 @@
 package com.vie.mit.green.ui.home.nearbybusstops
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -30,7 +24,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DirectionsBus
-import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -41,13 +34,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -92,6 +81,7 @@ fun NearbyBusStopsSheet(
     onRadiusSelected: (Double) -> Unit = {},
     onRefresh: () -> Unit = {},
     onFindBusRouteClick: () -> Unit = {},
+    onNavigateToTransitStopDetail: (String)->Unit
 ) {
     val busColor = AppTheme.colors.busColor
 
@@ -105,6 +95,7 @@ fun NearbyBusStopsSheet(
             title = stringResource(R.string.nearby_bus_title),
             icon = com.vie.mit.mapbox.R.drawable.ic_transit_bus,
             onBack = onBack,
+            onRefresh = onRefresh
         )
 
         Spacer(modifier = Modifier.height(10.dp))
@@ -112,29 +103,14 @@ fun NearbyBusStopsSheet(
         // ── 1.5 Mode Switcher Buttons (Stops / Find Bus Route) ─────────────
         Row(
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 4.dp),
+                .fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Surface(
-                modifier = Modifier
-                    .weight(1f)
-                    .height(40.dp),
-                shape = RoundedCornerShape(12.dp),
-                color = busColor,
-            ) {
                 Row(
-                    modifier = Modifier.fillMaxSize(),
+                    modifier = Modifier.weight(1f).clip(shape = RoundedCornerShape(8.dp)).background(AppTheme.colors.blackOverlay20).padding(vertical = 12.dp),
                     horizontalArrangement = Arrangement.Center,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.DirectionsBus,
-                        contentDescription = null,
-                        tint = Color.White,
-                        modifier = Modifier.size(18.dp),
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
                     Text(
                         text = "Trạm dừng",
                         style = AppTheme.typography.bodyMedium.copy(
@@ -143,18 +119,12 @@ fun NearbyBusStopsSheet(
                         ),
                     )
                 }
-            }
 
-            Surface(
-                onClick = onFindBusRouteClick,
-                modifier = Modifier
-                    .weight(1f)
-                    .height(40.dp),
-                shape = RoundedCornerShape(12.dp),
-                color = Color.White.copy(alpha = 0.2f),
-            ) {
                 Row(
-                    modifier = Modifier.fillMaxSize(),
+                    modifier = Modifier.weight(1f).clip(RoundedCornerShape(8.dp)).background(AppTheme.colors.blackOverlay10).clickable(
+                        enabled = true,
+                        onClick = onFindBusRouteClick
+                    ).padding(vertical = 12.dp),
                     horizontalArrangement = Arrangement.Center,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
@@ -172,7 +142,6 @@ fun NearbyBusStopsSheet(
                             color = Color.White,
                         ),
                     )
-                }
             }
         }
 
@@ -220,6 +189,7 @@ fun NearbyBusStopsSheet(
                     BusStopCard(
                         stopWithArrivals = stopWithArrivals,
                         busColor = busColor,
+                        onBusStopClick = onNavigateToTransitStopDetail
                     )
                 }
             }
@@ -234,13 +204,8 @@ private fun BusStopCard(
     stopWithArrivals: NearbyBusStopWithArrivals,
     busColor: Color,
     modifier: Modifier = Modifier,
+    onBusStopClick : (String)->Unit
 ) {
-    var expanded by rememberSaveable(stopWithArrivals.stop.stopId) { mutableStateOf(false) }
-    val rotationAngle by animateFloatAsState(
-        targetValue = if (expanded) 180f else 0f,
-        animationSpec = tween(durationMillis = 250, easing = FastOutSlowInEasing),
-        label = "expand_arrow",
-    )
 
     val formattedDistance = formatDistance(stopWithArrivals.stop.distanceMeters)
 
@@ -255,7 +220,7 @@ private fun BusStopCard(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable { expanded = !expanded }
+                    .clickable { onBusStopClick.invoke(stopWithArrivals.stop.stopId) }
                     .padding(12.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -290,27 +255,8 @@ private fun BusStopCard(
                         ),
                     )
                     Spacer(modifier = Modifier.height(4.dp))
-                    Icon(
-                        imageVector = Icons.Default.ExpandMore,
-                        contentDescription = if (expanded) "Thu gọn" else "Xem tuyến xe",
-                        tint = Color(0xFF9CA3AF),
-                        modifier = Modifier
-                            .size(20.dp)
-                            .rotate(rotationAngle),
-                    )
                 }
             }
-
-            // ── Arrivals Section (Expandable) ─────────────────────────────
-            AnimatedVisibility(
-                visible = expanded,
-                enter = expandVertically(
-                    animationSpec = tween(durationMillis = 250, easing = FastOutSlowInEasing),
-                ),
-                exit = shrinkVertically(
-                    animationSpec = tween(durationMillis = 200, easing = FastOutSlowInEasing),
-                ),
-            ) {
                 Column(modifier = Modifier.fillMaxWidth()) {
                     HorizontalDivider(
                         color = Color(0xFFE5E7EB),
@@ -322,7 +268,6 @@ private fun BusStopCard(
                         busColor = busColor,
                     )
                 }
-            }
         }
     }
 }
