@@ -132,6 +132,7 @@ fun TransitStopDetailScreen(
             TransitStopDetailSheetContent(
                 uiState = uiState,
                 onRetry = viewModel::loadStopDetail,
+                onRouteClick = viewModel:: navigateToDetailRoute
             )
         }
     )
@@ -142,6 +143,7 @@ private fun TransitStopDetailSheetContent(
     uiState: TransitStopDetailUiState,
     onRetry: () -> Unit,
     modifier: Modifier = Modifier,
+    onRouteClick: (String)->Unit
 ) {
     Column(
         modifier = modifier
@@ -287,7 +289,7 @@ private fun TransitStopDetailSheetContent(
                         items = uiState.routeArrivals,
                         key = { it.routeId },
                     ) { routeArrival ->
-                        RouteArrivalCard(routeArrival = routeArrival)
+                        RouteArrivalCard(routeArrival = routeArrival, onRouteClick = onRouteClick)
                     }
                 }
             }
@@ -299,6 +301,7 @@ private fun TransitStopDetailSheetContent(
 private fun RouteArrivalCard(
     routeArrival: StopArrival,
     modifier: Modifier = Modifier,
+    onRouteClick: (String) ->Unit
 ) {
     val defaultBusColor = AppTheme.colors.busColor
     val routeColor = remember(routeArrival.routeColor, defaultBusColor) {
@@ -306,6 +309,7 @@ private fun RouteArrivalCard(
     }
 
     Card(
+        onClick = {onRouteClick.invoke(routeArrival.routeId)},
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(14.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),

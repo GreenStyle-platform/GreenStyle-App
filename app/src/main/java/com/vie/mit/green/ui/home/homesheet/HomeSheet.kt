@@ -1,5 +1,6 @@
 package com.vie.mit.green.ui.home.homesheet
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -23,22 +24,16 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.DirectionsBike
-import androidx.compose.material.icons.automirrored.filled.DirectionsWalk
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ConfirmationNumber
-import androidx.compose.material.icons.filled.DirectionsBus
 import androidx.compose.material.icons.filled.DirectionsTransit
-import androidx.compose.material.icons.filled.ElectricScooter
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Star
-import androidx.compose.material.icons.filled.Subway
 import androidx.compose.material.icons.filled.Train
-import androidx.compose.material.icons.filled.WarningAmber
 import androidx.compose.material.icons.filled.Work
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -54,6 +49,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -62,6 +58,7 @@ import androidx.compose.ui.unit.sp
 import com.vie.mit.common.theme.AppTheme
 import com.vie.mit.data.model.common.map.TransitMode
 import com.vie.mit.data.model.common.map.TravelMode
+import com.vie.mit.green.R
 import com.vie.mit.mapbox.model.StopFeatureClick
 
 // ======================================================================================
@@ -97,7 +94,7 @@ internal fun HomeSheet(
             .padding(horizontal = 16.dp, vertical = 8.dp)
     ) {
         // 1. White Navigation Card ("Get Me Somewhere", "Get Me Home", "Work", "Places")
-        CitymapperNavigationCard(
+        NavigationCard(
             onSearchClick = onSearchClick,
             onHomeClick = onHomeClick,
             onWorkClick = onWorkClick,
@@ -221,7 +218,7 @@ internal fun StopDetailFloatingCard(
 // ======================================================================================
 
 @Composable
-private fun CitymapperNavigationCard(
+private fun NavigationCard(
     onSearchClick: () -> Unit,
     onHomeClick: () -> Unit,
     onWorkClick: () -> Unit,
@@ -404,84 +401,75 @@ private fun TransitModesGrid(
         modifier = modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        // Row 1: All | Walk | Bike | Maps | Issues (with badge)
+        // Row 1: Walk | Bike | Maps | e-Scooter | Bus (5 slots)
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            CitymapperGridButton(
-                icon = Icons.Default.DirectionsTransit,
-                label = "All",
-                onClick = { onTransitTypeClick("ALL") },
-                modifier = Modifier.weight(1f),
-            )
-            CitymapperGridButton(
-                icon = Icons.AutoMirrored.Filled.DirectionsWalk,
+            TransitModeGridButton(
+                icon = R.drawable.ic_walk_mode,
                 label = "Walk",
                 onClick = { /* Walk action */ },
                 modifier = Modifier.weight(1f),
             )
-            CitymapperGridButton(
-                icon = Icons.AutoMirrored.Filled.DirectionsBike,
+            TransitModeGridButton(
+                icon = R.drawable.ic_bike_mode,
                 label = "Bike",
                 isActive = activeTransitTypes.contains(TravelMode.BICYCLE_RENT.name),
                 onClick = { onTransitTypeClick(TravelMode.BICYCLE_RENT.name) },
                 modifier = Modifier.weight(1f),
             )
-            CitymapperGridButton(
-                icon = Icons.Default.Map,
-                label = "Maps",
-                onClick = { /* Open maps action */ },
-                modifier = Modifier.weight(1f),
-            )
-            CitymapperGridButton(
-                icon = Icons.Default.WarningAmber,
-                label = "Issues",
-                badgeText = "14",
-                onClick = { /* Issues action */ },
-                modifier = Modifier.weight(1f),
-            )
-        }
 
-        // Row 2: e-Scooter | Bus | Metro | Rail | More
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            CitymapperGridButton(
-                icon = Icons.Default.ElectricScooter,
-                label = "e-Scooter",
-                onClick = { /* e-Scooter action */ },
-                modifier = Modifier.weight(1f),
-            )
             // Bus: single click → navigate to NearbyBusStopsSheet
-            CitymapperGridButton(
-                icon = Icons.Default.DirectionsBus,
+            TransitModeGridButton(
+                icon = R.drawable.ic_bus_mode,
                 label = "Bus",
                 isActive = activeTransitTypes.contains(TransitMode.BUS.name),
                 onClick = { onTransitTypeClick(TransitMode.BUS.name) },
                 modifier = Modifier.weight(1f),
             )
-            CitymapperGridButton(
-                icon = Icons.Default.Subway,
+            TransitModeGridButton(
+                icon = R.drawable.ic_metro_mode,
                 label = "Metro",
                 isActive = activeTransitTypes.contains(TransitMode.SUBWAY.name),
                 onClick = { onTransitTypeClick(TransitMode.SUBWAY.name) },
                 modifier = Modifier.weight(1f),
             )
-            CitymapperGridButton(
+            TransitModeGridButton(
+                icon = R.drawable.ic_scooter_mode,
+                label = "e-Scooter",
+                onClick = { /* e-Scooter action */ },
+                modifier = Modifier.weight(1f),
+            )
+        }
+
+        // Row 2: Metro | Rail | More | Spacer | Spacer (5 slots)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            TransitModeGridButton(
+                icon = Icons.Default.Map,
+                label = "Maps",
+                onClick = { /* Open maps action */ },
+                modifier = Modifier.weight(1f),
+            )
+
+            TransitModeGridButton(
                 icon = Icons.Default.Train,
                 label = "Rail",
                 isActive = activeTransitTypes.contains(TransitMode.RAIL.name),
                 onClick = { onTransitTypeClick(TransitMode.RAIL.name) },
                 modifier = Modifier.weight(1f),
             )
-            CitymapperGridButton(
+            TransitModeGridButton(
                 icon = Icons.Default.KeyboardArrowDown,
                 label = "More",
                 onClick = { /* More transit types */ },
                 modifier = Modifier.weight(1f),
             )
+            Spacer(modifier = Modifier.weight(1f))
+            Spacer(modifier = Modifier.weight(1f))
         }
     }
 }@Composable
@@ -495,13 +483,13 @@ private fun UtilitiesGrid(
         modifier = modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        CitymapperGridButton(
+        TransitModeGridButton(
             icon = Icons.Default.ConfirmationNumber,
             label = "Vé",
             onClick = onTicketClick,
             modifier = Modifier.weight(1f),
         )
-        CitymapperGridButton(
+        TransitModeGridButton(
             icon = Icons.Default.History,
             label = "Lịch sử chuyến đi",
             onClick = onHistoryClick,
@@ -514,8 +502,8 @@ private fun UtilitiesGrid(
 }
 
 @Composable
-private fun CitymapperGridButton(
-    icon: ImageVector,
+private fun TransitModeGridButton(
+    icon: Any,
     label: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
@@ -525,7 +513,7 @@ private fun CitymapperGridButton(
     Surface(
         onClick = onClick,
         shape = RoundedCornerShape(14.dp),
-        color = if (isActive) AppTheme.colors.blackOverlay20 else Color(0x18000000),
+        color = if (isActive) AppTheme.colors.blackOverlay20 else AppTheme.colors.blackOverlay10,
         modifier = modifier.aspectRatio(1f)
     ) {
         Column(
@@ -536,12 +524,24 @@ private fun CitymapperGridButton(
             verticalArrangement = Arrangement.Center
         ) {
             Box(contentAlignment = Alignment.TopEnd) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = label,
-                    tint = if (isActive) Color.White else Color.White.copy(alpha = 0.5f),
-                    modifier = Modifier.size(24.dp)
-                )
+                when (icon) {
+                    is ImageVector -> {
+                        Icon(
+                            imageVector = icon,
+                            contentDescription = label,
+                            tint = if (isActive) Color.White else Color.White.copy(alpha = 0.5f),
+                            modifier = Modifier.size(28.dp)
+                        )
+                    }
+                    is Int -> {
+                        Image(
+                            painter = painterResource(id = icon),
+                            contentDescription = label,
+                            modifier = Modifier.size(28.dp)
+                        )
+                    }
+                }
+
                 if (badgeText != null) {
                     Box(
                         modifier = Modifier

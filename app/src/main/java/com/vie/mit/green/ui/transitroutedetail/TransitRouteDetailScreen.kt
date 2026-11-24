@@ -59,7 +59,7 @@ import com.vie.mit.common.theme.AppTheme
 import com.vie.mit.common.ui.button.FloatingBackButton
 import com.vie.mit.data.model.domain.map.RoundTrip
 import com.vie.mit.data.model.domain.map.TransitStopMarker
-import com.vie.mit.mapbox.composable.TransitRouteMap
+import com.vie.mit.mapbox.composable.TransitRouteFocusMap
 
 /**
  * Screen displaying the detailed route view with Mapbox path, stops, and bottom sheet.
@@ -104,7 +104,7 @@ fun TransitRouteDetailScreen(
         backgroundContent = { _ ->
             Box(modifier = Modifier.fillMaxSize()) {
                 // Background Mapbox path & stops
-                TransitRouteMap(
+                TransitRouteFocusMap(
                     shapes = uiState.shapes,
                     stops = uiState.stops,
                     cameraBottomPadding = cameraBottomPadding,

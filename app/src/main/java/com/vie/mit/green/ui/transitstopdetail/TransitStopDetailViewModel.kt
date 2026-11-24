@@ -5,7 +5,6 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.navigation.toRoute
 import com.vie.mit.common.navigation.AppNavigator
-import com.vie.mit.data.model.common.map.TransitMode
 import com.vie.mit.data.repository.map.MapRepository
 import com.vie.mit.green.navigation.main_graph.TransitRouteDetailRoute
 import com.vie.mit.green.navigation.main_graph.TransitStopDetailRoute
@@ -78,11 +77,10 @@ class TransitStopDetailViewModel @Inject constructor(
         appNavigator.navigateUp()
     }
 
-    fun navigateToDetailRoute(routeId: String, transitType: TransitMode) {
+    fun navigateToDetailRoute(routeId: String) {
         appNavigator.navigateTo(
             TransitRouteDetailRoute(
-                routeId = routeId,
-                transitMode = transitType
+                routeId = routeId, transitMode = uiState.value.type
             )
         )
     }

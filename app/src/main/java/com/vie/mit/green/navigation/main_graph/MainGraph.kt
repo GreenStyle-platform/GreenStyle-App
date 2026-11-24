@@ -1,5 +1,8 @@
 package com.vie.mit.green.navigation.main_graph
 
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.compose.composable
@@ -53,19 +56,34 @@ fun NavGraphBuilder.mainGraph() {
             )
         }
 
-        composable<TransitRouteDetailRoute> {
+        composable<TransitRouteDetailRoute>(
+            enterTransition = { fadeIn(tween(150)) },
+            exitTransition = { fadeOut(tween(150)) },
+            popEnterTransition = { fadeIn(tween(150)) },
+            popExitTransition = { fadeOut(tween(150)) },
+        ) {
             TransitRoutePathScreen(
                 viewModel = hiltViewModel<TransitRouteDetailViewModel>(),
             )
         }
 
-        composable<TransitRoutePathRoute> {
+        composable<TransitRoutePathRoute>(
+            enterTransition = { fadeIn(tween(150)) },
+            exitTransition = { fadeOut(tween(150)) },
+            popEnterTransition = { fadeIn(tween(150)) },
+            popExitTransition = { fadeOut(tween(150)) },
+        ) {
             TransitRoutePathScreen(
                 viewModel = hiltViewModel<TransitRouteDetailViewModel>(),
             )
         }
 
-        composable<TransitStopDetailRoute> {
+        composable<TransitStopDetailRoute>(
+            enterTransition = { fadeIn(tween(150)) },
+            exitTransition = { fadeOut(tween(150)) },
+            popEnterTransition = { fadeIn(tween(150)) },
+            popExitTransition = { fadeOut(tween(150)) },
+        ) {
             TransitStopDetailScreen(
                 viewModel = hiltViewModel<TransitStopDetailViewModel>(),
             )

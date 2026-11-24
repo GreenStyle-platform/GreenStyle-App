@@ -154,12 +154,21 @@ fun CommonScreenBottomSheet(
                     .fillMaxWidth()
                     .layout { measurable, constraints ->
                         val currentOffset = initState.offset
-                        val y = if (currentOffset.isNaN()) totalHeightPx.roundToInt() else currentOffset.roundToInt()
+                        val fallbackY = if (totalHeightPx > 0f) {
+                            val ratio = when (initState.targetValue) {
+                                CustomBottomSheetValue.Expanded -> config.expandedRatio
+                                CustomBottomSheetValue.PartiallyExpanded -> config.partiallyExpandedRatio
+                                CustomBottomSheetValue.Peeked -> config.peekedRatio
+                                CustomBottomSheetValue.Hidden -> 0f
+                            }
+                            totalHeightPx * (1f - ratio)
+                        } else totalHeightPx
+                        val y =
+                            if (currentOffset.isNaN()) fallbackY.roundToInt() else currentOffset.roundToInt()
                         val visibleHeight = (totalHeightPx - y).coerceAtLeast(0f).roundToInt()
                         val placeable = measurable.measure(
                             constraints.copy(
-                                minHeight = visibleHeight,
-                                maxHeight = visibleHeight
+                                minHeight = visibleHeight, maxHeight = visibleHeight
                             )
                         )
                         layout(placeable.width, placeable.height) {
@@ -168,8 +177,7 @@ fun CommonScreenBottomSheet(
                     }
                     .nestedScroll(nestedScrollConnection)
                     .anchoredDraggable(
-                        state = initState.anchoredState,
-                        orientation = Orientation.Vertical
+                        state = initState.anchoredState, orientation = Orientation.Vertical
                     ),
                 shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
                 color = AppTheme.colors.primary,

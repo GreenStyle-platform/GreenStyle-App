@@ -70,8 +70,9 @@ class CustomBottomSheetState(
     val sheetHeightPx: Float
         get() {
             val currentOffset = offset
-            return if (currentOffset.isNaN() || totalHeightPx <= 0f) 0f
-            else (totalHeightPx - currentOffset).coerceAtLeast(0f)
+            return if (currentOffset.isNaN() || totalHeightPx <= 0f) {
+                if (totalHeightPx > 0f) totalHeightPx * currentConfig.partiallyExpandedRatio else 0f
+            } else (totalHeightPx - currentOffset).coerceAtLeast(0f)
         }
 
     /**
@@ -81,7 +82,9 @@ class CustomBottomSheetState(
         get() {
             if (totalHeightPx <= 0f) return 0f
             val partialOffset = anchoredState.anchors.positionOf(CustomBottomSheetValue.PartiallyExpanded)
-            if (partialOffset.isNaN()) return 0f
+            if (partialOffset.isNaN()) {
+                return totalHeightPx * currentConfig.partiallyExpandedRatio
+            }
             return (totalHeightPx - partialOffset).coerceAtLeast(0f)
         }
 
