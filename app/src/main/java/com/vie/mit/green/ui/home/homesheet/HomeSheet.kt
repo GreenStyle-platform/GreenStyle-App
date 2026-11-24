@@ -30,7 +30,6 @@ import androidx.compose.material.icons.filled.DirectionsTransit
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Train
@@ -449,7 +448,7 @@ private fun TransitModesGrid(
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             TransitModeGridButton(
-                icon = Icons.Default.Map,
+                icon = R.drawable.ic_map,
                 label = "Maps",
                 onClick = { /* Open maps action */ },
                 modifier = Modifier.weight(1f),

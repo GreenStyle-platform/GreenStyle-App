@@ -142,6 +142,11 @@ class NearbyBusStopViewModel @Inject constructor(
     }
 
     fun navigateToTransitStopDetail(stopId: String){
-        appNavigator.navigateTo(TransitStopDetailRoute(stopId = stopId, typeId = TransitMode.BUS))
+        appNavigator.navigateTo(
+            TransitStopDetailRoute(
+                stopId = stopId,
+                transitMode = TransitMode.BUS
+            )
+        )
     }
 }

@@ -10,7 +10,6 @@ import com.vie.mit.data.model.remote.request.map.TransitStopBoundsRequest
 import com.vie.mit.data.repository.map.MapRepository
 import com.vie.mit.green.navigation.main_graph.BusRouteSearchRoute
 import com.vie.mit.green.navigation.main_graph.SettingRoute
-import com.vie.mit.green.ui.home.homesheet.HomeSheetUiState
 import com.vie.mit.green.ui.home.nearbytransitsheet.NearbyStopItem
 import com.vie.mit.mapbox.model.LocationData
 import com.vie.mit.mapbox.model.StopFeatureClick
@@ -40,9 +39,9 @@ class HomeContainerViewModel @Inject constructor(
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(
-        HomeSheetUiState(transitConfigs = mapRepository.defaultConfigs)
+        HomeContainerUiState(transitConfigs = mapRepository.defaultConfigs)
     )
-    val uiState: StateFlow<HomeSheetUiState> = _uiState.asStateFlow()
+    val uiState: StateFlow<HomeContainerUiState> = _uiState.asStateFlow()
 
     // Smart caching state per transit type for camera viewport
     private val cachedBoundsByType = mutableMapOf<String, List<TransitViewportBounds>>()
@@ -52,6 +51,7 @@ class HomeContainerViewModel @Inject constructor(
     private var debounceLoadJob: Job? = null
     private var fetchTransitDataJob: Job? = null
     private var computeNearbyStopsJob: Job? = null
+    private var updateRadiusJob: Job? = null
     private var lastKnownLocation: LocationData? = null
     private var currentMapCenter: LocationData? = null
     private var currentViewport: TransitMapViewportInfo? = null
@@ -162,6 +162,7 @@ class HomeContainerViewModel @Inject constructor(
 
         // Tự động tính toán lại trạm theo tâm bản đồ mới khi kéo và nhả tay (nếu NearbyTransitSheet đang hiển thị)
         if (isNearbySheetVisible) {
+            updateRadiusJob?.cancel()
             computeNearbyStopsForSheet()
         }
 
@@ -344,7 +345,7 @@ class HomeContainerViewModel @Inject constructor(
      * Called when user taps a transit type tile in HomeSheet to open the dedicated nearby sheet.
      * - Filters the map to only show [typeId] layer (hides all other types).
      * - Triggers individual loading method for [typeId] if not already cached.
-     * - Sets [HomeSheetUiState.selectedTransitTypeId] so downstream sheets can filter appropriately.
+     * - Sets [HomeContainerUiState.selectedTransitTypeId] so downstream sheets can filter appropriately.
      */
     fun selectTransitType(typeId: String) {
         _uiState.update { state ->
@@ -406,6 +407,7 @@ class HomeContainerViewModel @Inject constructor(
         if (isVisible) {
             computeNearbyStopsForSheet()
         } else {
+            updateRadiusJob?.cancel()
             computeNearbyStopsJob?.cancel()
         }
     }
@@ -435,12 +437,19 @@ class HomeContainerViewModel @Inject constructor(
     }
 
     /**
-     * Updates selected radius in KM for nearby transit stops filter.
-     * Recomputes nearby stops for the sheet.
+     * Updates selected radius in KM for nearby transit stops filter calculated from map zoom.
+     * Immediately updates UI state (badge & info text) and debounces stops computation.
      */
     fun setSelectedRadiusKm(radiusKm: Double) {
+        if (kotlin.math.abs(_uiState.value.selectedRadiusKm - radiusKm) < 0.005) return
         _uiState.update { it.copy(selectedRadiusKm = radiusKm) }
-        computeNearbyStopsForSheet()
+        if (isNearbySheetVisible) {
+            updateRadiusJob?.cancel()
+            updateRadiusJob = viewModelScope.launch {
+                delay(200.milliseconds)
+                computeNearbyStopsForSheet()
+            }
+        }
     }
 
     private fun computeNearbyStops(
@@ -535,5 +544,5 @@ class HomeContainerViewModel @Inject constructor(
     }
 }
 
-internal fun HomeSheetUiState.clearTransitLoading(): HomeSheetUiState =
+internal fun HomeContainerUiState.clearTransitLoading(): HomeContainerUiState =
     if (isLoadingTransit) copy(isLoadingTransit = false) else this

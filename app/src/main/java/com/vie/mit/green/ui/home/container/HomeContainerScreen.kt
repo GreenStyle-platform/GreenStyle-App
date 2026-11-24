@@ -47,7 +47,6 @@ import com.vie.mit.green.navigation.main_graph.NearbyBikeStationsSheetRoute
 import com.vie.mit.green.navigation.main_graph.NearbyBusStopsSheetRoute
 import com.vie.mit.green.navigation.main_graph.NearbySubwayStationsSheetRoute
 import com.vie.mit.green.navigation.main_graph.NearbyTransitStopsSheetRoute
-import com.vie.mit.green.navigation.main_graph.StopDetailSheetRoute
 import com.vie.mit.green.ui.home.SheetNavHost
 import com.vie.mit.green.ui.home.homesheet.StopDetailFloatingCard
 import com.vie.mit.mapbox.composable.TransitStopsMapScreen
@@ -87,13 +86,17 @@ fun HomeContainerScreen(
                 partiallyExpandedRatio = 0.65f,
                 expandedRatio = 1f,
             )
-            currentDestination?.hasRoute<StopDetailSheetRoute>() == true -> BottomSheetConfig(
-                peekedRatio = 0.20f,
-                partiallyExpandedRatio = 0.45f,
-                expandedRatio = 0.85f,
-            )
             else -> BottomSheetConfig()
         }
+    }
+    val isNearbySheetActive = remember(currentDestination) {
+        currentDestination?.hasRoute<NearbyTransitStopsSheetRoute>() == true || currentDestination?.hasRoute<NearbyBusStopsSheetRoute>() == true || currentDestination?.hasRoute<NearbySubwayStationsSheetRoute>() == true || currentDestination?.hasRoute<NearbyBikeStationsSheetRoute>() == true
+    }
+    val radiusCircleColor = when {
+        currentDestination?.hasRoute<NearbyBusStopsSheetRoute>() == true -> AppTheme.colors.busColor
+        currentDestination?.hasRoute<NearbySubwayStationsSheetRoute>() == true -> AppTheme.colors.metroColor
+        currentDestination?.hasRoute<NearbyBikeStationsSheetRoute>() == true -> AppTheme.colors.bikeColor
+        else -> AppTheme.colors.navyBlue
     }
 
     // Map lưu trữ trạng thái hiển thị của từng Route trong SheetNavHost
@@ -188,6 +191,9 @@ fun HomeContainerScreen(
                     transitConfigs = uiState.transitConfigs,
                     mapViewportState = mapViewportState,
                     showUserLocation = true,
+                    showRadiusCircle = isNearbySheetActive,
+                    radiusCircleColor = radiusCircleColor,
+                    currentRadiusKm = uiState.selectedRadiusKm,
                     cameraBottomPadding = cameraBottomPadding,
                     maxZoom = 18.0,
                     minZoom = 10.0 ,
@@ -196,6 +202,7 @@ fun HomeContainerScreen(
                     onMapClick = onMapClick,
                     onViewportChanged = homeContainerViewModel::onViewportChanged,
                     onCameraGestureRelease = homeContainerViewModel::onCameraGestureRelease,
+                    onRadiusCalculated = homeContainerViewModel::setSelectedRadiusKm,
                 )
 
                 // 2. Top-Left Floating Settings Button

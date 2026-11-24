@@ -49,7 +49,6 @@ import com.vie.mit.green.R
 import com.vie.mit.green.ui.home.common.NearbyEmptyStateCard
 import com.vie.mit.green.ui.home.common.NearbyLocationInfoCard
 import com.vie.mit.green.ui.home.common.NearbySheetHeader
-import com.vie.mit.green.ui.home.common.RadiusFilterChipsRow
 import com.vie.mit.green.ui.home.common.formatDistance
 
 // Arrival ETA status colors
@@ -107,7 +106,11 @@ fun NearbyBusStopsSheet(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
                 Row(
-                    modifier = Modifier.weight(1f).clip(shape = RoundedCornerShape(8.dp)).background(AppTheme.colors.blackOverlay20).padding(vertical = 12.dp),
+                    modifier = Modifier
+                        .weight(1f)
+                        .clip(shape = RoundedCornerShape(8.dp))
+                        .background(AppTheme.colors.blackOverlay20)
+                        .padding(vertical = 12.dp),
                     horizontalArrangement = Arrangement.Center,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
@@ -121,10 +124,14 @@ fun NearbyBusStopsSheet(
                 }
 
                 Row(
-                    modifier = Modifier.weight(1f).clip(RoundedCornerShape(8.dp)).background(AppTheme.colors.blackOverlay10).clickable(
-                        enabled = true,
-                        onClick = onFindBusRouteClick
-                    ).padding(vertical = 12.dp),
+                    modifier = Modifier
+                        .weight(1f)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(AppTheme.colors.blackOverlay10)
+                        .clickable(
+                            enabled = true, onClick = onFindBusRouteClick
+                        )
+                        .padding(vertical = 12.dp),
                     horizontalArrangement = Arrangement.Center,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
@@ -147,15 +154,6 @@ fun NearbyBusStopsSheet(
 
         Spacer(modifier = Modifier.height(10.dp))
 
-        // ── 2. Radius Filter Chips ─────────────────────────────────────────
-        RadiusFilterChipsRow(
-            selectedRadiusKm = selectedRadiusKm,
-            onRadiusSelected = onRadiusSelected,
-            accentColor = busColor,
-        )
-
-        Spacer(modifier = Modifier.height(10.dp))
-
         // ── 3. Info Card ───────────────────────────────────────────────────
         NearbyLocationInfoCard(
             itemCount = uiState.busStopsWithArrivals.size,
@@ -168,9 +166,10 @@ fun NearbyBusStopsSheet(
 
         // ── 4. Stop List or Empty State ────────────────────────────────────
         if (uiState.busStopsWithArrivals.isEmpty() && !uiState.isLoadingArrivals) {
+            val formattedRadius = formatDistance((selectedRadiusKm * 1000).toFloat())
             NearbyEmptyStateCard(
                 icon = Icons.Default.DirectionsBus,
-                message = "Không tìm thấy trạm xe buýt nào\ntrong bán kính $selectedRadiusKm km",
+                message = "Không tìm thấy trạm xe buýt nào\ntrong bán kính $formattedRadius",
             )
         } else {
             LazyColumn(
@@ -369,7 +368,7 @@ private fun RouteArrivalRow(
             Box(
                 modifier = Modifier
                     .background(busColor, RoundedCornerShape(6.dp))
-                    .padding( horizontal = 4.dp, vertical = 4.dp),
+                    .padding(horizontal = 4.dp, vertical = 4.dp),
                 contentAlignment = Alignment.Center,
             ) {
                 Text(

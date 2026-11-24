@@ -24,12 +24,12 @@ import com.vie.mit.green.navigation.main_graph.NearbyBikeStationsSheetRoute
 import com.vie.mit.green.navigation.main_graph.NearbyBusStopsSheetRoute
 import com.vie.mit.green.navigation.main_graph.NearbySubwayStationsSheetRoute
 import com.vie.mit.green.navigation.main_graph.NearbyTransitStopsSheetRoute
-import com.vie.mit.green.navigation.main_graph.StopDetailSheetRoute
 import com.vie.mit.green.ui.home.container.HomeContainerViewModel
 import com.vie.mit.green.ui.home.homesheet.HomeSheet
 import com.vie.mit.green.ui.home.nearbybikestations.NearbyBikeStationsSheet
 import com.vie.mit.green.ui.home.nearbybusstops.NearbyBusStopViewModel
 import com.vie.mit.green.ui.home.nearbybusstops.NearbyBusStopsSheet
+import com.vie.mit.green.ui.home.nearbysubwaystations.NearbySubwayStationViewModel
 import com.vie.mit.green.ui.home.nearbysubwaystations.NearbySubwayStationsSheet
 import com.vie.mit.green.ui.home.nearbytransitsheet.NearbyTransitSheet
 import timber.log.Timber
@@ -134,6 +134,8 @@ fun SheetNavHost(
 
         composable<NearbySubwayStationsSheetRoute> {
             val homeUiState by homeContainerViewModel.uiState.collectAsStateWithLifecycle()
+            val subwayViewModel: NearbySubwayStationViewModel = hiltViewModel()
+            val subwayUiState by subwayViewModel.uiState.collectAsStateWithLifecycle()
 
             DisposableEffect(Unit) {
                 homeContainerViewModel.setNearbySheetVisible(true)
@@ -145,18 +147,14 @@ fun SheetNavHost(
 
             NearbySubwayStationsSheet(
                 nearbyStops = homeUiState.nearbyStops,
+                uiState = subwayUiState,
                 selectedRadiusKm = homeUiState.selectedRadiusKm,
                 onRadiusSelected = homeContainerViewModel::setSelectedRadiusKm,
                 onBack = { sheetNavController.popBackStack() },
-                onStopClick = { stop ->
-                    sheetNavController.navigate(
-                        StopDetailSheetRoute(
-                            stopId = stop.stopId,
-                            typeId = stop.typeId,
-                            name = stop.name,
-                        )
-                    )
-                },
+                onTabSelected = subwayViewModel::onTabChanged,
+                onRetryLoadRoutes = subwayViewModel::loadSubwayRoutes,
+                onRouteClick = subwayViewModel::navigateToRouteDetail,
+                onStopClick = subwayViewModel::navigateToTransitStopDetail,
             )
         }
 
@@ -176,14 +174,7 @@ fun SheetNavHost(
                 selectedRadiusKm = homeUiState.selectedRadiusKm,
                 onRadiusSelected = homeContainerViewModel::setSelectedRadiusKm,
                 onBack = { sheetNavController.popBackStack() },
-                onStopClick = { stop ->
-                    sheetNavController.navigate(
-                        StopDetailSheetRoute(
-                            stopId = stop.stopId,
-                            typeId = stop.typeId,
-                            name = stop.name,
-                        )
-                    )
+                onStopClick = {
                 },
             )
         }
@@ -205,14 +196,7 @@ fun SheetNavHost(
                 selectedRadiusKm = uiState.selectedRadiusKm,
                 onRadiusSelected = homeContainerViewModel::setSelectedRadiusKm,
                 onBack = { sheetNavController.popBackStack() },
-                onStopClick = { stop ->
-                    sheetNavController.navigate(
-                        StopDetailSheetRoute(
-                            stopId = stop.stopId,
-                            typeId = stop.typeId,
-                            name = stop.name,
-                        )
-                    )
+                onStopClick = {
                 },
             )
         }

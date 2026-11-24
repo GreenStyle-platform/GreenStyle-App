@@ -46,7 +46,6 @@ import com.vie.mit.green.R
 import com.vie.mit.green.ui.home.common.NearbyEmptyStateCard
 import com.vie.mit.green.ui.home.common.NearbyLocationInfoCard
 import com.vie.mit.green.ui.home.common.NearbySheetHeader
-import com.vie.mit.green.ui.home.common.RadiusFilterChipsRow
 import com.vie.mit.green.ui.home.common.formatDistance
 
 /**
@@ -82,15 +81,6 @@ fun NearbyTransitSheet(
 
         Spacer(modifier = Modifier.height(10.dp))
 
-        // 2. Radius Filter Chips Row (x km parameter selection)
-        RadiusFilterChipsRow(
-            selectedRadiusKm = selectedRadiusKm,
-            onRadiusSelected = onRadiusSelected,
-            accentColor = AppTheme.colors.navyBlue,
-        )
-
-        Spacer(modifier = Modifier.height(10.dp))
-
         // 3. Info card showing location status and found count
         NearbyLocationInfoCard(
             itemCount = nearbyStops.size,
@@ -103,9 +93,10 @@ fun NearbyTransitSheet(
 
         // 4. List of nearby stops or Empty State
         if (nearbyStops.isEmpty()) {
+            val formattedRadius = formatDistance((selectedRadiusKm * 1000).toFloat())
             NearbyEmptyStateCard(
                 icon = Icons.Default.DirectionsTransit,
-                message = "Không tìm thấy trạm dừng nào trong bán kính $selectedRadiusKm km quanh khu vực này.",
+                message = "Không tìm thấy trạm dừng nào trong bán kính $formattedRadius quanh khu vực này.",
             )
         } else {
             LazyColumn(

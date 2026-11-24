@@ -27,8 +27,8 @@ class TransitStopDetailViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(
         TransitStopDetailUiState(
             stopId = route.stopId,
-            type = route.typeId,
-            typeId = route.typeId.name,
+            type = route.transitMode,
+            typeId = route.transitMode.name,
             isLoading = true,
         )
     )
@@ -48,7 +48,7 @@ class TransitStopDetailViewModel @Inject constructor(
         _uiState.update { it.copy(isLoading = true, error = null) }
 
         viewModelScope.launch {
-            mapRepository.getTransitStopDetail(stopId = stopId, type = route.typeId)
+            mapRepository.getTransitStopDetail(stopId = stopId, type = route.transitMode)
                 .onSuccess { detail ->
                     _uiState.update { current ->
                         current.copy(

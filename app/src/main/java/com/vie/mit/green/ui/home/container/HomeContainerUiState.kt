@@ -1,4 +1,4 @@
-package com.vie.mit.green.ui.home.homesheet
+package com.vie.mit.green.ui.home.container
 
 import com.vie.mit.data.model.common.map.TransitMode
 import com.vie.mit.data.model.common.map.TravelMode
@@ -8,7 +8,7 @@ import com.vie.mit.mapbox.model.StopFeatureClick
 import com.vie.mit.mapbox.model.TransitSourceData
 import com.vie.mit.mapbox.model.TransitTypeConfig
 
-data class HomeSheetUiState(
+data class HomeContainerUiState(
     val currentLocation: LocationData? = null,
     val selectedRadiusKm: Double = 1.0,
     val nearbyStops: List<NearbyStopItem> = emptyList(),

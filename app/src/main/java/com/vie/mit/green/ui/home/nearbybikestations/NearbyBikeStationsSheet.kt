@@ -41,7 +41,6 @@ import com.vie.mit.green.R
 import com.vie.mit.green.ui.home.common.NearbyEmptyStateCard
 import com.vie.mit.green.ui.home.common.NearbyLocationInfoCard
 import com.vie.mit.green.ui.home.common.NearbySheetHeader
-import com.vie.mit.green.ui.home.common.RadiusFilterChipsRow
 import com.vie.mit.green.ui.home.common.formatDistance
 import com.vie.mit.green.ui.home.nearbytransitsheet.NearbyStopItem
 
@@ -76,15 +75,6 @@ fun NearbyBikeStationsSheet(
 
         Spacer(modifier = Modifier.height(10.dp))
 
-        // 2. Radius Filter Chips
-        RadiusFilterChipsRow(
-            selectedRadiusKm = selectedRadiusKm,
-            onRadiusSelected = onRadiusSelected,
-            accentColor = bikeColor,
-        )
-
-        Spacer(modifier = Modifier.height(10.dp))
-
         // 3. Info Card
         NearbyLocationInfoCard(
             itemCount = nearbyStops.size,
@@ -97,9 +87,10 @@ fun NearbyBikeStationsSheet(
 
         // 4. Stations List or Empty State
         if (nearbyStops.isEmpty()) {
+            val formattedRadius = formatDistance((selectedRadiusKm * 1000).toFloat())
             NearbyEmptyStateCard(
                 icon = Icons.AutoMirrored.Filled.DirectionsBike,
-                message = "Không tìm thấy trạm xe đạp nào\ntrong bán kính $selectedRadiusKm km",
+                message = "Không tìm thấy trạm xe đạp nào\ntrong bán kính $formattedRadius",
             )
         } else {
             LazyColumn(

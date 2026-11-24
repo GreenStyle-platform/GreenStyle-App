@@ -19,6 +19,7 @@ import com.vie.mit.data.model.mapper.toDomain
 import com.vie.mit.data.model.mapper.toLocationRequest
 import com.vie.mit.data.model.remote.request.map.BusStopArrivalsRequest
 import com.vie.mit.data.model.remote.request.map.TransitStopBoundsRequest
+import com.vie.mit.data.model.remote.response.map.BusRoutePageResponse
 import com.vie.mit.data.model.remote.response.map.TransitStopMarkerResponse
 import com.vie.mit.data.network.api.map.MapApi
 import com.vie.mit.data.network.util.handleApiCall
@@ -180,6 +181,26 @@ class MapRepository @Inject constructor(
             ),
             pagingSourceFactory = { BusRoutePagingSource(mapApi, query) },
         ).flow
+    }
+
+    /**
+     * Searches subway (metro) routes by query string.
+     */
+    suspend fun searchSubwayRoutes(
+        query: String = "",
+        page: Int = 1,
+    ): Result<BusRoutePageResponse> = handleApiCall {
+        mapApi.searchSubwayRoutes(query = query, page = page)
+    }
+
+    /**
+     * Fetches all subway (metro) routes matching a query (or all if empty) as a list of [BusRoute].
+     */
+    suspend fun getSubwayRoutes(
+        query: String = "",
+        page: Int = 1,
+    ): Result<List<BusRoute>> = handleApiCall {
+        mapApi.searchSubwayRoutes(query = query, page = page).content.map { it.toDomain() }
     }
 
     /**

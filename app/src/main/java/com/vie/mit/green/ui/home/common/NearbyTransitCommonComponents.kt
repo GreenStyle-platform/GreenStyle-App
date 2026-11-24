@@ -15,16 +15,12 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -120,8 +116,7 @@ fun NearbySheetHeader(
 
         if (onRefresh != null) {
             IconButton(
-                onClick = onRefresh,
-                modifier = Modifier.size(36.dp)
+                onClick = onRefresh, modifier = Modifier.size(36.dp)
             ) {
                 Icon(
                     imageVector = Icons.Default.Refresh,
@@ -141,51 +136,6 @@ fun NearbySheetHeader(
             painter = painterResource(com.vie.mit.common.R.drawable.ic_close),
             contentDescription = "Close"
         )
-    }
-}
-
-/**
- * Standard Radius Filter Chips row (0.5km, 1.0km, 2.0km, 5.0km).
- */
-@Composable
-fun RadiusFilterChipsRow(
-    selectedRadiusKm: Double,
-    onRadiusSelected: (Double) -> Unit,
-    accentColor: Color,
-    modifier: Modifier = Modifier,
-    availableRadii: List<Double> = listOf(0.5, 1.0, 2.0, 5.0),
-) {
-    LazyRow(
-        modifier = modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        item {
-            Text(
-                text = "Bán kính:",
-                style = AppTheme.typography.titleMedium,
-            )
-        }
-        items(availableRadii) { radius ->
-            val isSelected = selectedRadiusKm == radius
-            FilterChip(
-                selected = isSelected,
-                onClick = { onRadiusSelected(radius) },
-                label = {
-                    Text(
-                        text = "$radius km",
-                        style = AppTheme.typography.bodyMedium,
-                    )
-                },
-                colors = FilterChipDefaults.filterChipColors(
-                    containerColor = Color.White.copy(alpha = 0.15f),
-                    labelColor = Color.White,
-                    selectedContainerColor = accentColor,
-                    selectedLabelColor = Color.White,
-                ),
-                shape = RoundedCornerShape(12.dp),
-            )
-        }
     }
 }
 
@@ -219,8 +169,9 @@ fun NearbyLocationInfoCard(
                 modifier = Modifier.size(20.dp),
             )
             Spacer(modifier = Modifier.width(10.dp))
+            val formattedRadius = formatDistance((selectedRadiusKm * 1000).toFloat())
             Text(
-                text = "Tìm thấy $itemCount $itemTypeName trong bán kính $selectedRadiusKm km",
+                text = "Tìm thấy $itemCount $itemTypeName trong bán kính $formattedRadius",
                 style = AppTheme.typography.bodyMedium,
                 color = AppTheme.colors.secondaryText,
             )

@@ -35,13 +35,6 @@ data object NearbySubwayStationsSheetRoute
 data object NearbyBikeStationsSheetRoute
 
 @Serializable
-data class StopDetailSheetRoute(
-    val stopId: String,
-    val typeId: String = "",
-    val name: String = "",
-)
-
-@Serializable
 object SettingRoute
 
 @Serializable
@@ -65,5 +58,5 @@ object TransitRoutePathRoute
 @Serializable
 data class TransitStopDetailRoute(
     val stopId: String,
-    val typeId: TransitMode = TransitMode.BUS,
+    val transitMode: TransitMode = TransitMode.BUS,
 )

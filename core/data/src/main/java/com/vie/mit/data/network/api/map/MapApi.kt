@@ -70,6 +70,15 @@ interface MapApi {
     ): BusRoutePageResponse
 
     /**
+     * Search subway (metro) routes by query string or route number.
+     */
+    @GET("transits/subway/search-routes")
+    suspend fun searchSubwayRoutes(
+        @Query("query") query: String = "",
+        @Query("page") page: Int = 1,
+    ): BusRoutePageResponse
+
+    /**
      * Get GTFS trips of a route.
      *
      * Example: GET transits/bus/search-trip-route?routeId=r12997260

@@ -14,7 +14,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.core.content.ContextCompat
 import com.mapbox.android.gestures.MoveGestureDetector
@@ -23,6 +26,7 @@ import com.mapbox.maps.CameraBoundsOptions
 import com.mapbox.maps.CameraChangedCallback
 import com.mapbox.maps.EdgeInsets
 import com.mapbox.maps.MapboxMap
+import com.mapbox.maps.ScreenCoordinate
 import com.mapbox.maps.dsl.cameraOptions
 import com.mapbox.maps.extension.compose.MapEffect
 import com.mapbox.maps.extension.compose.MapboxMap
@@ -73,6 +77,10 @@ fun TransitStopsMapScreen(
     clusterConfig: TransitClusterConfig = remember { TransitClusterConfig(isEnabled = false) },
     showUserLocation: Boolean = true,
     showCenterPin: Boolean = true,
+    showRadiusCircle: Boolean = false,
+    radiusCircleDp: Dp = DEFAULT_NEARBY_RADIUS_CIRCLE_DP,
+    radiusCircleColor: Color? = null,
+    currentRadiusKm: Double = 1.0,
     cameraBottomPadding: Float = 0f,
     minZoom: Double? = null,
     maxZoom: Double? = null,
@@ -83,15 +91,19 @@ fun TransitStopsMapScreen(
     onClusterClick: ((Point, expansionZoom: Double) -> Unit)? = null,
     onViewportChanged: ((TransitMapViewportInfo) -> Unit)? = null,
     onCameraGestureRelease: ((TransitMapViewportInfo) -> Unit)? = null,
+    onRadiusCalculated: ((Double) -> Unit)? = null,
     onMapLongClick: ((Point) -> Unit)? = null,
     onMapClick: ((Point) -> Unit)? = null,
 ) {
     val context = LocalContext.current
+    val density = LocalDensity.current.density
+    val radiusPx = radiusCircleDp.value * density
     val currentOnLocationUpdate by rememberUpdatedState(onLocationUpdate)
     val currentOnStopClick by rememberUpdatedState(onStopClick)
     val currentOnClusterClick by rememberUpdatedState(onClusterClick)
     val currentOnViewportChanged by rememberUpdatedState(onViewportChanged)
     val currentOnCameraGestureRelease by rememberUpdatedState(onCameraGestureRelease)
+    val currentOnRadiusCalculated by rememberUpdatedState(onRadiusCalculated)
     val currentOnMapLongClick by rememberUpdatedState(onMapLongClick)
     val currentOnMapClick by rememberUpdatedState(onMapClick)
     val currentTransitConfigs by rememberUpdatedState(transitConfigs)
@@ -256,6 +268,19 @@ fun TransitStopsMapScreen(
                         }
                         val viewportInfo = mapboxMap.getCurrentViewportInfo()
                         currentOnViewportChanged?.invoke(viewportInfo)
+
+                        // Calculate real-world radius for the fixed screen circle
+                        if (currentOnRadiusCalculated != null) {
+                            val cx = mapView.width / 2.0
+                            val cy = (mapView.height - cameraBottomPadding) / 2.0
+                            if (cx > 0.0 && cy > 0.0) {
+                                val centerCoord = mapboxMap.coordinateForPixel(ScreenCoordinate(cx, cy))
+                                val edgeCoord = mapboxMap.coordinateForPixel(ScreenCoordinate(cx + radiusPx, cy))
+                                val meters = centerCoord.toLocationData().distanceTo(edgeCoord.toLocationData())
+                                val radiusKm = (meters / 1000.0).coerceAtLeast(0.1)
+                                currentOnRadiusCalculated?.invoke(radiusKm)
+                            }
+                        }
                     }
                     val cancellableCamera = mapboxMap.subscribeCameraChanged(cameraChangedCallback)
 
@@ -280,6 +305,15 @@ fun TransitStopsMapScreen(
                 modifier = Modifier.offset {
                     IntOffset(0, -((cameraBottomPadding / 2f).roundToInt()))
                 }
+            )
+
+            // 7. Nearby Radius Circle Overlay (fixed screen circle representing loading radius)
+            NearbyRadiusCircleOverlay(
+                isVisible = showRadiusCircle,
+                radiusDp = radiusCircleDp,
+                radiusKm = currentRadiusKm,
+                strokeColor = radiusCircleColor ?: appColors.navyBlue,
+                cameraBottomPadding = cameraBottomPadding,
             )
         }
     }
