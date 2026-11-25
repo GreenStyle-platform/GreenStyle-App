@@ -1,4 +1,4 @@
-package com.vie.mit.green.ui.journeydetail
+package com.vie.mit.green.ui.routedetail
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier

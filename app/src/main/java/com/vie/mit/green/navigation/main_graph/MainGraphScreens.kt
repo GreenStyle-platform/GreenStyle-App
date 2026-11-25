@@ -14,7 +14,9 @@ object MapContainerRoute
 object HomeSheetRoute
 
 @Serializable
-data object NearbyTransitStopsSheetRoute
+data class NearbyTransitStopsSheetRoute(
+    val transitTypeId: String? = null,
+)
 
 /**
  * Route to NearbyBusStopsSheet — dedicated screen for nearby bus stops with arrival info.
@@ -39,6 +41,16 @@ object SettingRoute
 
 @Serializable
 object BusRouteSearchRoute
+
+@Serializable
+object RoutePlannerContainerRoute
+
+// RoutePlanner nested sheet routes
+@Serializable
+object RouteLocationPickerSheetRoute
+
+@Serializable
+object RouteOptionsRouteSheet
 
 @Serializable
 object JourneyDetailRoute

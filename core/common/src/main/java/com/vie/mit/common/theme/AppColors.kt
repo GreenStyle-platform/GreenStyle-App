@@ -28,7 +28,8 @@ data class AppColors(
     val white: Color,
     val busColor: Color,
     val metroColor: Color,
-    val bikeColor: Color
+    val bikeColor: Color,
+    val railColor: Color,
 )
 
 fun lightAppColors(): AppColors = AppColors(
@@ -55,5 +56,6 @@ fun lightAppColors(): AppColors = AppColors(
     white = Color.White,
     busColor = BlueBusColor,
     metroColor = GreenMetroColor,
-    bikeColor = BlueBikeColor
+    bikeColor = BlueBikeColor,
+    railColor = PurpleRailColor
 )

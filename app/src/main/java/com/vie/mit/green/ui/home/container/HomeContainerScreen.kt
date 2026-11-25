@@ -1,12 +1,19 @@
 package com.vie.mit.green.ui.home.container
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -29,12 +36,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.toRoute
 import com.mapbox.geojson.Point
 import com.mapbox.maps.extension.compose.animation.viewport.rememberMapViewportState
 import com.vie.mit.common.screenbottomsheet.BottomSheetConfig
@@ -42,6 +51,8 @@ import com.vie.mit.common.screenbottomsheet.CommonScreenBottomSheet
 import com.vie.mit.common.screenbottomsheet.CustomBottomSheetValue
 import com.vie.mit.common.screenbottomsheet.rememberCustomBottomSheetState
 import com.vie.mit.common.theme.AppTheme
+import com.vie.mit.data.model.common.map.TransitMode
+import com.vie.mit.data.model.common.map.TravelMode
 import com.vie.mit.green.navigation.main_graph.HomeSheetRoute
 import com.vie.mit.green.navigation.main_graph.NearbyBikeStationsSheetRoute
 import com.vie.mit.green.navigation.main_graph.NearbyBusStopsSheetRoute
@@ -49,6 +60,7 @@ import com.vie.mit.green.navigation.main_graph.NearbySubwayStationsSheetRoute
 import com.vie.mit.green.navigation.main_graph.NearbyTransitStopsSheetRoute
 import com.vie.mit.green.ui.home.SheetNavHost
 import com.vie.mit.green.ui.home.homesheet.StopDetailFloatingCard
+import com.vie.mit.green.ui.home.nearbysubwaystations.SubwaySheetTab
 import com.vie.mit.mapbox.composable.TransitStopsMapScreen
 import com.vie.mit.mapbox.util.focusUserLocationBoundingBox
 import kotlin.math.roundToInt
@@ -74,6 +86,8 @@ fun HomeContainerScreen(
     // Cấu hình động BottomSheetConfig cho từng Sheet route bên trong SheetNavHost
     val currentBackStackEntry by sheetNavController.currentBackStackEntryAsState()
     val currentDestination = currentBackStackEntry?.destination
+    var activeSubwayTab by remember { mutableStateOf(SubwaySheetTab.STATIONS) }
+
     val sheetConfig = remember(currentDestination) {
         when {
             currentDestination?.hasRoute<HomeSheetRoute>() == true -> BottomSheetConfig(
@@ -81,7 +95,10 @@ fun HomeContainerScreen(
                 partiallyExpandedRatio = 0.65f,
                 expandedRatio = 0.90f,
             )
-            currentDestination?.hasRoute<NearbyTransitStopsSheetRoute>() == true || currentDestination?.hasRoute<NearbyBusStopsSheetRoute>() == true || currentDestination?.hasRoute<NearbySubwayStationsSheetRoute>() == true || currentDestination?.hasRoute<NearbyBikeStationsSheetRoute>() == true -> BottomSheetConfig(
+            currentDestination?.hasRoute<NearbyTransitStopsSheetRoute>() == true ||
+                currentDestination?.hasRoute<NearbyBusStopsSheetRoute>() == true ||
+                currentDestination?.hasRoute<NearbySubwayStationsSheetRoute>() == true ||
+                currentDestination?.hasRoute<NearbyBikeStationsSheetRoute>() == true -> BottomSheetConfig(
                 peekedRatio = 0.20f,
                 partiallyExpandedRatio = 0.65f,
                 expandedRatio = 1f,
@@ -90,13 +107,63 @@ fun HomeContainerScreen(
         }
     }
     val isNearbySheetActive = remember(currentDestination) {
-        currentDestination?.hasRoute<NearbyTransitStopsSheetRoute>() == true || currentDestination?.hasRoute<NearbyBusStopsSheetRoute>() == true || currentDestination?.hasRoute<NearbySubwayStationsSheetRoute>() == true || currentDestination?.hasRoute<NearbyBikeStationsSheetRoute>() == true
+        currentDestination?.hasRoute<NearbyTransitStopsSheetRoute>() == true ||
+            currentDestination?.hasRoute<NearbyBusStopsSheetRoute>() == true ||
+            currentDestination?.hasRoute<NearbySubwayStationsSheetRoute>() == true ||
+            currentDestination?.hasRoute<NearbyBikeStationsSheetRoute>() == true
+    }
+    val showRadiusCircle = remember(currentDestination, isNearbySheetActive, activeSubwayTab) {
+        isNearbySheetActive && !(
+            currentDestination?.hasRoute<NearbySubwayStationsSheetRoute>() == true &&
+                activeSubwayTab == SubwaySheetTab.ROUTES
+            )
     }
     val radiusCircleColor = when {
         currentDestination?.hasRoute<NearbyBusStopsSheetRoute>() == true -> AppTheme.colors.busColor
         currentDestination?.hasRoute<NearbySubwayStationsSheetRoute>() == true -> AppTheme.colors.metroColor
         currentDestination?.hasRoute<NearbyBikeStationsSheetRoute>() == true -> AppTheme.colors.bikeColor
+        uiState.selectedTransitTypeId == TransitMode.RAIL.name -> AppTheme.colors.railColor
         else -> AppTheme.colors.navyBlue
+    }
+
+    // Single Source of Truth đồng bộ active sheet & transit type filter với HomeContainerViewModel
+    LaunchedEffect(currentBackStackEntry) {
+        val entry = currentBackStackEntry ?: return@LaunchedEffect
+        val destination = entry.destination
+        when {
+            destination.hasRoute<NearbyBusStopsSheetRoute>() -> {
+                homeContainerViewModel.onActiveSheetChanged(
+                    isNearbySheet = true,
+                    transitTypeId = TransitMode.BUS.name,
+                )
+            }
+            destination.hasRoute<NearbySubwayStationsSheetRoute>() -> {
+                homeContainerViewModel.onActiveSheetChanged(
+                    isNearbySheet = true,
+                    transitTypeId = TransitMode.SUBWAY.name,
+                )
+            }
+            destination.hasRoute<NearbyBikeStationsSheetRoute>() -> {
+                homeContainerViewModel.onActiveSheetChanged(
+                    isNearbySheet = true,
+                    transitTypeId = TravelMode.BICYCLE_RENT.name,
+                )
+            }
+            destination.hasRoute<NearbyTransitStopsSheetRoute>() -> {
+                val route = runCatching { entry.toRoute<NearbyTransitStopsSheetRoute>() }.getOrNull()
+                homeContainerViewModel.onActiveSheetChanged(
+                    isNearbySheet = true,
+                    transitTypeId = route?.transitTypeId,
+                )
+            }
+            else -> {
+                activeSubwayTab = SubwaySheetTab.STATIONS
+                homeContainerViewModel.onActiveSheetChanged(
+                    isNearbySheet = false,
+                    transitTypeId = null,
+                )
+            }
+        }
     }
 
     // Map lưu trữ trạng thái hiển thị của từng Route trong SheetNavHost
@@ -106,22 +173,17 @@ fun HomeContainerScreen(
     // Quản lý lưu và khôi phục trạng thái BottomSheet khi chuyển Sheet Route
     LaunchedEffect(currentBackStackEntry) {
         val entry = currentBackStackEntry ?: return@LaunchedEffect
-        val currentRouteKey = entry.destination.route ?: entry.destination.id.toString()
+        val currentRouteKey = entry.id
 
         // 1. Lưu lại trạng thái của route trước đó trước khi đổi route
-        previousRouteKey?.let { prevRoute ->
-            if (prevRoute != currentRouteKey) {
-                savedSheetStates[prevRoute] = bottomSheetState.currentValue
-            }
+        val prevRoute = previousRouteKey
+        if (prevRoute != null && prevRoute != currentRouteKey) {
+            savedSheetStates[prevRoute] = bottomSheetState.currentValue
         }
         previousRouteKey = currentRouteKey
 
-        // 2. Dọn dẹp cache của các destination đã bị pop khỏi back stack
-        @Suppress("RestrictedApi")
-        val activeRouteKeys: Set<String> = sheetNavController.currentBackStack.value
-            .map { it.destination.route ?: it.destination.id.toString() }
-            .toSet()
-        savedSheetStates.keys.retainAll(activeRouteKeys)
+        // 2. Bỏ qua animate thừa ở lần khởi tạo đầu tiên khi sheet đã ở đúng PartiallyExpanded
+        if (prevRoute == null) return@LaunchedEffect
 
         // 3. Khôi phục trạng thái đã lưu hoặc mở PartiallyExpanded mặc định cho route mới
         val savedValue = savedSheetStates[currentRouteKey]
@@ -132,7 +194,7 @@ fun HomeContainerScreen(
         }
     }
 
-    // Phương pháp 2: Chiều cao padding đáy của Mapbox Camera tương ứng với chiều cao của BottomSheet.
+    // Chiều cao padding đáy của Mapbox Camera tương ứng với chiều cao của BottomSheet.
     // Khi BottomSheet ở anchor PartiallyExpanded và kéo lên (Expanded), padding đáy giữ nguyên không đổi.
     // Khi BottomSheet hạ xuống (về Peeked/Hidden), cameraBottomPadding giảm mượt mà theo sheetHeightPx.
     val cameraBottomPadding by remember(bottomSheetState) {
@@ -150,53 +212,56 @@ fun HomeContainerScreen(
         }
     }
 
-    LaunchedEffect(uiState.currentLocation) {
-        val location = uiState.currentLocation
-        if (location != null ) {
+    // Alpha mượt mà cho các floating overlay phía trên sheet: mờ dần khi kéo sheet mở rộng quá PartiallyExpanded
+    val floatingOverlayAlpha by remember(bottomSheetState) {
+        derivedStateOf {
+            (1f - bottomSheetState.expandProgress * 2f).coerceIn(0f, 1f)
+        }
+    }
+
+    // One-shot camera focus events (lần đầu định vị GPS, nút My Location, hoặc chọn trạm không có detail screen)
+    LaunchedEffect(homeContainerViewModel) {
+        homeContainerViewModel.cameraFocusEvents.collect { command ->
             focusUserLocationBoundingBox(
                 mapViewportState = mapViewportState,
-                location = location,
-                zoom = 14.5,
-                animate = true,
+                location = command.location,
+                zoom = command.zoom,
+                animate = command.animate,
+                bottomPaddingPx = cameraBottomPadding.toDouble(),
             )
         }
     }
 
-    // Khi người dùng chạm bản đồ (isMapFocused), hạ sheet xuống trạng thái Peeked để xem bản đồ
-    LaunchedEffect(uiState.isMapFocused) {
-//        if (uiState.isMapFocused) {
-//            bottomSheetState.peek()
-//        }
-    }
-
-    // Memoize callback click trên map để tránh tạo lại đối tượng lambda ở mỗi recomposition
-    val onMapClick = remember(sheetNavController, currentDestination, homeContainerViewModel) {
-        { point: Point ->
+    // Memoize callback click vùng trống trên map để mở NearbyTransitStopsSheet từ HomeSheet
+    val onMapClick = remember(sheetNavController, currentDestination) {
+        { _: Point ->
             if (currentDestination?.hasRoute<HomeSheetRoute>() == true) {
-                sheetNavController.navigate(NearbyTransitStopsSheetRoute)
+                sheetNavController.navigate(NearbyTransitStopsSheetRoute())
             }
         }
     }
+
+    val statusBarTopPadding = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
 
     CommonScreenBottomSheet(
         modifier = modifier,
         initState = bottomSheetState,
         config = sheetConfig,
-        backgroundContent = { mapTransform ->
+        backgroundContent = { _ ->
             Box(modifier = Modifier.fillMaxSize()) {
-                // 1. Mapbox dùng chung — Single Instance (Phương pháp 2: Camera Padding)
+                // 1. Mapbox dùng chung — Single Instance (Camera Padding)
                 TransitStopsMapScreen(
                     modifier = Modifier.fillMaxSize(),
                     transitSources = uiState.transitSources,
                     transitConfigs = uiState.transitConfigs,
                     mapViewportState = mapViewportState,
                     showUserLocation = true,
-                    showRadiusCircle = isNearbySheetActive,
+                    showRadiusCircle = showRadiusCircle,
                     radiusCircleColor = radiusCircleColor,
                     currentRadiusKm = uiState.selectedRadiusKm,
                     cameraBottomPadding = cameraBottomPadding,
                     maxZoom = 18.0,
-                    minZoom = 10.0 ,
+                    minZoom = 10.0,
                     onLocationUpdate = homeContainerViewModel::onLocationUpdated,
                     onStopClick = homeContainerViewModel::onStopClicked,
                     onMapClick = onMapClick,
@@ -213,7 +278,8 @@ fun HomeContainerScreen(
                     shadowElevation = 6.dp,
                     modifier = Modifier
                         .align(Alignment.TopStart)
-                        .padding(top = 48.dp, start = 16.dp)
+                        .statusBarsPadding()
+                        .padding(top = 12.dp, start = 16.dp)
                         .size(40.dp)
                 ) {
                     Box(contentAlignment = Alignment.Center) {
@@ -226,39 +292,7 @@ fun HomeContainerScreen(
                     }
                 }
 
-                // 3. Floating "My Location" Button (di chuyển mượt theo mép sheet không recompose)
-                FloatingActionButton(
-                    onClick = {
-                        val latestLocation = homeContainerViewModel.getLastKnownLocation() ?: uiState.currentLocation
-                        if (latestLocation != null) {
-                            homeContainerViewModel.onUserLocationButtonClicked(latestLocation)
-                            focusUserLocationBoundingBox(
-                                mapViewportState = mapViewportState,
-                                location = latestLocation,
-                                zoom = 15.0,
-                                animate = true,
-                            )
-                        }
-                    },
-                    shape = CircleShape,
-                    containerColor = AppTheme.colors.white,
-                    contentColor = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier
-                        .align(Alignment.BottomEnd)
-                        .padding(end = 16.dp, bottom = 16.dp)
-                        .offset {
-                            IntOffset(0, -bottomSheetState.sheetHeightPx.roundToInt())
-                        }
-                        .size(48.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.MyLocation,
-                        contentDescription = "My Location",
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
-
-                // 4. Loading indicator khi đang tải dữ liệu transit
+                // 3. Loading indicator khi đang tải dữ liệu transit
                 if (uiState.isLoadingTransit) {
                     Surface(
                         shape = RoundedCornerShape(20.dp),
@@ -266,7 +300,8 @@ fun HomeContainerScreen(
                         shadowElevation = 4.dp,
                         modifier = Modifier
                             .align(Alignment.TopCenter)
-                            .padding(top = 40.dp)
+                            .statusBarsPadding()
+                            .padding(top = 12.dp)
                     ) {
                         Row(
                             modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
@@ -286,26 +321,69 @@ fun HomeContainerScreen(
                     }
                 }
 
-                // 5. Floating Selected Stop Info Card
-                uiState.selectedStop?.let { stop ->
-                    StopDetailFloatingCard(
-                        stop = stop,
-                        onClose = homeContainerViewModel::dismissStopDetail,
+                // 4. Stacked Bottom Floating Controls (My Location FAB + Selected Stop Card)
+                // Neo theo cameraBottomPadding (giới hạn tại PartiallyExpanded) và mờ dần khi sheet kéo lên Expanded
+                if (floatingOverlayAlpha > 0.01f) {
+                    Column(
                         modifier = Modifier
                             .align(Alignment.BottomCenter)
-                            .padding(start = 16.dp, end = 16.dp, bottom = 16.dp)
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 16.dp)
                             .offset {
-                                IntOffset(0, -bottomSheetState.sheetHeightPx.roundToInt())
+                                IntOffset(0, -cameraBottomPadding.roundToInt())
                             }
-                    )
+                            .graphicsLayer { alpha = floatingOverlayAlpha },
+                        horizontalAlignment = Alignment.End,
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        FloatingActionButton(
+                            onClick = {
+                                val latestLocation =
+                                    homeContainerViewModel.getLastKnownLocation() ?: uiState.currentLocation
+                                if (latestLocation != null) {
+                                    homeContainerViewModel.onUserLocationButtonClicked(latestLocation)
+                                }
+                            },
+                            shape = CircleShape,
+                            containerColor = AppTheme.colors.white,
+                            contentColor = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(48.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.MyLocation,
+                                contentDescription = "My Location",
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+
+                        uiState.selectedStop?.let { stop ->
+                            StopDetailFloatingCard(
+                                stop = stop,
+                                onClose = homeContainerViewModel::dismissStopDetail,
+                                onViewDetail = if (stop.typeId.equals(TravelMode.BICYCLE_RENT.name, ignoreCase = true)) {
+                                    null
+                                } else {
+                                    { homeContainerViewModel.navigateToSelectedStopDetail(stop) }
+                                },
+                            )
+                        }
+                    }
                 }
             }
         },
         sheetContent = {
+            // Thêm top padding linh hoạt theo status bar khi sheet giãn lên full màn hình (expandedRatio == 1f)
+            val dynamicTopPadding = if (sheetConfig.expandedRatio >= 0.95f) {
+                statusBarTopPadding * bottomSheetState.expandProgress
+            } else {
+                0.dp
+            }
             // NESTED NAVHOST: Nội dung BottomSheet thay đổi theo Navigation
             SheetNavHost(
-                sheetNavController = sheetNavController,
+                homeNavController = sheetNavController,
                 homeContainerViewModel = homeContainerViewModel,
+                onSubwayTabChanged = { activeSubwayTab = it },
+                modifier = Modifier.padding(top = dynamicTopPadding),
             )
         }
     )

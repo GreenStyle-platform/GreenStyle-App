@@ -8,6 +8,7 @@ import com.vie.mit.data.repository.map.MapRepository
 import com.vie.mit.green.navigation.main_graph.TransitRouteDetailRoute
 import com.vie.mit.green.navigation.main_graph.TransitStopDetailRoute
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -32,6 +33,8 @@ class NearbySubwayStationViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(NearbySubwayStationUiState())
     val uiState: StateFlow<NearbySubwayStationUiState> = _uiState.asStateFlow()
 
+    private var loadRoutesJob: Job? = null
+
     /**
      * Switch between Stations tab and Routes tab.
      * When switching to Routes tab, automatically fetch metro routes if not already loaded.
@@ -47,6 +50,7 @@ class NearbySubwayStationViewModel @Inject constructor(
      * Fetches subway/metro routes from the backend.
      */
     fun loadSubwayRoutes(query: String = "") {
+        loadRoutesJob?.cancel()
         _uiState.update {
             it.copy(
                 isLoadingRoutes = true,
@@ -54,26 +58,26 @@ class NearbySubwayStationViewModel @Inject constructor(
             )
         }
 
-        viewModelScope.launch {
+        loadRoutesJob = viewModelScope.launch {
             mapRepository.getSubwayRoutes(query = query).onSuccess { routes ->
-                    _uiState.update {
-                        it.copy(
-                            subwayRoutes = routes,
-                            isLoadingRoutes = false,
-                            routesErrorMessage = null,
-                        )
-                    }
-                    Timber.d("NearbySubwayStationViewModel: loaded ${routes.size} subway routes")
-                }.onFailure { error ->
-                    Timber.e(error, "NearbySubwayStationViewModel: failed to load subway routes")
-                    _uiState.update {
-                        it.copy(
-                            isLoadingRoutes = false,
-                            routesErrorMessage = error.message
-                                ?: "Không thể tải danh sách tuyến metro",
-                        )
-                    }
+                _uiState.update {
+                    it.copy(
+                        subwayRoutes = routes,
+                        isLoadingRoutes = false,
+                        routesErrorMessage = null,
+                    )
                 }
+                Timber.d("NearbySubwayStationViewModel: loaded ${routes.size} subway routes")
+            }.onFailure { error ->
+                Timber.e(error, "NearbySubwayStationViewModel: failed to load subway routes")
+                _uiState.update {
+                    it.copy(
+                        isLoadingRoutes = false,
+                        routesErrorMessage = error.message
+                            ?: "Không thể tải danh sách tuyến metro",
+                    )
+                }
+            }
         }
     }
 
@@ -96,9 +100,5 @@ class NearbySubwayStationViewModel @Inject constructor(
                 transitMode = TransitMode.SUBWAY,
             )
         )
-    }
-
-    fun navigateBack() {
-        appNavigator.navigateUp()
     }
 }

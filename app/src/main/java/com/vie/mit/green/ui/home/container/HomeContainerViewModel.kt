@@ -2,6 +2,7 @@ package com.vie.mit.green.ui.home.container
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.mapbox.geojson.Point
 import com.vie.mit.common.navigation.AppNavigator
 import com.vie.mit.data.model.common.map.TransitMode
 import com.vie.mit.data.model.common.map.TravelMode
@@ -9,7 +10,9 @@ import com.vie.mit.data.model.domain.map.TransitStopsGeoJsonLoad
 import com.vie.mit.data.model.remote.request.map.TransitStopBoundsRequest
 import com.vie.mit.data.repository.map.MapRepository
 import com.vie.mit.green.navigation.main_graph.BusRouteSearchRoute
+import com.vie.mit.green.navigation.main_graph.RoutePlannerContainerRoute
 import com.vie.mit.green.navigation.main_graph.SettingRoute
+import com.vie.mit.green.navigation.main_graph.TransitStopDetailRoute
 import com.vie.mit.green.ui.home.nearbytransitsheet.NearbyStopItem
 import com.vie.mit.mapbox.model.LocationData
 import com.vie.mit.mapbox.model.StopFeatureClick
@@ -23,8 +26,11 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -32,6 +38,21 @@ import org.json.JSONObject
 import timber.log.Timber
 import javax.inject.Inject
 import kotlin.time.Duration.Companion.milliseconds
+
+data class CameraFocusCommand(
+    val location: LocationData,
+    val zoom: Double = 14.5,
+    val animate: Boolean = true,
+)
+
+private data class ParsedTransitStop(
+    val stopId: String,
+    val name: String,
+    val typeId: String,
+    val location: LocationData,
+    val routesOrInfo: String,
+    val properties: Map<String, String>,
+)
 
 @HiltViewModel
 class HomeContainerViewModel @Inject constructor(
@@ -43,10 +64,13 @@ class HomeContainerViewModel @Inject constructor(
     )
     val uiState: StateFlow<HomeContainerUiState> = _uiState.asStateFlow()
 
+    private val _cameraFocusEvents = MutableSharedFlow<CameraFocusCommand>(extraBufferCapacity = 1)
+    val cameraFocusEvents: SharedFlow<CameraFocusCommand> = _cameraFocusEvents.asSharedFlow()
+
     // Smart caching state per transit type for camera viewport
     private val cachedBoundsByType = mutableMapOf<String, List<TransitViewportBounds>>()
-    private val lastLoadedZoomByType = mutableMapOf<String, Double>()
     private val cachedGeoJsonByType = mutableMapOf<String, String>()
+    private val cachedParsedStopsByType = mutableMapOf<String, List<ParsedTransitStop>>()
 
     private var debounceLoadJob: Job? = null
     private var fetchTransitDataJob: Job? = null
@@ -60,14 +84,15 @@ class HomeContainerViewModel @Inject constructor(
 
     companion object {
         private const val MIN_ZOOM_THRESHOLD = 8.0
-        private const val BOUNDS_BUFFER_FACTOR = 0.25 // 35% buffer to reduce reload frequency
+        private const val BOUNDS_BUFFER_FACTOR = 0.25 // 25% buffer to reduce reload frequency
         private const val DEBOUNCE_DELAY_MS = 400L
+        private const val NEARBY_RECOMPUTE_DELAY_MS = 200L
     }
 
     /**
      * Called when the user's GPS location is first acquired or updated.
      * Caches the latest location without triggering continuous recomposition.
-     * Only updates UI State on the very first fix to initialize data.
+     * Only updates UI State and emits a one-shot camera focus event on the very first fix.
      */
     fun onLocationUpdated(location: LocationData) {
         lastKnownLocation = location
@@ -79,7 +104,13 @@ class HomeContainerViewModel @Inject constructor(
                     currentLocation = location,
                 )
             }
-
+            _cameraFocusEvents.tryEmit(
+                CameraFocusCommand(
+                    location = location,
+                    zoom = 14.5,
+                    animate = true,
+                )
+            )
             // Data loads from Mapbox's viewport callback after the camera focuses this location.
         }
     }
@@ -90,30 +121,41 @@ class HomeContainerViewModel @Inject constructor(
     fun getLastKnownLocation(): LocationData? = lastKnownLocation
 
     /**
-     * Updates user location on-demand (e.g. when clicking My Location button).
+     * Updates user location on-demand (e.g. when clicking My Location button),
+     * emits a single camera focus event, and recomputes nearby stops if a nearby sheet is visible.
      */
     fun onUserLocationButtonClicked(location: LocationData) {
+        currentMapCenter = location
         _uiState.update { currentState ->
             currentState.copy(
                 currentLocation = location,
             )
         }
+        _cameraFocusEvents.tryEmit(
+            CameraFocusCommand(
+                location = location,
+                zoom = 15.0,
+                animate = true,
+            )
+        )
+        if (isNearbySheetVisible) {
+            updateRadiusJob?.cancel()
+            computeNearbyStopsForSheet(targetLocation = location)
+        }
     }
 
-    private fun shouldFetchForType(typeId: String, viewport: TransitMapViewportInfo): Boolean {
+    internal fun shouldFetchForType(typeId: String, viewport: TransitMapViewportInfo): Boolean {
         val cached = cachedBoundsByType[typeId] ?: return true
-        val lastZoom = lastLoadedZoomByType[typeId] ?: 0.0
-        val isZoomingIn = viewport.zoom >= lastZoom
         val isWithinCachedBounds =
             viewport.bufferedRequestBounds(bufferFactor = 0.0).all { visibleBounds ->
                 cached.any { cachedBound -> visibleBounds.isInside(cachedBound) }
-        }
-        return !(isWithinCachedBounds && isZoomingIn)
+            }
+        return !isWithinCachedBounds
     }
 
     /**
      * Evaluates camera movement and determines whether new data is needed.
-     * Prevents unnecessary reloads when zooming in or panning within cached bounds.
+     * Prevents unnecessary reloads when panning/zooming within cached bounds.
      * Updates [currentMapCenter] directly from MapView camera state as Single Source of Truth.
      */
     fun onViewportChanged(viewport: TransitMapViewportInfo) {
@@ -140,6 +182,10 @@ class HomeContainerViewModel @Inject constructor(
 
         if (typesNeedingFetch.isEmpty()) {
             cancelTransitDataLoad()
+            // Recompute nearby stops after programmatic camera moves (e.g. flyTo) within cached bounds
+            if (isNearbySheetVisible) {
+                scheduleNearbyRecompute()
+            }
             Timber.d("PhucTH: LoadStopDebug: skipped — all transit types cached for this viewport")
             return
         }
@@ -152,41 +198,18 @@ class HomeContainerViewModel @Inject constructor(
     }
 
     /**
-     * Called when user releases a gesture (long press / scroll / drag release).
-     * Directly triggers transit data loading for the current camera viewport.
+     * Called when user releases a gesture (scroll / drag release).
+     * Immediately recomputes nearby stops for the new map center when a nearby sheet is visible.
      */
     fun onCameraGestureRelease(viewport: TransitMapViewportInfo) {
-        val centerLocation = LocationData(viewport.centerLatitude, viewport.centerLongitude)
-        currentMapCenter = centerLocation
+        currentMapCenter = LocationData(viewport.centerLatitude, viewport.centerLongitude)
         currentViewport = viewport
 
-        // Tự động tính toán lại trạm theo tâm bản đồ mới khi kéo và nhả tay (nếu NearbyTransitSheet đang hiển thị)
+        // Tự động tính toán lại trạm theo tâm bản đồ mới khi kéo và nhả tay (nếu NearbySheet đang hiển thị)
         if (isNearbySheetVisible) {
             updateRadiusJob?.cancel()
             computeNearbyStopsForSheet()
         }
-
-        if (viewport.zoom < MIN_ZOOM_THRESHOLD) {
-            Timber.d("Skip load on gesture release: current zoom (${viewport.zoom}) is below threshold ($MIN_ZOOM_THRESHOLD)")
-            return
-        }
-
-        // Khi đang ở Sheet chuyên biệt (selectedTransitTypeId != null), CHỈ fetch đúng loại phương tiện đó
-        val focusedType = _uiState.value.selectedTransitTypeId
-        val typesNeedingFetch = if (focusedType != null) {
-            if (shouldFetchForType(focusedType, viewport)) listOf(focusedType) else emptyList()
-        } else {
-            _uiState.value.transitConfigs.map { it.typeId }
-                .filter { shouldFetchForType(it, viewport) }
-        }
-
-        if (typesNeedingFetch.isEmpty()) {
-            Timber.d("Skip load on gesture release: all transit types cached for this viewport")
-            return
-        }
-
-//        debounceLoadJob?.cancel()
-//        loadTransitStopsData(viewport, typesNeedingFetch.toSet())
     }
 
     private fun loadTransitStopsData(
@@ -217,8 +240,8 @@ class HomeContainerViewModel @Inject constructor(
                         if (!load.failedTypeIds.contains(typeId)) {
                             val geoJson = fetchedGeoJsonMap[typeId].orEmpty()
                             cachedGeoJsonByType[typeId] = geoJson
+                            cachedParsedStopsByType[typeId] = parseStopsFromGeoJson(geoJson, typeId)
                             cachedBoundsByType[typeId] = bufferedBounds
-                            lastLoadedZoomByType[typeId] = viewport.zoom
                         }
                     }
 
@@ -226,46 +249,62 @@ class HomeContainerViewModel @Inject constructor(
                         Timber.w("Transit stop load was partial; failed types: ${load.failedTypeIds}")
                     }
 
-                val activeTypes = _uiState.value.activeTransitTypes
-                val selectedType = _uiState.value.selectedTransitTypeId
-                val sources = _uiState.value.transitConfigs.map { config ->
-                    TransitSourceData(
-                        typeId = config.typeId,
-                        geoJson = cachedGeoJsonByType[config.typeId].orEmpty(),
-                        isVisible = if (selectedType != null) {
-                            config.typeId == selectedType
-                        } else {
-                            activeTypes.contains(config.typeId)
-                        },
+                    val sources = buildTransitSources(
+                        configs = _uiState.value.transitConfigs,
+                        activeTypes = _uiState.value.activeTransitTypes,
+                        selectedType = _uiState.value.selectedTransitTypeId,
                     )
-                }
-                _uiState.update { currentState ->
-                    currentState.copy(
-                        transitSources = sources,
-                        isLoadingTransit = false,
-                    )
-                }
+                    _uiState.update { currentState ->
+                        currentState.copy(
+                            transitSources = sources,
+                            isLoadingTransit = false,
+                        )
+                    }
 
                     if (isNearbySheetVisible) {
                         computeNearbyStopsForSheet()
                     }
                     Timber.d("Successfully loaded GTFS data for ${typeIdsToFetch.size - load.failedTypeIds.size} fetched transit types")
-            }.onFailure { error ->
-                Timber.e(error, "Failed to load GTFS transit stops")
-                _uiState.update {
-                    it.copy(
-                        isLoadingTransit = false,
-                        errorMessage = error.message ?: "Failed to load transit stops",
-                    )
+                }.onFailure { error ->
+                    Timber.e(error, "Failed to load GTFS transit stops")
+                    _uiState.update {
+                        it.copy(
+                            isLoadingTransit = false,
+                            errorMessage = error.message ?: "Failed to load transit stops",
+                        )
+                    }
                 }
-            }
         }
+    }
+
+    private fun buildTransitSources(
+        configs: List<com.vie.mit.mapbox.model.TransitTypeConfig>,
+        activeTypes: Set<String>,
+        selectedType: String?,
+    ): List<TransitSourceData> = configs.map { config ->
+        TransitSourceData(
+            typeId = config.typeId,
+            geoJson = cachedGeoJsonByType[config.typeId].orEmpty(),
+            isVisible = if (selectedType != null) {
+                config.typeId == selectedType
+            } else {
+                activeTypes.contains(config.typeId)
+            },
+        )
     }
 
     private fun cancelTransitDataLoad() {
         fetchTransitDataJob?.cancel()
         fetchTransitDataJob = null
         _uiState.update { it.clearTransitLoading() }
+    }
+
+    private fun scheduleNearbyRecompute() {
+        updateRadiusJob?.cancel()
+        updateRadiusJob = viewModelScope.launch {
+            delay(NEARBY_RECOMPUTE_DELAY_MS.milliseconds)
+            computeNearbyStopsForSheet()
+        }
     }
 
     /**
@@ -279,20 +318,82 @@ class HomeContainerViewModel @Inject constructor(
                 currentState.activeTransitTypes + typeId
             }
 
-            val updatedSources = currentState.transitSources.map { source ->
-                source.copy(isVisible = updatedActive.contains(source.typeId))
-            }
+            val updatedSources = buildTransitSources(
+                configs = currentState.transitConfigs,
+                activeTypes = updatedActive,
+                selectedType = currentState.selectedTransitTypeId,
+            )
 
             currentState.copy(
                 activeTransitTypes = updatedActive,
                 transitSources = updatedSources,
             )
         }
+        if (isNearbySheetVisible && _uiState.value.selectedTransitTypeId == null) {
+            computeNearbyStopsForSheet()
+        }
+    }
+
+    /**
+     * Single source of truth for synchronizing map layers, nearby stop computation,
+     * and data fetching whenever the active sheet route changes in [HomeContainerScreen].
+     *
+     * Eliminates race conditions between entering and exiting sheets' DisposableEffects.
+     */
+    fun onActiveSheetChanged(
+        isNearbySheet: Boolean,
+        transitTypeId: String? = null,
+    ) {
+        debounceLoadJob?.cancel()
+        debounceLoadJob = null
+
+        val previousTypeId = _uiState.value.selectedTransitTypeId
+        val typeChanged = previousTypeId != transitTypeId
+        isNearbySheetVisible = isNearbySheet
+
+        if (!isNearbySheet) {
+            updateRadiusJob?.cancel()
+            computeNearbyStopsJob?.cancel()
+        }
+
+        _uiState.update { state ->
+            val updatedSources = buildTransitSources(
+                configs = state.transitConfigs,
+                activeTypes = state.activeTransitTypes,
+                selectedType = transitTypeId,
+            )
+            state.copy(
+                selectedTransitTypeId = transitTypeId,
+                transitSources = updatedSources,
+                // Clear stale stops from a previous transit type immediately to prevent cross-type flash
+                nearbyStops = if (isNearbySheet && typeChanged) emptyList() else state.nearbyStops,
+            )
+        }
+
+        val vp = currentViewport
+        if (transitTypeId != null) {
+            if (vp != null && vp.zoom >= MIN_ZOOM_THRESHOLD && shouldFetchForType(transitTypeId, vp)) {
+                loadTransitStopsData(vp, setOf(transitTypeId))
+            } else if (isNearbySheet) {
+                computeNearbyStopsForSheet()
+            }
+        } else {
+            if (vp != null && vp.zoom >= MIN_ZOOM_THRESHOLD) {
+                val typesNeedingFetch = _uiState.value.transitConfigs.map { it.typeId }
+                    .filter { shouldFetchForType(it, vp) }
+                if (typesNeedingFetch.isNotEmpty()) {
+                    loadTransitStopsData(vp, typesNeedingFetch.toSet())
+                } else if (isNearbySheet) {
+                    computeNearbyStopsForSheet()
+                }
+            } else if (isNearbySheet) {
+                computeNearbyStopsForSheet()
+            }
+        }
     }
 
     /**
      * Loads bus stops specifically for the current or specified viewport.
-     * Prevents fetching other transit modes to avoid unnecessary network calls.
      */
     fun loadBusStopsData(viewport: TransitMapViewportInfo? = currentViewport) {
         val vp = viewport ?: return
@@ -305,7 +406,6 @@ class HomeContainerViewModel @Inject constructor(
 
     /**
      * Loads subway / metro stations specifically for the current or specified viewport.
-     * Prevents fetching other transit modes to avoid unnecessary network calls.
      */
     fun loadSubwayStationsData(viewport: TransitMapViewportInfo? = currentViewport) {
         val vp = viewport ?: return
@@ -318,7 +418,6 @@ class HomeContainerViewModel @Inject constructor(
 
     /**
      * Loads bicycle rental stations specifically for the current or specified viewport.
-     * Prevents fetching other transit modes to avoid unnecessary network calls.
      */
     fun loadBikeStationsData(viewport: TransitMapViewportInfo? = currentViewport) {
         val vp = viewport ?: return
@@ -330,7 +429,7 @@ class HomeContainerViewModel @Inject constructor(
     }
 
     /**
-     * Loads all configured transit stop data for the current viewport (used on the main Home screen).
+     * Loads all configured transit stop data for the current viewport.
      */
     fun loadAllTransitStopsData(viewport: TransitMapViewportInfo? = currentViewport) {
         val vp = viewport ?: return
@@ -341,57 +440,76 @@ class HomeContainerViewModel @Inject constructor(
         }
     }
 
-    /**
-     * Called when user taps a transit type tile in HomeSheet to open the dedicated nearby sheet.
-     * - Filters the map to only show [typeId] layer (hides all other types).
-     * - Triggers individual loading method for [typeId] if not already cached.
-     * - Sets [HomeContainerUiState.selectedTransitTypeId] so downstream sheets can filter appropriately.
-     */
-    fun selectTransitType(typeId: String) {
-        _uiState.update { state ->
-            val updatedSources = state.transitSources.map { src ->
-                src.copy(isVisible = src.typeId == typeId)
-            }
-            state.copy(
-                selectedTransitTypeId = typeId,
-                transitSources = updatedSources,
-            )
-        }
-
-        val vp = currentViewport
-        when (typeId) {
-            TransitMode.BUS.name -> loadBusStopsData(vp)
-            TransitMode.SUBWAY.name -> loadSubwayStationsData(vp)
-            TravelMode.BICYCLE_RENT.name -> loadBikeStationsData(vp)
-            else -> {
-                if (vp != null && shouldFetchForType(typeId, vp)) {
-                    loadTransitStopsData(vp, typeIdsToFetch = setOf(typeId))
-                } else if (isNearbySheetVisible) {
-                    computeNearbyStopsForSheet()
-                }
-            }
-        }
-    }
-
-    /**
-     * Restores the map to show all active transit types.
-     * Called when user navigates back from NearbyBusStopsSheet / NearbyTransitStopsSheet.
-     */
-    fun clearTransitTypeSelection() {
-        _uiState.update { state ->
-            val updatedSources = state.transitSources.map { src ->
-                src.copy(isVisible = state.activeTransitTypes.contains(src.typeId))
-            }
-            state.copy(
-                selectedTransitTypeId = null,
-                transitSources = updatedSources,
-            )
-        }
-    }
-
     fun onStopClicked(click: StopFeatureClick) {
         Timber.d("Stop clicked: ${click.stopId} (${click.name})")
         _uiState.update { it.copy(selectedStop = click) }
+    }
+
+    /**
+     * Focuses the map camera on [stop] and opens the floating stop detail card.
+     * Useful for transit modes that do not yet have a dedicated full detail screen (e.g. Bike).
+     */
+    fun focusOnNearbyStop(stop: NearbyStopItem) {
+        _cameraFocusEvents.tryEmit(
+            CameraFocusCommand(
+                location = stop.location,
+                zoom = 16.0,
+                animate = true,
+            )
+        )
+        _uiState.update {
+            it.copy(
+                selectedStop = StopFeatureClick(
+                    stopId = stop.stopId,
+                    typeId = stop.typeId,
+                    name = stop.name,
+                    point = Point.fromLngLat(stop.location.longitude, stop.location.latitude),
+                    properties = stop.properties,
+                )
+            )
+        }
+    }
+
+    /**
+     * Handles clicking a nearby stop item: navigates to [TransitStopDetailRoute] for supported
+     * transit modes (BUS, SUBWAY, RAIL, etc.), or focuses the stop on the map for Bike stations.
+     */
+    fun onNearbyStopSelected(stop: NearbyStopItem) {
+        val transitMode = resolveTransitMode(stop.typeId)
+        if (transitMode != null) {
+            appNavigator.navigateTo(
+                TransitStopDetailRoute(
+                    stopId = stop.stopId,
+                    transitMode = transitMode,
+                )
+            )
+        } else {
+            focusOnNearbyStop(stop)
+        }
+    }
+
+    /**
+     * Opens [TransitStopDetailRoute] from the floating stop detail card when supported.
+     */
+    fun navigateToSelectedStopDetail(stop: StopFeatureClick) {
+        val transitMode = resolveTransitMode(stop.typeId) ?: return
+        dismissStopDetail()
+        appNavigator.navigateTo(
+            TransitStopDetailRoute(
+                stopId = stop.stopId,
+                transitMode = transitMode,
+            )
+        )
+    }
+
+    private fun resolveTransitMode(typeId: String): TransitMode? = when (typeId.uppercase()) {
+        TransitMode.BUS.name -> TransitMode.BUS
+        TransitMode.SUBWAY.name, "METRO" -> TransitMode.SUBWAY
+        TransitMode.RAIL.name, "TRAIN" -> TransitMode.RAIL
+        TransitMode.TRAM.name -> TransitMode.TRAM
+        TransitMode.FERRY.name -> TransitMode.FERRY
+        TransitMode.MONORAIL.name -> TransitMode.MONORAIL
+        else -> null
     }
 
     fun dismissStopDetail() {
@@ -399,38 +517,46 @@ class HomeContainerViewModel @Inject constructor(
     }
 
     /**
-     * Controls lifecycle visibility of NearbyTransitSheet.
-     * Starts computing nearby stops when sheet appears, cancels ongoing computation when sheet disappears.
-     */
-    fun setNearbySheetVisible(isVisible: Boolean) {
-        isNearbySheetVisible = isVisible
-        if (isVisible) {
-            computeNearbyStopsForSheet()
-        } else {
-            updateRadiusJob?.cancel()
-            computeNearbyStopsJob?.cancel()
-        }
-    }
-
-    /**
-     * Computes nearby stops around [targetLocation] or the current map center/user location.
+     * Computes nearby stops around [targetLocation] or the current map center/user location
+     * using pre-parsed in-memory stop lists.
      * Runs asynchronously on Dispatchers.Default to avoid blocking the Main UI thread.
-     * Called ONLY when NearbyTransitSheet is displayed.
      */
     fun computeNearbyStopsForSheet(targetLocation: LocationData? = null) {
         computeNearbyStopsJob?.cancel()
-        computeNearbyStopsJob = viewModelScope.launch(Dispatchers.Default) {
-            val currentState = _uiState.value
-            val center = targetLocation
-                ?: currentMapCenter
-                ?: currentState.currentLocation
-                ?: return@launch
+        val currentState = _uiState.value
+        val visibleTypeIds = currentState.transitSources
+            .filter { it.isVisible }
+            .map { it.typeId }
+        val parsedSnapshot = visibleTypeIds.associateWith { typeId ->
+            cachedParsedStopsByType[typeId].orEmpty()
+        }
+        val center = targetLocation
+            ?: currentMapCenter
+            ?: currentState.currentLocation
+            ?: return
+        val radiusKm = currentState.selectedRadiusKm
 
-            val stops = computeNearbyStops(
-                sources = currentState.transitSources,
-                centerLocation = center,
-                radiusKm = currentState.selectedRadiusKm
-            )
+        computeNearbyStopsJob = viewModelScope.launch(Dispatchers.Default) {
+            val maxDistanceMeters = radiusKm * 1000.0
+            val stops = parsedSnapshot.values
+                .asSequence()
+                .flatten()
+                .map { parsed ->
+                    val dist = parsed.location.distanceTo(center)
+                    NearbyStopItem(
+                        stopId = parsed.stopId,
+                        name = parsed.name,
+                        typeId = parsed.typeId,
+                        location = parsed.location,
+                        distanceMeters = dist,
+                        routesOrInfo = parsed.routesOrInfo,
+                        properties = parsed.properties,
+                    )
+                }
+                .filter { it.distanceMeters <= maxDistanceMeters }
+                .distinctBy { "${it.typeId}_${it.stopId}" }
+                .sortedBy { it.distanceMeters }
+                .toList()
 
             _uiState.update { it.copy(nearbyStops = stops) }
         }
@@ -444,40 +570,16 @@ class HomeContainerViewModel @Inject constructor(
         if (kotlin.math.abs(_uiState.value.selectedRadiusKm - radiusKm) < 0.005) return
         _uiState.update { it.copy(selectedRadiusKm = radiusKm) }
         if (isNearbySheetVisible) {
-            updateRadiusJob?.cancel()
-            updateRadiusJob = viewModelScope.launch {
-                delay(200.milliseconds)
-                computeNearbyStopsForSheet()
-            }
+            scheduleNearbyRecompute()
         }
-    }
-
-    private fun computeNearbyStops(
-        sources: List<TransitSourceData>,
-        centerLocation: LocationData?,
-        radiusKm: Double,
-    ): List<NearbyStopItem> {
-        if (centerLocation == null) return emptyList()
-        val maxDistanceMeters = radiusKm * 1000.0
-        val allStops = mutableListOf<NearbyStopItem>()
-
-        for (source in sources) {
-            if (!source.isVisible) continue
-            val stops = parseStopsFromGeoJson(source.geoJson, source.typeId, centerLocation)
-            allStops.addAll(stops)
-        }
-
-        return allStops
-            .filter { it.distanceMeters <= maxDistanceMeters }
-            .sortedBy { it.distanceMeters }
     }
 
     private fun parseStopsFromGeoJson(
         geoJsonStr: String,
         defaultTypeId: String,
-        centerLocation: LocationData,
-    ): List<NearbyStopItem> {
-        val result = mutableListOf<NearbyStopItem>()
+    ): List<ParsedTransitStop> {
+        if (geoJsonStr.isBlank()) return emptyList()
+        val result = mutableListOf<ParsedTransitStop>()
         try {
             val json = JSONObject(geoJsonStr)
             val features = json.optJSONArray("features") ?: return emptyList()
@@ -489,11 +591,10 @@ class HomeContainerViewModel @Inject constructor(
                 val lon = coordinates.optDouble(0)
                 val lat = coordinates.optDouble(1)
                 val stopLocation = LocationData(lat, lon)
-                val dist = stopLocation.distanceTo(centerLocation)
 
                 val propertiesObj = feature.optJSONObject("properties")
                 val propertiesMap = mutableMapOf<String, String>()
-                var stopId = feature.optString("id", "stop_$i")
+                var stopId = feature.optString("id", "${defaultTypeId}_stop_$i")
                 var name = ""
                 var typeId = defaultTypeId
                 var routesOrInfo = ""
@@ -504,9 +605,11 @@ class HomeContainerViewModel @Inject constructor(
                         val key = keys.next()
                         propertiesMap[key] = propertiesObj.optString(key, "")
                     }
-                    if (propertiesMap.containsKey("stop_id")) stopId = propertiesMap["stop_id"] ?: stopId
+                    if (!propertiesMap["stop_id"].isNullOrBlank()) {
+                        stopId = propertiesMap["stop_id"]!!
+                    }
                     name = propertiesMap["name"] ?: ""
-                    typeId = propertiesMap["type"] ?: defaultTypeId
+                    typeId = propertiesMap["type"]?.ifBlank { defaultTypeId } ?: defaultTypeId
                     routesOrInfo = propertiesMap["routes"]
                         ?: propertiesMap["line"]
                         ?: propertiesMap["available_bikes"]?.let { "Xe khả dụng: $it" }
@@ -518,12 +621,11 @@ class HomeContainerViewModel @Inject constructor(
                 }
 
                 result.add(
-                    NearbyStopItem(
+                    ParsedTransitStop(
                         stopId = stopId,
                         name = name,
                         typeId = typeId,
                         location = stopLocation,
-                        distanceMeters = dist,
                         routesOrInfo = routesOrInfo,
                         properties = propertiesMap,
                     )
@@ -541,6 +643,10 @@ class HomeContainerViewModel @Inject constructor(
 
     fun navigateToBusRouteSearch() {
         appNavigator.navigateTo(BusRouteSearchRoute)
+    }
+
+    fun navigateToRouteLocationPicker() {
+        appNavigator.navigateTo(RoutePlannerContainerRoute)
     }
 }
 

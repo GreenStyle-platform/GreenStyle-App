@@ -33,6 +33,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -45,6 +46,7 @@ import com.vie.mit.common.theme.AppTheme
 import com.vie.mit.data.model.domain.map.BusRoute
 import com.vie.mit.green.R
 import com.vie.mit.green.ui.home.common.NearbyEmptyStateCard
+import com.vie.mit.green.ui.home.common.NearbyLoadingStateCard
 import com.vie.mit.green.ui.home.common.NearbyLocationInfoCard
 import com.vie.mit.green.ui.home.common.NearbySheetHeader
 import com.vie.mit.green.ui.home.common.formatDistance
@@ -64,8 +66,8 @@ fun NearbySubwayStationsSheet(
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
     uiState: NearbySubwayStationUiState = NearbySubwayStationUiState(),
+    isLoadingStops: Boolean = false,
     selectedRadiusKm: Double = 1.0,
-    onRadiusSelected: (Double) -> Unit = {},
     onTabSelected: (SubwaySheetTab) -> Unit = {},
     onRetryLoadRoutes: () -> Unit = {},
     onRouteClick: (String) -> Unit = {},
@@ -167,32 +169,43 @@ fun NearbySubwayStationsSheet(
 
                 Spacer(modifier = Modifier.height(12.dp))
 
-                // 4. Stations List or Empty State
-                if (nearbyStops.isEmpty()) {
-                    val formattedRadius = formatDistance((selectedRadiusKm * 1000).toFloat())
-                    NearbyEmptyStateCard(
-                        icon = Icons.Default.Subway,
-                        message = "Không tìm thấy ga tàu điện ngầm nào\ntrong bán kính $formattedRadius",
-                    )
-                } else {
-                    LazyColumn(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .weight(1f),
-                        contentPadding = PaddingValues(
-                            bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 16.dp
-                        ),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        items(
-                            items = nearbyStops,
-                            key = { it.stopId },
-                        ) { stop ->
-                            SubwayStationCard(
-                                stop = stop,
-                                metroColor = metroColor,
-                                onClick = { onStopClick(stop.stopId) },
-                            )
+                // 4. Stations List, Loading State, or Empty State
+                when {
+                    nearbyStops.isEmpty() && isLoadingStops -> {
+                        NearbyLoadingStateCard(
+                            accentColor = metroColor,
+                            message = "Đang tìm ga tàu điện ngầm gần đây...",
+                        )
+                    }
+
+                    nearbyStops.isEmpty() -> {
+                        val formattedRadius = formatDistance((selectedRadiusKm * 1000).toFloat())
+                        NearbyEmptyStateCard(
+                            icon = Icons.Default.Subway,
+                            message = "Không tìm thấy ga tàu điện ngầm nào\ntrong bán kính $formattedRadius",
+                        )
+                    }
+
+                    else -> {
+                        LazyColumn(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .weight(1f),
+                            contentPadding = PaddingValues(
+                                bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 16.dp
+                            ),
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            items(
+                                items = nearbyStops,
+                                key = { "${it.typeId}_${it.stopId}" },
+                            ) { stop ->
+                                SubwayStationCard(
+                                    stop = stop,
+                                    metroColor = metroColor,
+                                    onClick = { onStopClick(stop.stopId) },
+                                )
+                            }
                         }
                     }
                 }
@@ -368,13 +381,15 @@ private fun SubwayRouteCard(
                 .padding(14.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            val badgeColor = route.routeColor?.let {
-                try {
-                    Color(android.graphics.Color.parseColor(if (it.startsWith("#")) it else "#$it"))
-                } catch (e: Exception) {
-                    metroColor
-                }
-            } ?: metroColor
+            val badgeColor = remember(route.routeColor, metroColor) {
+                route.routeColor?.let {
+                    try {
+                        Color(android.graphics.Color.parseColor(if (it.startsWith("#")) it else "#$it"))
+                    } catch (e: Exception) {
+                        metroColor
+                    }
+                } ?: metroColor
+            }
 
             Box(
                 modifier = Modifier

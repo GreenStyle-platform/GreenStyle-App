@@ -6,6 +6,7 @@ import androidx.paging.PagingData
 import com.vie.mit.data.model.common.map.TransitMode
 import com.vie.mit.data.model.common.map.TravelMode
 import com.vie.mit.data.model.common.map.toTransitTypeConfig
+import com.vie.mit.data.model.domain.map.AutosuggestPlace
 import com.vie.mit.data.model.domain.map.BusRoute
 import com.vie.mit.data.model.domain.map.Location
 import com.vie.mit.data.model.domain.map.PublicTransportSuggestion
@@ -18,6 +19,8 @@ import com.vie.mit.data.model.domain.map.TransitStopsGeoJsonLoad
 import com.vie.mit.data.model.mapper.toDomain
 import com.vie.mit.data.model.mapper.toLocationRequest
 import com.vie.mit.data.model.remote.request.map.BusStopArrivalsRequest
+import com.vie.mit.data.model.remote.request.map.HereAutocompleteRequest
+import com.vie.mit.data.model.remote.request.map.HereAutosuggestRequest
 import com.vie.mit.data.model.remote.request.map.TransitStopBoundsRequest
 import com.vie.mit.data.model.remote.response.map.BusRoutePageResponse
 import com.vie.mit.data.model.remote.response.map.TransitStopMarkerResponse
@@ -64,6 +67,40 @@ class MapRepository @Inject constructor(
         location: Location,
     ): Result<List<PublicTransportSuggestion>> = handleApiCall {
         mapApi.getPublicTransportSuggestions(location.toLocationRequest()).map { it.toDomain() }
+    }
+
+    /**
+     * Searches places and locations using HERE Autosuggest API (returns coordinates).
+     */
+    suspend fun getAutosuggest(
+        query: String,
+        latitude: Double,
+        longitude: Double,
+    ): Result<List<AutosuggestPlace>> = handleApiCall {
+        mapApi.getAutosuggest(
+            HereAutosuggestRequest(
+                query = query,
+                latitude = latitude,
+                longitude = longitude,
+            )
+        ).items.map { it.toDomain() }
+    }
+
+    /**
+     * Suggests keywords and text completions using HERE Autocomplete API.
+     */
+    suspend fun getAutocomplete(
+        query: String,
+        latitude: Double,
+        longitude: Double,
+    ): Result<List<AutosuggestPlace>> = handleApiCall {
+        mapApi.getAutocomplete(
+            HereAutocompleteRequest(
+                query = query,
+                latitudeIn = latitude,
+                longitudeIn = longitude,
+            )
+        ).items.map { it.toDomain() }
     }
 
     /**

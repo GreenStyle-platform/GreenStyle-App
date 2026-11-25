@@ -10,6 +10,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -33,6 +34,7 @@ import com.mapbox.maps.extension.style.sources.generated.geoJsonSource
 import com.mapbox.maps.extension.style.sources.getSourceAs
 import com.mapbox.maps.plugin.PuckBearing
 import com.mapbox.maps.plugin.animation.MapAnimationOptions
+import com.mapbox.maps.plugin.animation.camera
 import com.mapbox.maps.plugin.locationcomponent.location
 import com.vie.mit.mapbox.model.TransitTypeConfig
 import com.vie.mit.mapbox.permission.MapPermissionHandler
@@ -73,9 +75,15 @@ fun TransitStopFocusMap(
     showUserLocation: Boolean = true,
     cameraBottomPadding: Float = 0f,
     zoom: Double = 16.0,
-    mapViewportState: MapViewportState = rememberMapViewportState(),
+    mapViewportState: MapViewportState = rememberMapViewportState{ setCameraOptions {
+        center(Point.fromLngLat(105.8542, 21.0285))
+        zoom(8.0)
+        pitch(0.0)
+    }
+                                                                 },
 ) {
     val context = LocalContext.current
+    val currentCameraBottomPadding by rememberUpdatedState(cameraBottomPadding)
 
     val isPermissionGrantedInitially = remember(context) {
         (ContextCompat.checkSelfPermission(
@@ -86,145 +94,151 @@ fun TransitStopFocusMap(
             Manifest.permission.ACCESS_COARSE_LOCATION,
         ) == PackageManager.PERMISSION_GRANTED)
     }
-    var showMap by remember {
-        mutableStateOf(if (showUserLocation) isPermissionGrantedInitially else true)
-    }
+    var hasLocationPermission by remember { mutableStateOf(isPermissionGrantedInitially) }
 
     if (showUserLocation) {
         MapPermissionHandler(
-            onPermissionGranted = { showMap = true },
-            onPermissionDenied = { showMap = false },
+            onPermissionGranted = { hasLocationPermission = true },
+            onPermissionDenied = { hasLocationPermission = false },
         )
     }
 
     Box(modifier = modifier.fillMaxSize()) {
-        if (showMap) {
-            MapboxMap(
-                modifier = Modifier.fillMaxSize(),
-                mapViewportState = mapViewportState,
-            ) {
-                // 1. Fly camera to stop location
-                MapEffect(stopLatitude, stopLongitude, zoom) { _ ->
-                    if (stopLatitude != 0.0 || stopLongitude != 0.0) {
-                        val point = Point.fromLngLat(stopLongitude, stopLatitude)
-                        mapViewportState.flyTo(
-                            cameraOptions {
-                                center(point)
-                                zoom(zoom)
-                                pitch(0.0)
-                            },
-                            MapAnimationOptions.mapAnimationOptions { duration(900) },
-                        )
-                    }
+        MapboxMap(
+            modifier = Modifier.fillMaxSize(),
+            mapViewportState = mapViewportState,
+        ) {
+            // 1. Fly camera to stop location (including current bottom padding)
+            MapEffect(stopLatitude, stopLongitude, zoom) { _ ->
+                if (stopLatitude != 0.0 || stopLongitude != 0.0) {
+                    val point = Point.fromLngLat(stopLongitude, stopLatitude)
+                    val targetBottom = currentCameraBottomPadding.toDouble().coerceAtLeast(0.0)
+                    mapViewportState.flyTo(
+                        cameraOptions {
+                            center(point)
+                            zoom(zoom)
+                            pitch(0.0)
+                            padding(EdgeInsets(0.0, 0.0, targetBottom, 0.0))
+                        },
+                        MapAnimationOptions.mapAnimationOptions { duration(900) },
+                    )
                 }
+            }
 
-                // 2. Sync camera bottom padding with BottomSheet
-                MapEffect(cameraBottomPadding) { mapView ->
-                    val mapboxMap = mapView.mapboxMap
-                    val currentCamera = mapboxMap.cameraState
-                    val targetBottom = cameraBottomPadding.toDouble().coerceAtLeast(0.0)
-                    if (abs(currentCamera.padding.bottom - targetBottom) >= 2.0) {
-                        mapboxMap.setCamera(
-                            cameraOptions {
-                                center(currentCamera.center)
-                                zoom(currentCamera.zoom)
-                                pitch(currentCamera.pitch)
-                                bearing(currentCamera.bearing)
-                                padding(EdgeInsets(0.0, 0.0, targetBottom, 0.0))
-                            },
-                        )
-                    }
+            // 2. Sync camera bottom padding with BottomSheet without interrupting flyTo animation
+            MapEffect(cameraBottomPadding) { mapView ->
+                val mapboxMap = mapView.mapboxMap
+                val currentCamera = mapboxMap.cameraState
+                val targetBottom = cameraBottomPadding.toDouble().coerceAtLeast(0.0)
+                if (abs(currentCamera.padding.bottom - targetBottom) >= 2.0) {
+                    mapView.camera.easeTo(
+                        cameraOptions {
+                            padding(EdgeInsets(0.0, 0.0, targetBottom, 0.0))
+                        },
+                        MapAnimationOptions.mapAnimationOptions {
+                            duration(0L)
+                            owner("BOTTOM_SHEET_PADDING")
+                        },
+                    )
                 }
+            }
 
-                // 3. Add single stop marker icon and GeoJSON source
-                MapEffect(stopLatitude, stopLongitude, stopName, transitTypeConfig) { mapView ->
-                    val mapboxMap = mapView.mapboxMap
-                    mapboxMap.getStyle { style ->
-                        // Register transit icon if config provided, otherwise fallback to default pin
-                        if (transitTypeConfig != null) {
-                            if (style.getStyleImage(transitTypeConfig.iconName) == null) {
-                                val bitmap = bitmapFromDrawableRes(context, transitTypeConfig.iconResId)
-                                if (bitmap != null) {
-                                    style.addImage(transitTypeConfig.iconName, bitmap)
-                                }
-                            }
-                        } else {
-                            if (style.getStyleImage("transit_icon_default") == null) {
-                                val bitmap = bitmapFromDrawableRes(context, com.vie.mit.mapbox.R.drawable.ic_pin_map)
-                                if (bitmap != null) {
-                                    style.addImage("transit_icon_default", bitmap)
-                                }
+            // 3. Add or update single stop marker icon, GeoJSON source, and symbol layer styling
+            MapEffect(stopLatitude, stopLongitude, stopName, transitTypeConfig) { mapView ->
+                if (stopLatitude == 0.0 && stopLongitude == 0.0) return@MapEffect
+                val mapboxMap = mapView.mapboxMap
+                mapboxMap.getStyle { style ->
+                    // Register transit icon if config provided, otherwise fallback to default pin
+                    if (transitTypeConfig != null) {
+                        if (style.getStyleImage(transitTypeConfig.iconName) == null) {
+                            val bitmap = bitmapFromDrawableRes(context, transitTypeConfig.iconResId)
+                            if (bitmap != null) {
+                                style.addImage(transitTypeConfig.iconName, bitmap)
                             }
                         }
-
-                        // Build single-point GeoJSON FeatureCollection
-                        val feature = Feature.fromGeometry(Point.fromLngLat(stopLongitude, stopLatitude))
-                        feature.addStringProperty("name", stopName)
-                        val geoJson = FeatureCollection.fromFeature(feature).toJson()
-
-                        // Add or update GeoJSON source
-                        val existingSource =
-                            style.getSourceAs<GeoJsonSource>(FOCUS_STOP_SOURCE_ID)
-                        if (existingSource != null) {
-                            existingSource.data(geoJson)
-                        } else {
-                            val source = geoJsonSource(FOCUS_STOP_SOURCE_ID) {
-                                data(geoJson)
+                    } else {
+                        if (style.getStyleImage("transit_icon_default") == null) {
+                            val bitmap = bitmapFromDrawableRes(context, com.vie.mit.mapbox.R.drawable.ic_pin_map)
+                            if (bitmap != null) {
+                                style.addImage("transit_icon_default", bitmap)
                             }
-                            style.addSource(source)
-                        }
-
-                        // Add symbol layer if not exists
-                        if (!style.styleLayerExists(FOCUS_STOP_LAYER_ID)) {
-                            val iconName =
-                                transitTypeConfig?.iconName ?: "transit_icon_default"
-                            val iconSizeVal = transitTypeConfig?.iconSize ?: 1.2
-                            val showStopName = transitTypeConfig?.showStopName ?: true
-                            val textMinZoom = transitTypeConfig?.textMinZoom ?: 15.0
-                            val textSize = transitTypeConfig?.textSize ?: 11.0
-                            val textColor = transitTypeConfig?.textColor ?: 0xFF0369D8.toInt()
-                            val textHaloColor = transitTypeConfig?.textHaloColor ?: 0xFFFFFFFF.toInt()
-                            val textHaloWidth = transitTypeConfig?.textHaloWidth ?: 1.2
-
-                            val layer = symbolLayer(FOCUS_STOP_LAYER_ID, FOCUS_STOP_SOURCE_ID) {
-                                iconImage(iconName)
-                                iconSize(iconSizeVal)
-                                iconAllowOverlap(true)
-                                iconIgnorePlacement(true)
-
-                                if (showStopName) {
-                                    textField(Expression.fromRaw("""["get", "name"]"""))
-                                    textSize(
-                                        Expression.fromRaw(
-                                            """["step", ["zoom"], 0.0, $textMinZoom, $textSize]"""
-                                        )
-                                    )
-                                    textAnchor(TextAnchor.TOP)
-                                    textOffset(listOf(0.0, 1.1))
-                                    textColor(textColor)
-                                    textHaloColor(textHaloColor)
-                                    textHaloWidth(textHaloWidth)
-                                    textMaxWidth(9.0)
-                                    textAllowOverlap(false)
-                                    textOptional(true)
-                                }
-                            }
-                            style.addLayer(layer)
                         }
                     }
-                }
 
-                // 4. User location puck
-                if (showUserLocation) {
-                    MapEffect(Unit) { mapView ->
-                        val locationPlugin = mapView.location
-                        locationPlugin.updateSettings {
-                            locationPuck = createZoomScaled2DPuck(withBearing = true)
-                            enabled = true
-                            puckBearing = PuckBearing.HEADING
-                            puckBearingEnabled = true
-                            showAccuracyRing = true
+                    // Build single-point GeoJSON FeatureCollection
+                    val feature = Feature.fromGeometry(Point.fromLngLat(stopLongitude, stopLatitude))
+                    feature.addStringProperty("name", stopName)
+                    val geoJson = FeatureCollection.fromFeature(feature).toJson()
+
+                    // Add or update GeoJSON source
+                    val existingSource =
+                        style.getSourceAs<GeoJsonSource>(FOCUS_STOP_SOURCE_ID)
+                    if (existingSource != null) {
+                        existingSource.data(geoJson)
+                    } else {
+                        val source = geoJsonSource(FOCUS_STOP_SOURCE_ID) {
+                            data(geoJson)
                         }
+                        style.addSource(source)
+                    }
+
+                    // Recreate symbol layer when config changes so icon/color/size stay in sync
+                    if (style.styleLayerExists(FOCUS_STOP_LAYER_ID)) {
+                        style.removeStyleLayer(FOCUS_STOP_LAYER_ID)
+                    }
+
+                    val iconName =
+                        transitTypeConfig?.iconName ?: "transit_icon_default"
+                    val iconSizeVal = transitTypeConfig?.iconSize ?: 1.2
+                    val showStopName = transitTypeConfig?.showStopName ?: true
+                    val textMinZoom = transitTypeConfig?.textMinZoom ?: 15.0
+                    val textSize = transitTypeConfig?.textSize ?: 11.0
+                    val textColor = transitTypeConfig?.textColor ?: 0xFF0369D8.toInt()
+                    val textHaloColor = transitTypeConfig?.textHaloColor ?: 0xFFFFFFFF.toInt()
+                    val textHaloWidth = transitTypeConfig?.textHaloWidth ?: 1.2
+
+                    val layer = symbolLayer(FOCUS_STOP_LAYER_ID, FOCUS_STOP_SOURCE_ID) {
+                        iconImage(iconName)
+                        iconSize(iconSizeVal)
+                        iconAllowOverlap(true)
+                        iconIgnorePlacement(true)
+
+                        if (showStopName) {
+                            textField(Expression.fromRaw("""["get", "name"]"""))
+                            textSize(
+                                Expression.fromRaw(
+                                    """["step", ["zoom"], 0.0, $textMinZoom, $textSize]"""
+                                )
+                            )
+                            textAnchor(TextAnchor.TOP)
+                            textOffset(listOf(0.0, 1.1))
+                            textColor(textColor)
+                            textHaloColor(textHaloColor)
+                            textHaloWidth(textHaloWidth)
+                            textMaxWidth(9.0)
+                            textAllowOverlap(false)
+                            textOptional(true)
+                        }
+                    }
+                    style.addLayer(layer)
+                }
+            }
+
+            // 4. User location puck (enabled only when showUserLocation && permission granted)
+            MapEffect(showUserLocation, hasLocationPermission) { mapView ->
+                val locationPlugin = mapView.location
+                val shouldEnableLocation = showUserLocation && hasLocationPermission
+                if (shouldEnableLocation) {
+                    locationPlugin.updateSettings {
+                        locationPuck = createZoomScaled2DPuck(withBearing = true)
+                        enabled = true
+                        puckBearing = PuckBearing.HEADING
+                        puckBearingEnabled = true
+                        showAccuracyRing = true
+                    }
+                } else {
+                    locationPlugin.updateSettings {
+                        enabled = false
                     }
                 }
             }

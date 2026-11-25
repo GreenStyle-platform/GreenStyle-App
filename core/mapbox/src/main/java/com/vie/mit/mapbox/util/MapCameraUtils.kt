@@ -23,12 +23,16 @@ fun focusUserLocationBoundingBox(
     location: LocationData,
     zoom: Double = 14.5,
     animate: Boolean = true,
+    bottomPaddingPx: Double? = null,
 ) {
     val centerPoint = Point.fromLngLat(location.longitude, location.latitude)
     val cameraOpts = cameraOptions {
         center(centerPoint)
         zoom(zoom)
         pitch(0.0)
+        if (bottomPaddingPx != null) {
+            padding(EdgeInsets(0.0, 0.0, bottomPaddingPx.coerceAtLeast(0.0), 0.0))
+        }
     }
     if (animate) {
         mapViewportState.flyTo(

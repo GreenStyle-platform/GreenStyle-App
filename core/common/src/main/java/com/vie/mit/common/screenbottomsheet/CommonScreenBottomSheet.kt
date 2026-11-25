@@ -180,7 +180,7 @@ fun CommonScreenBottomSheet(
                         state = initState.anchoredState, orientation = Orientation.Vertical
                     ),
                 shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
-                color = AppTheme.colors.primary,
+                color = AppTheme.colors.backgroundGreenCard,
                 shadowElevation = 8.dp
             ) {
                 sheetContent()

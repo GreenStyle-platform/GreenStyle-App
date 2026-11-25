@@ -150,9 +150,22 @@ internal fun StopDetailFloatingCard(
     stop: StopFeatureClick,
     onClose: () -> Unit,
     modifier: Modifier = Modifier,
+    onViewDetail: (() -> Unit)? = null,
 ) {
+    val typeLabel = when (stop.typeId.uppercase()) {
+        TransitMode.BUS.name -> "Trạm xe buýt"
+        TransitMode.SUBWAY.name, "METRO" -> "Ga tàu điện ngầm"
+        TransitMode.RAIL.name, "TRAIN" -> "Ga tàu hỏa"
+        TravelMode.BICYCLE_RENT.name, TravelMode.BICYCLE.name, "BIKE" -> "Trạm xe đạp công cộng"
+        else -> "Trạm dừng công cộng"
+    }
+
     Card(
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier
+            .fillMaxWidth()
+            .then(
+                if (onViewDetail != null) Modifier.clickable(onClick = onViewDetail) else Modifier
+            ),
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface
@@ -177,12 +190,14 @@ internal fun StopDetailFloatingCard(
                 Spacer(modifier = Modifier.width(12.dp))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = stop.name ?: "Trạm dừng công cộng",
+                        text = stop.name ?: typeLabel,
                         style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                        color = MaterialTheme.colorScheme.onSurface
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
                     )
                     Text(
-                        text = "Loại: ${stop.typeId} | ID: ${stop.stopId}",
+                        text = if (onViewDetail != null) "$typeLabel • Nhấn để xem chi tiết" else typeLabel,
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -471,7 +486,9 @@ private fun TransitModesGrid(
             Spacer(modifier = Modifier.weight(1f))
         }
     }
-}@Composable
+}
+
+@Composable
 private fun UtilitiesGrid(
     onTicketClick: () -> Unit,
     onHistoryClick: () -> Unit,
@@ -536,6 +553,7 @@ private fun TransitModeGridButton(
                         Image(
                             painter = painterResource(id = icon),
                             contentDescription = label,
+                            alpha = if (isActive) 1f else 0.5f,
                             modifier = Modifier.size(28.dp)
                         )
                     }

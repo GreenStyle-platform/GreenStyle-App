@@ -1,5 +1,6 @@
 package com.vie.mit.data.model.mapper
 
+import com.vie.mit.data.model.domain.map.AutosuggestPlace
 import com.vie.mit.data.model.domain.map.BusRoute
 import com.vie.mit.data.model.domain.map.Location
 import com.vie.mit.data.model.domain.map.PublicTransportSuggestion
@@ -11,6 +12,8 @@ import com.vie.mit.data.model.domain.map.TransitStopMarker
 import com.vie.mit.data.model.domain.map.VehicleArrival
 import com.vie.mit.data.model.remote.request.map.LocationRequest
 import com.vie.mit.data.model.remote.response.map.BusRouteResponse
+import com.vie.mit.data.model.remote.response.map.HereAutocompleteItemResponse
+import com.vie.mit.data.model.remote.response.map.HereAutosuggestItemResponse
 import com.vie.mit.data.model.remote.response.map.PublicTransportSuggestionResponse
 import com.vie.mit.data.model.remote.response.map.RouteArrivalResponse
 import com.vie.mit.data.model.remote.response.map.RouteTripResponse
@@ -174,4 +177,33 @@ fun TripStopResponse.toDomain(): TransitStopMarker = TransitStopMarker(
     latitude = latitude,
     longitude = longitude,
 )
+
+fun HereAutosuggestItemResponse.toDomain(): AutosuggestPlace {
+    val addrLabel = address?.label ?: title.orEmpty()
+    return AutosuggestPlace(
+        id = id ?: title.orEmpty(),
+        title = title ?: addrLabel,
+        address = addrLabel,
+        latitude = position?.lat,
+        longitude = position?.lng,
+        distance = distance,
+        highlights = emptyList(),
+    )
+}
+
+fun HereAutocompleteItemResponse.toDomain(): AutosuggestPlace {
+    val addrLabel = address?.label ?: title.orEmpty()
+    val highlightRanges = highlights?.title?.map { it.start to it.end }
+        ?: highlights?.address?.label?.map { it.start to it.end }
+        ?: emptyList()
+    return AutosuggestPlace(
+        id = id ?: title.orEmpty(),
+        title = title ?: addrLabel,
+        address = addrLabel,
+        latitude = null,
+        longitude = null,
+        distance = distance,
+        highlights = highlightRanges,
+    )
+}
 

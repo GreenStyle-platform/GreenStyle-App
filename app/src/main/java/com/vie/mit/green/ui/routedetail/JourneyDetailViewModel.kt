@@ -1,4 +1,4 @@
-package com.vie.mit.green.ui.journeydetail
+package com.vie.mit.green.ui.routedetail
 
 import androidx.lifecycle.ViewModel
 import dagger.hilt.android.lifecycle.HiltViewModel

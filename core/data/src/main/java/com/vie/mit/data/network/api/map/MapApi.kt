@@ -1,9 +1,13 @@
 package com.vie.mit.data.network.api.map
 
 import com.vie.mit.data.model.remote.request.map.BusStopArrivalsRequest
+import com.vie.mit.data.model.remote.request.map.HereAutocompleteRequest
+import com.vie.mit.data.model.remote.request.map.HereAutosuggestRequest
 import com.vie.mit.data.model.remote.request.map.LocationRequest
 import com.vie.mit.data.model.remote.request.map.TransitStopBoundsRequest
 import com.vie.mit.data.model.remote.response.map.BusRoutePageResponse
+import com.vie.mit.data.model.remote.response.map.HereAutocompleteResponse
+import com.vie.mit.data.model.remote.response.map.HereAutosuggestResponse
 import com.vie.mit.data.model.remote.response.map.PublicTransportSuggestionResponse
 import com.vie.mit.data.model.remote.response.map.RouteArrivalResponse
 import com.vie.mit.data.model.remote.response.map.RouteTripResponse
@@ -22,6 +26,16 @@ interface MapApi {
     suspend fun getPublicTransportSuggestions(
         @Body location: LocationRequest,
     ): List<PublicTransportSuggestionResponse>
+
+    @POST("here-geocode/autosuggest")
+    suspend fun getAutosuggest(
+        @Body request: HereAutosuggestRequest,
+    ): HereAutosuggestResponse
+
+    @POST("here-geocode/autocomplete")
+    suspend fun getAutocomplete(
+        @Body request: HereAutocompleteRequest,
+    ): HereAutocompleteResponse
 
     @POST("transits/bus/search-in-bounds")
     suspend fun searchBusStopsInBounds(

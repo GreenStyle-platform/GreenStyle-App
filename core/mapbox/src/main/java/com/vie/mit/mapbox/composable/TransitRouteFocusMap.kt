@@ -77,7 +77,11 @@ fun TransitRouteFocusMap(
     routeColorHex: String? = null,
     cameraBottomPadding: Float = 0f,
     showUserLocation: Boolean = true,
-    mapViewportState: MapViewportState = rememberMapViewportState(),
+    mapViewportState: MapViewportState = rememberMapViewportState{ setCameraOptions {
+        center(Point.fromLngLat(105.8542, 21.0285))
+        zoom(8.0)
+        pitch(0.0)
+    }}
 ) {
     val context = LocalContext.current
     val busColor = AppTheme.colors.busColor

@@ -11,10 +11,12 @@ import com.vie.mit.green.ui.busroutesearch.BusRouteSearchScreen
 import com.vie.mit.green.ui.busroutesearch.BusRouteSearchViewModel
 import com.vie.mit.green.ui.home.container.HomeContainerScreen
 import com.vie.mit.green.ui.home.container.HomeContainerViewModel
-import com.vie.mit.green.ui.journeydetail.JourneyDetailScreen
-import com.vie.mit.green.ui.journeydetail.JourneyDetailViewModel
 import com.vie.mit.green.ui.journeynavigation.JourneyNavigationScreen
 import com.vie.mit.green.ui.journeynavigation.JourneyNavigationViewModel
+import com.vie.mit.green.ui.routedetail.JourneyDetailScreen
+import com.vie.mit.green.ui.routedetail.JourneyDetailViewModel
+import com.vie.mit.green.ui.routeplanner.container.RoutePlannerContainerScreen
+import com.vie.mit.green.ui.routeplanner.container.RoutePlannerContainerViewModel
 import com.vie.mit.green.ui.setting.SettingScreen
 import com.vie.mit.green.ui.setting.SettingViewModel
 import com.vie.mit.green.ui.transitroutedetail.TransitRouteDetailViewModel
@@ -41,6 +43,12 @@ fun NavGraphBuilder.mainGraph() {
         composable<BusRouteSearchRoute> {
             BusRouteSearchScreen(
                 viewModel = hiltViewModel<BusRouteSearchViewModel>(),
+            )
+        }
+
+        composable<RoutePlannerContainerRoute> {
+            RoutePlannerContainerScreen(
+                containerViewModel = hiltViewModel<RoutePlannerContainerViewModel>(),
             )
         }
 

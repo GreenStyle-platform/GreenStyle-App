@@ -1,5 +1,6 @@
 package com.vie.mit.green.ui.home.nearbytransitsheet
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -23,9 +24,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.DirectionsBike
-import androidx.compose.material.icons.filled.DirectionsBus
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.DirectionsTransit
-import androidx.compose.material.icons.filled.Subway
 import androidx.compose.material.icons.filled.Train
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -36,6 +36,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -44,6 +45,7 @@ import com.vie.mit.data.model.common.map.TransitMode
 import com.vie.mit.data.model.common.map.TravelMode
 import com.vie.mit.green.R
 import com.vie.mit.green.ui.home.common.NearbyEmptyStateCard
+import com.vie.mit.green.ui.home.common.NearbyLoadingStateCard
 import com.vie.mit.green.ui.home.common.NearbyLocationInfoCard
 import com.vie.mit.green.ui.home.common.NearbySheetHeader
 import com.vie.mit.green.ui.home.common.formatDistance
@@ -53,8 +55,8 @@ import com.vie.mit.green.ui.home.common.formatDistance
  * within radius [selectedRadiusKm] around the current map center location.
  *
  * @param nearbyStops List of transit stops located within [selectedRadiusKm] km (sorted by distance ascending)
+ * @param isLoadingStops Whether transit stops for the current viewport are still loading
  * @param selectedRadiusKm Radius parameter in kilometers (e.g. 0.5, 1.0, 2.0, 5.0)
- * @param onRadiusSelected Callback when user changes search radius parameter
  * @param onBack Callback to close sheet and return to HomeSheet
  * @param onStopClick Callback when user taps a stop item
  */
@@ -63,8 +65,8 @@ fun NearbyTransitSheet(
     nearbyStops: List<NearbyStopItem>,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
+    isLoadingStops: Boolean = false,
     selectedRadiusKm: Double = 1.0,
-    onRadiusSelected: (Double) -> Unit = {},
     onStopClick: (NearbyStopItem) -> Unit = {},
 ) {
     Column(
@@ -91,31 +93,42 @@ fun NearbyTransitSheet(
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        // 4. List of nearby stops or Empty State
-        if (nearbyStops.isEmpty()) {
-            val formattedRadius = formatDistance((selectedRadiusKm * 1000).toFloat())
-            NearbyEmptyStateCard(
-                icon = Icons.Default.DirectionsTransit,
-                message = "Không tìm thấy trạm dừng nào trong bán kính $formattedRadius quanh khu vực này.",
-            )
-        } else {
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f),
-                contentPadding = PaddingValues(
-                    bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 16.dp
-                ),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                items(
-                    items = nearbyStops,
-                    key = { it.stopId }
-                ) { stop ->
-                    NearbyStopItemCard(
-                        stop = stop,
-                        onClick = { onStopClick(stop) }
-                    )
+        // 4. List of nearby stops, Loading State, or Empty State
+        when {
+            nearbyStops.isEmpty() && isLoadingStops -> {
+                NearbyLoadingStateCard(
+                    accentColor = AppTheme.colors.navyBlue,
+                    message = "Đang tìm trạm dừng gần đây...",
+                )
+            }
+
+            nearbyStops.isEmpty() -> {
+                val formattedRadius = formatDistance((selectedRadiusKm * 1000).toFloat())
+                NearbyEmptyStateCard(
+                    icon = Icons.Default.DirectionsTransit,
+                    message = "Không tìm thấy trạm dừng nào trong bán kính $formattedRadius quanh khu vực này.",
+                )
+            }
+
+            else -> {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f),
+                    contentPadding = PaddingValues(
+                        bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 16.dp
+                    ),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    items(
+                        items = nearbyStops,
+                        key = { "${it.typeId}_${it.stopId}" }
+                    ) { stop ->
+                        NearbyStopItemCard(
+                            stop = stop,
+                            onClick = { onStopClick(stop) }
+                        )
+                    }
                 }
             }
         }
@@ -128,12 +141,12 @@ private fun NearbyStopItemCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val (icon, badgeColor) = when (stop.typeId.uppercase()) {
-        TransitMode.BUS.name -> Icons.Default.DirectionsBus to AppTheme.colors.busColor
-        TransitMode.SUBWAY.name -> Icons.Default.Subway to AppTheme.colors.metroColor
-        TransitMode.RAIL.name -> Icons.Default.Train to Color(0xFF8E24AA)
-        TravelMode.BICYCLE_RENT.name -> Icons.AutoMirrored.Filled.DirectionsBike to AppTheme.colors.bikeColor
-        else -> Icons.Default.DirectionsTransit to AppTheme.colors.navyBlue
+    val badgeColor = when (stop.typeId.uppercase()) {
+        TransitMode.BUS.name -> AppTheme.colors.busColor
+        TransitMode.SUBWAY.name, "METRO" -> AppTheme.colors.metroColor
+        TransitMode.RAIL.name, "TRAIN" -> AppTheme.colors.railColor
+        TravelMode.BICYCLE_RENT.name, TravelMode.BICYCLE.name, "BIKE" -> AppTheme.colors.bikeColor
+        else -> AppTheme.colors.navyBlue
     }
 
     val formattedDistance = formatDistance(stop.distanceMeters)
@@ -143,8 +156,8 @@ private fun NearbyStopItemCard(
             .fillMaxWidth()
             .clickable(onClick = onClick),
         shape = RoundedCornerShape(14.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.95f)),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+        colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.97f)),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Row(
             modifier = Modifier
@@ -152,19 +165,10 @@ private fun NearbyStopItemCard(
                 .padding(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Box(
-                modifier = Modifier
-                    .size(40.dp)
-                    .background(badgeColor, CircleShape),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = stop.typeId,
-                    tint = Color.White,
-                    modifier = Modifier.size(22.dp)
-                )
-            }
+            NearbyStopBadgeIcon(
+                typeId = stop.typeId,
+                badgeColor = badgeColor
+            )
             Spacer(modifier = Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
@@ -172,24 +176,106 @@ private fun NearbyStopItemCard(
                     style = MaterialTheme.typography.bodyMedium.copy(
                         fontWeight = FontWeight.Bold,
                         color = Color(0xFF111827)
-                    )
+                    ),
+                    maxLines = 2,
                 )
                 if (stop.routesOrInfo.isNotBlank()) {
+                    Spacer(modifier = Modifier.height(2.dp))
                     Text(
                         text = stop.routesOrInfo,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = Color(0xFF4B5563)
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color(0xFF6B7280),
+                        maxLines = 1,
                     )
                 }
             }
             Spacer(modifier = Modifier.width(8.dp))
-            Text(
-                text = formattedDistance,
-                style = MaterialTheme.typography.labelMedium.copy(
-                    fontWeight = FontWeight.SemiBold,
-                    color = badgeColor
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = formattedDistance,
+                    style = MaterialTheme.typography.labelMedium.copy(
+                        fontWeight = FontWeight.Bold,
+                        color = badgeColor
+                    )
                 )
-            )
+                Spacer(modifier = Modifier.width(4.dp))
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                    contentDescription = null,
+                    tint = Color(0xFF9CA3AF),
+                    modifier = Modifier.size(18.dp),
+                )
+            }
         }
     }
 }
+
+@Composable
+private fun NearbyStopBadgeIcon(
+    typeId: String,
+    badgeColor: Color,
+    modifier: Modifier = Modifier,
+) {
+    when (typeId.uppercase()) {
+        TransitMode.BUS.name -> {
+            Image(
+                painter = painterResource(id = R.drawable.ic_bus_stop),
+                contentDescription = "Trạm xe buýt",
+                modifier = modifier.size(36.dp)
+            )
+        }
+        TransitMode.SUBWAY.name, "METRO" -> {
+            Image(
+                painter = painterResource(id = R.drawable.ic_metro_station),
+                contentDescription = "Ga tàu điện ngầm",
+                modifier = modifier.size(36.dp)
+            )
+        }
+        TravelMode.BICYCLE_RENT.name, TravelMode.BICYCLE.name, "BIKE" -> {
+            Box(
+                modifier = modifier
+                    .size(36.dp)
+                    .background(badgeColor, CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.DirectionsBike,
+                    contentDescription = "Trạm xe đạp",
+                    tint = Color.White,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+        }
+        TransitMode.RAIL.name, "TRAIN" -> {
+            Box(
+                modifier = modifier
+                    .size(36.dp)
+                    .background(badgeColor, CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Train,
+                    contentDescription = "Trạm tàu hỏa",
+                    tint = Color.White,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+        }
+        else -> {
+            Box(
+                modifier = modifier
+                    .size(36.dp)
+                    .background(badgeColor, CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.DirectionsTransit,
+                    contentDescription = typeId,
+                    tint = Color.White,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+        }
+    }
+}
+
