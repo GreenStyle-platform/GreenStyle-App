@@ -4,6 +4,7 @@ package com.vie.mit.mapbox.composable
 
 import android.Manifest
 import android.content.pm.PackageManager
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.offset
@@ -52,7 +53,9 @@ import com.vie.mit.mapbox.model.TransitTypeConfig
 import com.vie.mit.mapbox.model.distanceTo
 import com.vie.mit.mapbox.model.toLocationData
 import com.vie.mit.mapbox.permission.MapPermissionHandler
+import com.vie.mit.mapbox.util.MapPlaceholderBackgroundColor
 import com.vie.mit.mapbox.util.createZoomScaled2DPuck
+import com.vie.mit.mapbox.util.rememberTextureMapInitOptions
 import kotlinx.coroutines.awaitCancellation
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.math.abs
@@ -133,9 +136,16 @@ fun TransitStopsMapScreen(
         )
     }
 
-    Box(modifier = modifier.fillMaxSize()) {
+    val mapInitOptions = rememberTextureMapInitOptions("transit_stops_map")
+
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .background(MapPlaceholderBackgroundColor)
+    ) {
         MapboxMap(
             modifier = Modifier.fillMaxSize(),
+            composeMapInitOptions = mapInitOptions,
             mapViewportState = mapViewportState,
         ) {
             // Thiết lập giới hạn Zoom (minZoom, maxZoom)

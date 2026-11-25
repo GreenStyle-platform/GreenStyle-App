@@ -79,7 +79,27 @@ fun HomeContainerScreen(
     modifier: Modifier = Modifier,
 ) {
     val uiState by homeContainerViewModel.uiState.collectAsStateWithLifecycle()
-    val mapViewportState = rememberMapViewportState()
+    val savedViewport = remember(homeContainerViewModel) {
+        homeContainerViewModel.getSavedCameraViewport()
+    }
+    val mapViewportState = rememberMapViewportState {
+        if (savedViewport != null) {
+            setCameraOptions {
+                center(Point.fromLngLat(savedViewport.centerLongitude, savedViewport.centerLatitude))
+                zoom(savedViewport.zoom)
+                pitch(0.0)
+            }
+        } else {
+            val fallbackLocation = homeContainerViewModel.getLastKnownLocation()
+            if (fallbackLocation != null) {
+                setCameraOptions {
+                    center(Point.fromLngLat(fallbackLocation.longitude, fallbackLocation.latitude))
+                    zoom(14.5)
+                    pitch(0.0)
+                }
+            }
+        }
+    }
     val sheetNavController = rememberNavController()
     val bottomSheetState = rememberCustomBottomSheetState()
 
@@ -103,7 +123,11 @@ fun HomeContainerScreen(
                 partiallyExpandedRatio = 0.65f,
                 expandedRatio = 1f,
             )
-            else -> BottomSheetConfig()
+            else -> BottomSheetConfig(
+                peekedRatio = 0.20f,
+                partiallyExpandedRatio = 0.65f,
+                expandedRatio = 0.90f,
+            )
         }
     }
     val isNearbySheetActive = remember(currentDestination) {

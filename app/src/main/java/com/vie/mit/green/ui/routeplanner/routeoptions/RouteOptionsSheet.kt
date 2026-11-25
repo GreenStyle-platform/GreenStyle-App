@@ -1,10 +1,12 @@
 package com.vie.mit.green.ui.routeplanner.routeoptions
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -15,6 +17,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -25,14 +28,18 @@ import androidx.compose.material.icons.automirrored.filled.DirectionsWalk
 import androidx.compose.material.icons.filled.DirectionsBus
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Train
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -45,103 +52,51 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.vie.mit.common.theme.AppTheme
+import com.vie.mit.data.model.domain.map.RouteOption
+import com.vie.mit.data.model.domain.map.RouteOptionTransportType
+import com.vie.mit.green.ui.routeplanner.container.LocationPickerField
 import com.vie.mit.green.ui.routeplanner.container.RoutePlannerContainerViewModel
 import com.vie.mit.mapbox.model.distanceTo
-
-data class RouteOptionItem(
-    val id: String,
-    val title: String,
-    val description: String,
-    val durationMinutes: Int,
-    val costVnd: Int,
-    val walkDistanceMeters: Int,
-    val icon: ImageVector,
-    val iconColor: Color,
-    val tags: List<String> = emptyList(),
-)
+import java.util.Locale
 
 /**
  * RouteOptionsSheet: Nội dung Bottom Sheet thứ hai trong RoutePlanner.
- * Hiển thị danh sách các phương án di chuyển giữa điểm xuất phát và điểm đích đã chọn.
+ * Hiển thị danh sách các phương án di chuyển giữa điểm xuất phát và điểm đích từ ViewModel / Backend.
  */
 @Composable
 fun RouteOptionsSheet(
     containerViewModel: RoutePlannerContainerViewModel,
-    onBackToPicker: () -> Unit,
+    onBackToPicker: (fieldToFocus: LocationPickerField?) -> Unit,
     modifier: Modifier = Modifier,
-    onOptionSelected: (RouteOptionItem) -> Unit = {},
+    onOptionSelected: (RouteOption) -> Unit = {},
 ) {
     val uiState by containerViewModel.uiState.collectAsStateWithLifecycle()
     val selectedFilter = uiState.selectedRouteFilter
 
-    // Khoảng cách đường thẳng ước tính
+    // Đảm bảo dữ liệu được tải nếu chưa có khi mở trực tiếp sheet
+    LaunchedEffect(uiState.startPoint, uiState.endPoint) {
+        if (uiState.hasValidRoute && uiState.routeOptions.isEmpty() && !uiState.isLoadingRoutes) {
+            containerViewModel.loadRouteOptions()
+        }
+    }
+
     val directDistanceKm = remember(uiState.startPoint, uiState.endPoint) {
         val start = uiState.startPoint
         val end = uiState.endPoint
         if (start != null && end != null) {
-            String.format("%.1f km", start.distanceTo(end) / 1000.0)
+            String.format(Locale.US, "%.1f km", start.distanceTo(end) / 1000.0)
         } else {
-            "-- km"
+            null
         }
     }
 
-    // Danh sách mẫu các options di chuyển
-    val options = remember(uiState.startAddress, uiState.endAddress) {
-        listOf(
-            RouteOptionItem(
-                id = "opt_bus_fast",
-                title = "Xe buýt tuyến 01",
-                description = "Bến Thành ➔ Chợ Lớn • Chuyến kế tiếp trong 5 phút",
-                durationMinutes = 28,
-                costVnd = 7000,
-                walkDistanceMeters = 250,
-                icon = Icons.Default.DirectionsBus,
-                iconColor = Color(0xFF10B981),
-                tags = listOf("Nhanh nhất", "Tiết kiệm"),
-            ),
-            RouteOptionItem(
-                id = "opt_metro_1",
-                title = "Tàu điện Metro Tuyến 1",
-                description = "Ga Bến Thành ➔ Ga Nhà hát Thành phố",
-                durationMinutes = 18,
-                costVnd = 12000,
-                walkDistanceMeters = 400,
-                icon = Icons.Default.Train,
-                iconColor = Color(0xFF3B82F6),
-                tags = listOf("Đúng giờ", "Tránh kẹt xe"),
-            ),
-            RouteOptionItem(
-                id = "opt_bike",
-                title = "Xe đạp công cộng TNGo",
-                description = "Thuê tại trạm gần nhất • Tuyến đường ven sông",
-                durationMinutes = 25,
-                costVnd = 10000,
-                walkDistanceMeters = 100,
-                icon = Icons.AutoMirrored.Filled.DirectionsBike,
-                iconColor = Color(0xFFF59E0B),
-                tags = listOf("Thân thiện môi trường"),
-            ),
-            RouteOptionItem(
-                id = "opt_walk",
-                title = "Đi bộ",
-                description = "Tuyến đường đi bộ an toàn có vỉa hè",
-                durationMinutes = 48,
-                costVnd = 0,
-                walkDistanceMeters = 3200,
-                icon = Icons.AutoMirrored.Filled.DirectionsWalk,
-                iconColor = Color(0xFF6B7280),
-                tags = listOf("Tập luyện"),
-            ),
-        )
-    }
-
-    val filteredOptions = remember(selectedFilter, options) {
+    val filteredOptions = remember(selectedFilter, uiState.routeOptions) {
         when (selectedFilter) {
-            "Xe buýt" -> options.filter { it.icon == Icons.Default.DirectionsBus }
-            "Tàu điện" -> options.filter { it.icon == Icons.Default.Train }
-            "Xe đạp" -> options.filter { it.icon == Icons.AutoMirrored.Filled.DirectionsBike }
-            "Đi bộ" -> options.filter { it.icon == Icons.AutoMirrored.Filled.DirectionsWalk }
-            else -> options
+            "Xe buýt" -> uiState.routeOptions.filter { it.transportType == RouteOptionTransportType.BUS }
+            "Tàu điện" -> uiState.routeOptions.filter { it.transportType == RouteOptionTransportType.SUBWAY }
+            "Xe đạp" -> uiState.routeOptions.filter { it.transportType == RouteOptionTransportType.BIKE }
+            "Đi bộ" -> uiState.routeOptions.filter { it.transportType == RouteOptionTransportType.WALK }
+            else -> uiState.routeOptions
         }
     }
 
@@ -155,19 +110,19 @@ fun RouteOptionsSheet(
         Box(
             modifier = Modifier
                 .align(Alignment.CenterHorizontally)
-                .padding(vertical = 6.dp)
+                .padding(vertical = 4.dp)
                 .size(width = 40.dp, height = 4.dp)
-                .background(Color.White.copy(alpha = 0.4f), RoundedCornerShape(2.dp))
+                .background(Color.White.copy(alpha = 0.45f), RoundedCornerShape(2.dp)),
         )
 
-        // Header: Nút Back + Tiêu đề
+        // Header: Nút Back + Tiêu đề + Khoảng cách ước tính
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(vertical = 4.dp),
+                .padding(vertical = 2.dp),
         ) {
-            IconButton(onClick = onBackToPicker) {
+            IconButton(onClick = { onBackToPicker(null) }) {
                 Icon(
                     imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                     contentDescription = "Quay lại chỉnh sửa điểm",
@@ -182,10 +137,20 @@ fun RouteOptionsSheet(
                     color = Color.White,
                     fontSize = 18.sp,
                 ),
+                modifier = Modifier.weight(1f),
             )
+            if (directDistanceKm != null) {
+                Text(
+                    text = directDistanceKm,
+                    style = AppTheme.typography.bodySmall.copy(
+                        color = Color.White.copy(alpha = 0.85f),
+                        fontWeight = FontWeight.SemiBold,
+                    ),
+                )
+            }
         }
 
-        // Tóm tắt Lộ trình Điểm xuất phát ➔ Điểm đích
+        // Tóm tắt Lộ trình Điểm xuất phát ➔ Điểm đích (nhấn vào từng dòng để sửa nhanh)
         Card(
             shape = RoundedCornerShape(16.dp),
             colors = CardDefaults.cardColors(containerColor = Color.White),
@@ -199,11 +164,16 @@ fun RouteOptionsSheet(
                     .padding(14.dp),
             ) {
                 Column(modifier = Modifier.weight(1f)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onBackToPicker(LocationPickerField.START) },
+                    ) {
                         Box(
                             modifier = Modifier
                                 .size(8.dp)
-                                .background(Color(0xFF10B981), CircleShape)
+                                .background(Color(0xFF10B981), CircleShape),
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
@@ -219,11 +189,16 @@ fun RouteOptionsSheet(
 
                     Spacer(modifier = Modifier.height(8.dp))
 
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onBackToPicker(LocationPickerField.END) },
+                    ) {
                         Box(
                             modifier = Modifier
                                 .size(8.dp)
-                                .background(Color(0xFFEF4444), CircleShape)
+                                .background(Color(0xFFEF4444), CircleShape),
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
@@ -238,7 +213,7 @@ fun RouteOptionsSheet(
                     }
                 }
 
-                IconButton(onClick = onBackToPicker) {
+                IconButton(onClick = { onBackToPicker(null) }) {
                     Icon(
                         imageVector = Icons.Default.Edit,
                         contentDescription = "Chỉnh sửa",
@@ -251,13 +226,13 @@ fun RouteOptionsSheet(
 
         Spacer(modifier = Modifier.height(10.dp))
 
-        // Filter chips row
-        val filters = listOf("Tất cả", "Xe buýt", "Tàu điện", "Xe đạp", "Đi bộ")
-        Row(
+        // Filter chips row (cuộn ngang được cho mọi kích thước màn hình)
+        val filters = remember { listOf("Tất cả", "Xe buýt", "Tàu điện", "Xe đạp", "Đi bộ") }
+        LazyRow(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             modifier = Modifier.fillMaxWidth(),
         ) {
-            filters.forEach { filter ->
+            items(filters) { filter ->
                 val isSelected = selectedFilter == filter
                 FilterChip(
                     selected = isSelected,
@@ -283,36 +258,112 @@ fun RouteOptionsSheet(
 
         Spacer(modifier = Modifier.height(10.dp))
 
-        // Danh sách các phương án di chuyển
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            items(
-                items = filteredOptions,
-                key = { it.id },
-            ) { option ->
-                RouteOptionCard(
-                    option = option,
-                    onClick = { onOptionSelected(option) },
-                )
+        // Danh sách các phương án di chuyển (Loading / Error / Empty / Content)
+        when {
+            uiState.isLoadingRoutes -> {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    CircularProgressIndicator(
+                        color = Color.White,
+                        modifier = Modifier.size(32.dp),
+                    )
+                }
+            }
+
+            uiState.routeOptionsError != null -> {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f),
+                ) {
+                    Text(
+                        text = uiState.routeOptionsError ?: "Đã có lỗi xảy ra",
+                        style = AppTheme.typography.bodyMedium.copy(color = Color.White),
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Button(
+                        onClick = containerViewModel::loadRouteOptions,
+                        colors = ButtonDefaults.buttonColors(containerColor = Color.White),
+                    ) {
+                        Text(
+                            text = "Thử lại",
+                            color = AppTheme.colors.navyBlue,
+                            fontWeight = FontWeight.Bold,
+                        )
+                    }
+                }
+            }
+
+            filteredOptions.isEmpty() -> {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = "Không có phương án di chuyển phù hợp.",
+                        style = AppTheme.typography.bodyMedium.copy(color = Color.White),
+                    )
+                }
+            }
+
+            else -> {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f),
+                    contentPadding = PaddingValues(bottom = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    items(
+                        items = filteredOptions,
+                        key = { it.id },
+                    ) { option ->
+                        RouteOptionCard(
+                            option = option,
+                            isSelected = uiState.selectedRouteOptionId == option.id,
+                            onClick = {
+                                containerViewModel.onSelectRouteOption(option.id)
+                                onOptionSelected(option)
+                            },
+                        )
+                    }
+                }
             }
         }
     }
 }
 
+private fun RouteOptionTransportType.toIconAndColor(): Pair<ImageVector, Color> = when (this) {
+    RouteOptionTransportType.BUS -> Icons.Default.DirectionsBus to Color(0xFF10B981)
+    RouteOptionTransportType.SUBWAY -> Icons.Default.Train to Color(0xFF3B82F6)
+    RouteOptionTransportType.BIKE -> Icons.AutoMirrored.Filled.DirectionsBike to Color(0xFFF59E0B)
+    RouteOptionTransportType.WALK -> Icons.AutoMirrored.Filled.DirectionsWalk to Color(0xFF6B7280)
+}
+
 @Composable
 private fun RouteOptionCard(
-    option: RouteOptionItem,
+    option: RouteOption,
+    isSelected: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val (icon, iconColor) = remember(option.transportType) {
+        option.transportType.toIconAndColor()
+    }
+
     Card(
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        border = if (isSelected) BorderStroke(2.dp, AppTheme.colors.navyBlue) else null,
+        elevation = CardDefaults.cardElevation(defaultElevation = if (isSelected) 4.dp else 2.dp),
         modifier = modifier
             .fillMaxWidth()
             .clickable(onClick = onClick),
@@ -326,17 +377,16 @@ private fun RouteOptionCard(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                // Icon phương tiện
                 Box(
                     modifier = Modifier
                         .size(40.dp)
-                        .background(option.iconColor.copy(alpha = 0.12f), CircleShape),
+                        .background(iconColor.copy(alpha = 0.12f), CircleShape),
                     contentAlignment = Alignment.Center,
                 ) {
                     Icon(
-                        imageVector = option.icon,
+                        imageVector = icon,
                         contentDescription = null,
-                        tint = option.iconColor,
+                        tint = iconColor,
                         modifier = Modifier.size(24.dp),
                     )
                 }
@@ -361,7 +411,6 @@ private fun RouteOptionCard(
                     )
                 }
 
-                // Thời gian ước tính nổi bật
                 Column(horizontalAlignment = Alignment.End) {
                     Text(
                         text = "${option.durationMinutes} phút",
@@ -372,7 +421,7 @@ private fun RouteOptionCard(
                     )
                     if (option.costVnd > 0) {
                         Text(
-                            text = "${String.format("%,d", option.costVnd)} đ",
+                            text = "${String.format(Locale.US, "%,d", option.costVnd)} đ",
                             style = AppTheme.typography.bodySmall.copy(
                                 color = Color(0xFF10B981),
                                 fontWeight = FontWeight.SemiBold,
@@ -389,7 +438,6 @@ private fun RouteOptionCard(
                 }
             }
 
-            // Tags (ví dụ: Nhanh nhất, Đúng giờ)
             if (option.tags.isNotEmpty()) {
                 Spacer(modifier = Modifier.height(8.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {

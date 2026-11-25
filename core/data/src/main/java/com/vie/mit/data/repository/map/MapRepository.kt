@@ -1,5 +1,9 @@
 package com.vie.mit.data.repository.map
 
+import android.content.Context
+import android.location.Address
+import android.location.Geocoder
+import android.os.Build
 import androidx.paging.Pager
 import androidx.paging.PagingConfig
 import androidx.paging.PagingData
@@ -10,6 +14,8 @@ import com.vie.mit.data.model.domain.map.AutosuggestPlace
 import com.vie.mit.data.model.domain.map.BusRoute
 import com.vie.mit.data.model.domain.map.Location
 import com.vie.mit.data.model.domain.map.PublicTransportSuggestion
+import com.vie.mit.data.model.domain.map.RouteOption
+import com.vie.mit.data.model.domain.map.RouteOptionTransportType
 import com.vie.mit.data.model.domain.map.RouteTrip
 import com.vie.mit.data.model.domain.map.ShapePoint
 import com.vie.mit.data.model.domain.map.StopArrival
@@ -28,6 +34,7 @@ import com.vie.mit.data.network.api.map.MapApi
 import com.vie.mit.data.network.util.handleApiCall
 import com.vie.mit.data.paging.BusRoutePagingSource
 import com.vie.mit.mapbox.model.TransitTypeConfig
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
@@ -35,6 +42,7 @@ import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.supervisorScope
+import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.add
 import kotlinx.serialization.json.addJsonObject
@@ -43,13 +51,24 @@ import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
 import kotlinx.serialization.json.putJsonObject
 import timber.log.Timber
+import java.util.Locale
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlin.coroutines.resume
 
 @Singleton
-class MapRepository @Inject constructor(
+class MapRepository(
     private val mapApi: MapApi,
 ) {
+    private var appContext: Context? = null
+
+    @Inject
+    constructor(
+        mapApi: MapApi,
+        @ApplicationContext context: Context,
+    ) : this(mapApi) {
+        this.appContext = context.applicationContext
+    }
     val defaultConfigs: List<TransitTypeConfig> = listOf(
         TransitMode.BUS.toTransitTypeConfig(iconSize = 1.0),
         TransitMode.SUBWAY.toTransitTypeConfig(iconSize = 1.0),
@@ -101,6 +120,158 @@ class MapRepository @Inject constructor(
                 longitudeIn = longitude,
             )
         ).items.map { it.toDomain() }
+    }
+
+    /**
+     * Reverse geocodes map coordinates into a human-readable address label using Android [Geocoder]
+     * with a graceful coordinate fallback when unavailable or offline.
+     *
+     * TODO: Prefer backend HERE reverse-geocode endpoint when available.
+     */
+    suspend fun reverseGeocode(
+        latitude: Double,
+        longitude: Double,
+    ): Result<String> = withContext(Dispatchers.IO) {
+        val fallback = "Vị trí đã chọn (${
+            String.format(Locale.US, "%.4f, %.4f", latitude, longitude)
+        })"
+        val context = appContext
+        if (context == null || !Geocoder.isPresent()) {
+            return@withContext Result.success(fallback)
+        }
+
+        try {
+            val geocoder = Geocoder(context, Locale.forLanguageTag("vi-VN"))
+            val address = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                suspendCancellableCoroutine<Address?> { continuation ->
+                    geocoder.getFromLocation(
+                        latitude,
+                        longitude,
+                        1,
+                        object : Geocoder.GeocodeListener {
+                            override fun onGeocode(addresses: MutableList<Address>) {
+                                if (continuation.isActive) {
+                                    continuation.resume(addresses.firstOrNull())
+                                }
+                            }
+
+                            override fun onError(errorMessage: String?) {
+                                if (continuation.isActive) {
+                                    continuation.resume(null)
+                                }
+                            }
+                        },
+                    )
+                }
+            } else {
+                @Suppress("DEPRECATION")
+                geocoder.getFromLocation(latitude, longitude, 1)?.firstOrNull()
+            }
+
+            val label = address?.toDisplayLabel()
+            Result.success(if (!label.isNullOrBlank()) label else fallback)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Timber.w(e, "Reverse geocode failed for ($latitude, $longitude), using coordinate fallback")
+            Result.success(fallback)
+        }
+    }
+
+    private fun Address.toDisplayLabel(): String? {
+        val line = getAddressLine(0)?.trim()
+        if (!line.isNullOrBlank()) return line
+        val parts = listOfNotNull(
+            featureName?.takeIf { it.isNotBlank() },
+            thoroughfare?.takeIf { it.isNotBlank() },
+            subLocality?.takeIf { it.isNotBlank() },
+            locality?.takeIf { it.isNotBlank() },
+            adminArea?.takeIf { it.isNotBlank() },
+        ).distinct()
+        return parts.joinToString(", ").takeIf { it.isNotBlank() }
+    }
+
+    /**
+     * Fetches multimodal route options between Start and End coordinates.
+     *
+     * TODO: Replace mock implementation with real backend route-planning API when available.
+     */
+    suspend fun getRouteOptions(
+        startLat: Double,
+        startLng: Double,
+        endLat: Double,
+        endLng: Double,
+    ): Result<List<RouteOption>> {
+        val distanceKm = estimateDistanceKm(startLat, startLng, endLat, endLng)
+        val busMinutes = (distanceKm * 4.2 + 8).toInt().coerceIn(10, 120)
+        val metroMinutes = (distanceKm * 2.5 + 6).toInt().coerceIn(8, 90)
+        val bikeMinutes = (distanceKm * 4.0 + 4).toInt().coerceIn(6, 120)
+        val walkMinutes = (distanceKm * 12.0).toInt().coerceIn(5, 180)
+        val walkMeters = (distanceKm * 1000).toInt().coerceAtLeast(150)
+
+        return Result.success(
+            listOf(
+                RouteOption(
+                    id = "opt_bus_fast",
+                    title = "Xe buýt tuyến 01",
+                    description = "Đi bộ 250m • Chuyến kế tiếp trong 5 phút",
+                    durationMinutes = busMinutes,
+                    costVnd = 7000,
+                    walkDistanceMeters = 250,
+                    transportType = RouteOptionTransportType.BUS,
+                    tags = listOf("Nhanh nhất", "Tiết kiệm"),
+                ),
+                RouteOption(
+                    id = "opt_metro_1",
+                    title = "Tàu điện Metro Tuyến 1",
+                    description = "Chuyển tuyến 1 lần • Giãn cách 8 phút",
+                    durationMinutes = metroMinutes,
+                    costVnd = 12000,
+                    walkDistanceMeters = 400,
+                    transportType = RouteOptionTransportType.SUBWAY,
+                    tags = listOf("Đúng giờ", "Tránh kẹt xe"),
+                ),
+                RouteOption(
+                    id = "opt_bike",
+                    title = "Xe đạp công cộng TNGo",
+                    description = "Thuê tại trạm gần nhất • Tuyến đường thoáng",
+                    durationMinutes = bikeMinutes,
+                    costVnd = 10000,
+                    walkDistanceMeters = 100,
+                    transportType = RouteOptionTransportType.BIKE,
+                    tags = listOf("Thân thiện môi trường"),
+                ),
+                RouteOption(
+                    id = "opt_walk",
+                    title = "Đi bộ",
+                    description = "Tuyến đường đi bộ an toàn có vỉa hè",
+                    durationMinutes = walkMinutes,
+                    costVnd = 0,
+                    walkDistanceMeters = walkMeters,
+                    transportType = RouteOptionTransportType.WALK,
+                    tags = listOf("Tập luyện"),
+                ),
+            ),
+        )
+    }
+
+    private fun estimateDistanceKm(
+        lat1: Double,
+        lng1: Double,
+        lat2: Double,
+        lng2: Double,
+    ): Double {
+        val earthRadiusKm = 6371.0
+        val dLat = Math.toRadians(lat2 - lat1)
+        val dLng = Math.toRadians(lng2 - lng1)
+        val sinLat = kotlin.math.sin(dLat / 2)
+        val sinLng = kotlin.math.sin(dLng / 2)
+        val a = sinLat * sinLat +
+            kotlin.math.cos(Math.toRadians(lat1)) *
+            kotlin.math.cos(Math.toRadians(lat2)) *
+            sinLng * sinLng
+        val c = 2 * kotlin.math.atan2(kotlin.math.sqrt(a), kotlin.math.sqrt(1 - a))
+        return (earthRadiusKm * c).coerceAtLeast(0.5)
     }
 
     /**

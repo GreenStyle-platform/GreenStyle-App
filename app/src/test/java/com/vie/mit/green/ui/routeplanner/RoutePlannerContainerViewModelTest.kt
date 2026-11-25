@@ -230,6 +230,185 @@ class RoutePlannerContainerViewModelTest {
             scope.cancel()
         }
     }
+
+    @Test
+    fun onLocationUpdated_initialFix_autoFillsStartAndFocusesEnd() = runBlocking {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
+        try {
+            val viewModel = RoutePlannerContainerViewModel(
+                appNavigator = FakeAppNavigator(),
+                mapRepository = MapRepository(FakeMapApi()),
+                customScope = scope,
+                searchDebounceMs = 20L,
+            )
+
+            val gpsLocation = LocationData(latitude = 10.7755, longitude = 106.7011)
+            viewModel.onLocationUpdated(gpsLocation)
+
+            val state = viewModel.uiState.value
+            assertEquals(gpsLocation, state.currentLocation)
+            assertEquals(gpsLocation, state.startPoint)
+            assertEquals(RoutePlannerContainerViewModel.CURRENT_LOCATION_LABEL, state.startAddress)
+            assertEquals(RoutePlannerContainerViewModel.CURRENT_LOCATION_LABEL, state.startQuery)
+            assertEquals(LocationPickerField.END, state.focusedField)
+        } finally {
+            scope.cancel()
+        }
+    }
+
+    @Test
+    fun loadRouteOptions_returnsMockOptionsAndSelectsFirst() = runBlocking {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
+        try {
+            val viewModel = RoutePlannerContainerViewModel(
+                appNavigator = FakeAppNavigator(),
+                mapRepository = MapRepository(FakeMapApi()),
+                customScope = scope,
+                searchDebounceMs = 20L,
+            )
+
+            viewModel.updateStartLocation(LocationData(10.7725, 106.6980), "Chợ Bến Thành")
+            viewModel.updateEndLocation(LocationData(10.7769, 106.7009), "Nhà thờ Đức Bà")
+            viewModel.loadRouteOptions()
+
+            val state = viewModel.uiState.value
+            assertFalse(state.isLoadingRoutes)
+            assertNull(state.routeOptionsError)
+            assertTrue(state.routeOptions.isNotEmpty())
+            assertEquals(state.routeOptions.first().id, state.selectedRouteOptionId)
+        } finally {
+            scope.cancel()
+        }
+    }
+
+    @Test
+    fun mapDrag_whenStartFocused_updatesStartLocationLiveAndKeepsStartFocus() = runBlocking {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
+        try {
+            val viewModel = RoutePlannerContainerViewModel(
+                appNavigator = FakeAppNavigator(),
+                mapRepository = MapRepository(FakeMapApi()),
+                customScope = scope,
+                searchDebounceMs = 20L,
+                reverseGeocodeDebounceMs = 30L,
+            )
+
+            viewModel.setFocusedField(LocationPickerField.START)
+            viewModel.onMapMoveStateChanged(true)
+            viewModel.onMapCameraMoved(10.77123, 106.69876)
+
+            val draggingState = viewModel.uiState.value
+            assertTrue(draggingState.isMapMoving)
+            assertEquals(LocationData(10.77123, 106.69876), draggingState.startPoint)
+            assertEquals("10.77123, 106.69876", draggingState.startQuery)
+            assertEquals(LocationPickerField.START, draggingState.focusedField)
+
+            viewModel.onMapMoveStateChanged(false)
+            viewModel.onMapCameraIdle(10.77123, 106.69876)
+            delay(80L)
+
+            val settledState = viewModel.uiState.value
+            assertFalse(settledState.isMapMoving)
+            assertEquals(LocationData(10.77123, 106.69876), settledState.startPoint)
+            assertEquals("Vị trí đã chọn (10.7712, 106.6988)", settledState.startAddress)
+            assertEquals(settledState.startAddress, settledState.startQuery)
+            assertEquals(LocationPickerField.START, settledState.focusedField)
+        } finally {
+            scope.cancel()
+        }
+    }
+
+    @Test
+    fun mapDrag_whenEndFocused_resolvesAfterMoveEndDebounceEvenWithoutIdle() = runBlocking {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
+        try {
+            val viewModel = RoutePlannerContainerViewModel(
+                appNavigator = FakeAppNavigator(),
+                mapRepository = MapRepository(FakeMapApi()),
+                customScope = scope,
+                searchDebounceMs = 20L,
+                reverseGeocodeDebounceMs = 30L,
+            )
+
+            viewModel.updateStartLocation(LocationData(10.7725, 106.6980), "Chợ Bến Thành")
+            assertEquals(LocationPickerField.END, viewModel.uiState.value.focusedField)
+
+            viewModel.onMapMoveStateChanged(true)
+            viewModel.onMapCameraMoved(10.78500, 106.70500)
+            viewModel.onMapMoveStateChanged(false)
+            delay(100L)
+
+            val state = viewModel.uiState.value
+            assertEquals(LocationData(10.78500, 106.70500), state.endPoint)
+            assertEquals("Vị trí đã chọn (10.7850, 106.7050)", state.endAddress)
+            assertEquals(state.endAddress, state.endQuery)
+            assertTrue(state.hasValidRoute)
+            assertEquals(LocationPickerField.END, state.focusedField)
+        } finally {
+            scope.cancel()
+        }
+    }
+
+    @Test
+    fun programmaticCameraMove_doesNotOverwriteSelectedLocation() = runBlocking {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
+        try {
+            val viewModel = RoutePlannerContainerViewModel(
+                appNavigator = FakeAppNavigator(),
+                mapRepository = MapRepository(FakeMapApi()),
+                customScope = scope,
+                searchDebounceMs = 20L,
+                reverseGeocodeDebounceMs = 20L,
+            )
+
+            val expectedStart = LocationData(10.7725, 106.6980)
+            viewModel.updateStartLocation(expectedStart, "Chợ Bến Thành")
+            viewModel.setFocusedField(LocationPickerField.START)
+
+            // Camera moves without user drag gesture (e.g., flyTo or bottom sheet padding)
+            viewModel.onMapCameraMoved(10.8000, 106.7500)
+            viewModel.onMapCameraIdle(10.8000, 106.7500)
+            delay(80L)
+
+            val state = viewModel.uiState.value
+            assertEquals(LocationData(10.8000, 106.7500), state.mapCenter)
+            assertEquals(expectedStart, state.startPoint)
+            assertEquals("Chợ Bến Thành", state.startAddress)
+            assertEquals("Chợ Bến Thành", state.startQuery)
+        } finally {
+            scope.cancel()
+        }
+    }
+
+    @Test
+    fun mapDrag_flingAfterMoveEnd_usesFinalIdleCoordinates() = runBlocking {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
+        try {
+            val viewModel = RoutePlannerContainerViewModel(
+                appNavigator = FakeAppNavigator(),
+                mapRepository = MapRepository(FakeMapApi()),
+                customScope = scope,
+                searchDebounceMs = 20L,
+                reverseGeocodeDebounceMs = 80L,
+            )
+
+            viewModel.setFocusedField(LocationPickerField.START)
+            viewModel.onMapMoveStateChanged(true)
+            viewModel.onMapCameraMoved(10.7700, 106.6900)
+            viewModel.onMapMoveStateChanged(false)
+            // Fling continues after finger lifts
+            viewModel.onMapCameraMoved(10.7750, 106.6950)
+            viewModel.onMapCameraIdle(10.7780, 106.6980)
+            delay(80L)
+
+            val state = viewModel.uiState.value
+            assertEquals(LocationData(10.7780, 106.6980), state.startPoint)
+            assertEquals("Vị trí đã chọn (10.7780, 106.6980)", state.startAddress)
+            assertEquals(state.startAddress, state.startQuery)
+        } finally {
+            scope.cancel()
+        }
+    }
 }
 
 private class FakeAppNavigator : AppNavigator {

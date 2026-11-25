@@ -4,6 +4,7 @@ package com.vie.mit.mapbox.composable
 
 import android.Manifest
 import android.content.pm.PackageManager
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
@@ -43,7 +44,9 @@ import com.vie.mit.common.theme.AppTheme
 import com.vie.mit.mapbox.model.ShapePoint
 import com.vie.mit.mapbox.model.TransitStopMarker
 import com.vie.mit.mapbox.permission.MapPermissionHandler
+import com.vie.mit.mapbox.util.MapPlaceholderBackgroundColor
 import com.vie.mit.mapbox.util.createZoomScaled2DPuck
+import com.vie.mit.mapbox.util.rememberTextureMapInitOptions
 
 private const val ROUTE_PATH_SOURCE_ID = "source_focus_route_path"
 private const val ROUTE_PATH_LAYER_ID = "layer_focus_route_path"
@@ -108,10 +111,17 @@ fun TransitRouteFocusMap(
         )
     }
 
-    Box(modifier = modifier.fillMaxSize()) {
+    val mapInitOptions = rememberTextureMapInitOptions("transit_route_focus_map")
+
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .background(MapPlaceholderBackgroundColor)
+    ) {
         if (showMap) {
             MapboxMap(
                 modifier = Modifier.fillMaxSize(),
+                composeMapInitOptions = mapInitOptions,
                 mapViewportState = mapViewportState,
             ) {
                 // 1. Draw Polyline Path (LineLayer) from Shape Points

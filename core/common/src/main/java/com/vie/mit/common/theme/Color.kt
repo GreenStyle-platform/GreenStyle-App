@@ -24,3 +24,14 @@ val GreenMetroColor = Color(0xFF2C9F00)
 val BlueBikeColor = Color(0xFF148ED0)
 val PurpleRailColor = Color(0xFF8E24AA)
 
+// Route & Location Input colors
+val RouteStartGreen = Color(0xFF10B981)
+val RouteStartHalo = Color(0xFFD1FAE5)
+val RouteStartTextDark = Color(0xFF047857)
+val RouteEndRed = Color(0xFFEF4444)
+val RouteEndHalo = Color(0xFFFFEBEE)
+val InputContainerUnfocused = Color(0xFFF3F4F6)
+val InputBorderUnfocused = Color(0xFFE5E7EB)
+val InputPlaceholderGray = Color(0xFF9CA3AF)
+val RouteConnectorDot = Color(0xFFCBD5E1)
+
