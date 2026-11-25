@@ -1,5 +1,7 @@
 package com.vie.mit.green.navigation.main_graph
 
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -28,7 +30,12 @@ fun NavGraphBuilder.mainGraph() {
     navigation<MainGraph>(
         startDestination = MapContainerRoute
     ) {
-        composable<MapContainerRoute> {
+        composable<MapContainerRoute>(
+            enterTransition = { fadeIn(tween(150)) },
+            exitTransition = { ExitTransition.None },
+            popEnterTransition = { EnterTransition.None },
+            popExitTransition = { fadeOut(tween(150)) },
+        ) {
             HomeContainerScreen(
                 homeContainerViewModel = hiltViewModel<HomeContainerViewModel>(),
             )
@@ -46,7 +53,12 @@ fun NavGraphBuilder.mainGraph() {
             )
         }
 
-        composable<RoutePlannerContainerRoute> {
+        composable<RoutePlannerContainerRoute>(
+            enterTransition = { fadeIn(tween(150)) },
+            exitTransition = { ExitTransition.None },
+            popEnterTransition = { EnterTransition.None },
+            popExitTransition = { fadeOut(tween(150)) },
+        ) {
             RoutePlannerContainerScreen(
                 containerViewModel = hiltViewModel<RoutePlannerContainerViewModel>(),
             )
@@ -66,8 +78,8 @@ fun NavGraphBuilder.mainGraph() {
 
         composable<TransitRouteDetailRoute>(
             enterTransition = { fadeIn(tween(150)) },
-            exitTransition = { fadeOut(tween(150)) },
-            popEnterTransition = { fadeIn(tween(150)) },
+            exitTransition = { ExitTransition.None },
+            popEnterTransition = { EnterTransition.None },
             popExitTransition = { fadeOut(tween(150)) },
         ) {
             TransitRoutePathScreen(
@@ -77,8 +89,8 @@ fun NavGraphBuilder.mainGraph() {
 
         composable<TransitRoutePathRoute>(
             enterTransition = { fadeIn(tween(150)) },
-            exitTransition = { fadeOut(tween(150)) },
-            popEnterTransition = { fadeIn(tween(150)) },
+            exitTransition = { ExitTransition.None },
+            popEnterTransition = { EnterTransition.None },
             popExitTransition = { fadeOut(tween(150)) },
         ) {
             TransitRoutePathScreen(
@@ -88,8 +100,8 @@ fun NavGraphBuilder.mainGraph() {
 
         composable<TransitStopDetailRoute>(
             enterTransition = { fadeIn(tween(150)) },
-            exitTransition = { fadeOut(tween(150)) },
-            popEnterTransition = { fadeIn(tween(150)) },
+            exitTransition = { ExitTransition.None },
+            popEnterTransition = { EnterTransition.None },
             popExitTransition = { fadeOut(tween(150)) },
         ) {
             TransitStopDetailScreen(

@@ -1,6 +1,7 @@
 package com.vie.mit.green.ui.routeplanner.container
 
 import com.vie.mit.data.model.domain.map.AutosuggestPlace
+import com.vie.mit.data.model.domain.map.RouteOption
 import com.vie.mit.mapbox.model.LocationData
 
 /**
@@ -30,6 +31,10 @@ data class RoutePlannerContainerUiState(
     val isLoadingSuggestions: Boolean = false,
     val errorMessage: String? = null,
     val selectedRouteFilter: String = "Tất cả",
+    val routeOptions: List<RouteOption> = emptyList(),
+    val isLoadingRoutes: Boolean = false,
+    val routeOptionsError: String? = null,
+    val selectedRouteOptionId: String? = null,
 ) {
     /**
      * Xác định khi cả điểm xuất phát và điểm đích đều có toạ độ hợp lệ.

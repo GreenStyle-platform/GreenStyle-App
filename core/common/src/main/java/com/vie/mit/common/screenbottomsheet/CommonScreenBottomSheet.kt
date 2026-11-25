@@ -181,7 +181,7 @@ fun CommonScreenBottomSheet(
                     ),
                 shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
                 color = AppTheme.colors.backgroundGreenCard,
-                shadowElevation = 8.dp
+                shadowElevation = if (totalHeightPx > 0f && initState.sheetHeightPx > 0f) 8.dp else 0.dp
             ) {
                 sheetContent()
             }

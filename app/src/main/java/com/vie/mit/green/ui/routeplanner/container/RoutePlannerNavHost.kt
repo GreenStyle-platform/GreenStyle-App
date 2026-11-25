@@ -26,6 +26,9 @@ import com.vie.mit.green.ui.routeplanner.routeoptions.RouteOptionsSheet
 fun RoutePlannerNavHost(
     routePlannerNavController: NavHostController,
     routePlannerContainerViewModel: RoutePlannerContainerViewModel,
+    onSearchFieldClicked: () -> Unit = {},
+    onPickOnMapClicked: () -> Unit = {},
+    onNavigateToRouteOptions: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     NavHost(
@@ -35,32 +38,35 @@ fun RoutePlannerNavHost(
         enterTransition = {
             slideInVertically(
                 initialOffsetY = { fullHeight -> fullHeight / 6 },
-                animationSpec = tween(durationMillis = 220, easing = FastOutSlowInEasing)
+                animationSpec = tween(durationMillis = 220, easing = FastOutSlowInEasing),
             ) + fadeIn(animationSpec = tween(durationMillis = 200))
         },
         exitTransition = {
             slideOutVertically(
                 targetOffsetY = { fullHeight -> fullHeight / 6 },
-                animationSpec = tween(durationMillis = 200, easing = FastOutSlowInEasing)
+                animationSpec = tween(durationMillis = 200, easing = FastOutSlowInEasing),
             ) + fadeOut(animationSpec = tween(durationMillis = 180))
         },
         popEnterTransition = {
             slideInVertically(
                 initialOffsetY = { fullHeight -> fullHeight / 6 },
-                animationSpec = tween(durationMillis = 220, easing = FastOutSlowInEasing)
+                animationSpec = tween(durationMillis = 220, easing = FastOutSlowInEasing),
             ) + fadeIn(animationSpec = tween(durationMillis = 200))
         },
         popExitTransition = {
             slideOutVertically(
                 targetOffsetY = { fullHeight -> fullHeight / 6 },
-                animationSpec = tween(durationMillis = 200, easing = FastOutSlowInEasing)
+                animationSpec = tween(durationMillis = 200, easing = FastOutSlowInEasing),
             ) + fadeOut(animationSpec = tween(durationMillis = 180))
         },
     ) {
         composable<RouteLocationPickerSheetRoute> {
             RouteLocationPickerSheet(
                 containerViewModel = routePlannerContainerViewModel,
+                onSearchFieldClicked = onSearchFieldClicked,
+                onPickOnMapClicked = onPickOnMapClicked,
                 onNavigateToRouteOptions = {
+                    onNavigateToRouteOptions()
                     routePlannerNavController.navigate(RouteOptionsRouteSheet)
                 },
             )
@@ -69,7 +75,10 @@ fun RoutePlannerNavHost(
         composable<RouteOptionsRouteSheet> {
             RouteOptionsSheet(
                 containerViewModel = routePlannerContainerViewModel,
-                onBackToPicker = {
+                onBackToPicker = { fieldToFocus ->
+                    if (fieldToFocus != null) {
+                        routePlannerContainerViewModel.setFocusedField(fieldToFocus)
+                    }
                     routePlannerNavController.popBackStack()
                 },
             )

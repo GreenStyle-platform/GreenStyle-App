@@ -4,6 +4,7 @@ package com.vie.mit.mapbox.composable
 
 import android.Manifest
 import android.content.pm.PackageManager
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
@@ -38,8 +39,10 @@ import com.mapbox.maps.plugin.animation.camera
 import com.mapbox.maps.plugin.locationcomponent.location
 import com.vie.mit.mapbox.model.TransitTypeConfig
 import com.vie.mit.mapbox.permission.MapPermissionHandler
+import com.vie.mit.mapbox.util.MapPlaceholderBackgroundColor
 import com.vie.mit.mapbox.util.bitmapFromDrawableRes
 import com.vie.mit.mapbox.util.createZoomScaled2DPuck
+import com.vie.mit.mapbox.util.rememberTextureMapInitOptions
 import kotlin.math.abs
 
 private const val FOCUS_STOP_SOURCE_ID = "source_focus_stop"
@@ -103,9 +106,16 @@ fun TransitStopFocusMap(
         )
     }
 
-    Box(modifier = modifier.fillMaxSize()) {
+    val mapInitOptions = rememberTextureMapInitOptions("transit_stop_focus_map")
+
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .background(MapPlaceholderBackgroundColor)
+    ) {
         MapboxMap(
             modifier = Modifier.fillMaxSize(),
+            composeMapInitOptions = mapInitOptions,
             mapViewportState = mapViewportState,
         ) {
             // 1. Fly camera to stop location (including current bottom padding)

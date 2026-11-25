@@ -121,6 +121,13 @@ class HomeContainerViewModel @Inject constructor(
     fun getLastKnownLocation(): LocationData? = lastKnownLocation
 
     /**
+     * Returns the last valid map viewport so [HomeContainerScreen] can restore
+     * the exact camera center & zoom immediately when returning from another destination.
+     */
+    fun getSavedCameraViewport(): TransitMapViewportInfo? =
+        currentViewport?.takeIf { it.zoom >= MIN_ZOOM_THRESHOLD }
+
+    /**
      * Updates user location on-demand (e.g. when clicking My Location button),
      * emits a single camera focus event, and recomputes nearby stops if a nearby sheet is visible.
      */

@@ -30,6 +30,15 @@ data class AppColors(
     val metroColor: Color,
     val bikeColor: Color,
     val railColor: Color,
+    val routeStartColor: Color,
+    val routeStartHaloColor: Color,
+    val routeStartTextColor: Color,
+    val routeEndColor: Color,
+    val routeEndHaloColor: Color,
+    val inputContainerUnfocused: Color,
+    val inputBorderUnfocused: Color,
+    val inputPlaceholder: Color,
+    val routeConnectorDot: Color,
 )
 
 fun lightAppColors(): AppColors = AppColors(
@@ -57,5 +66,14 @@ fun lightAppColors(): AppColors = AppColors(
     busColor = BlueBusColor,
     metroColor = GreenMetroColor,
     bikeColor = BlueBikeColor,
-    railColor = PurpleRailColor
+    railColor = PurpleRailColor,
+    routeStartColor = RouteStartGreen,
+    routeStartHaloColor = RouteStartHalo,
+    routeStartTextColor = RouteStartTextDark,
+    routeEndColor = RouteEndRed,
+    routeEndHaloColor = RouteEndHalo,
+    inputContainerUnfocused = InputContainerUnfocused,
+    inputBorderUnfocused = InputBorderUnfocused,
+    inputPlaceholder = InputPlaceholderGray,
+    routeConnectorDot = RouteConnectorDot,
 )
