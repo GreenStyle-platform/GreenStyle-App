@@ -1,5 +1,6 @@
 package com.vie.mit.green.ui.home.container
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -32,6 +33,7 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -63,6 +65,7 @@ import com.vie.mit.green.ui.home.homesheet.StopDetailFloatingCard
 import com.vie.mit.green.ui.home.nearbysubwaystations.SubwaySheetTab
 import com.vie.mit.mapbox.composable.TransitStopsMapScreen
 import com.vie.mit.mapbox.util.focusUserLocationBoundingBox
+import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
 /**
@@ -106,7 +109,12 @@ fun HomeContainerScreen(
     // Cấu hình động BottomSheetConfig cho từng Sheet route bên trong SheetNavHost
     val currentBackStackEntry by sheetNavController.currentBackStackEntryAsState()
     val currentDestination = currentBackStackEntry?.destination
-    var activeSubwayTab by remember { mutableStateOf(SubwaySheetTab.STATIONS) }
+    var activeSubwayTab by rememberSaveable { mutableStateOf(SubwaySheetTab.STATIONS) }
+
+    // Dismiss selected stop floating card on system Back when staying on HomeSheetRoute
+    BackHandler(enabled = uiState.selectedStop != null) {
+        homeContainerViewModel.dismissStopDetail()
+    }
 
     val sheetConfig = remember(currentDestination) {
         when {
@@ -246,6 +254,11 @@ fun HomeContainerScreen(
     // One-shot camera focus events (lần đầu định vị GPS, nút My Location, hoặc chọn trạm không có detail screen)
     LaunchedEffect(homeContainerViewModel) {
         homeContainerViewModel.cameraFocusEvents.collect { command ->
+            if (command.collapseExpandedSheet && bottomSheetState.targetValue == CustomBottomSheetValue.Expanded) {
+                launch {
+                    bottomSheetState.partialExpand()
+                }
+            }
             focusUserLocationBoundingBox(
                 mapViewportState = mapViewportState,
                 location = command.location,
@@ -256,11 +269,15 @@ fun HomeContainerScreen(
         }
     }
 
-    // Memoize callback click vùng trống trên map để mở NearbyTransitStopsSheet từ HomeSheet
-    val onMapClick = remember(sheetNavController, currentDestination) {
+    // Memoize callback click vùng trống trên map: đóng card trạm đang chọn nếu có, ngược lại mở NearbyTransitStopsSheet từ HomeSheet
+    val onMapClick = remember(sheetNavController, currentDestination, uiState.selectedStop) {
         { _: Point ->
-            if (currentDestination?.hasRoute<HomeSheetRoute>() == true) {
-                sheetNavController.navigate(NearbyTransitStopsSheetRoute())
+            if (uiState.selectedStop != null) {
+                homeContainerViewModel.dismissStopDetail()
+            } else if (currentDestination?.hasRoute<HomeSheetRoute>() == true) {
+                sheetNavController.navigate(NearbyTransitStopsSheetRoute()) {
+                    launchSingleTop = true
+                }
             }
         }
     }
@@ -384,10 +401,13 @@ fun HomeContainerScreen(
                             StopDetailFloatingCard(
                                 stop = stop,
                                 onClose = homeContainerViewModel::dismissStopDetail,
-                                onViewDetail = if (stop.typeId.equals(TravelMode.BICYCLE_RENT.name, ignoreCase = true)) {
-                                    null
-                                } else {
+                                onViewDetail = if (
+                                    homeContainerViewModel.canNavigateToStopDetail(stop.typeId) &&
+                                    stop.stopId.isNotBlank()
+                                ) {
                                     { homeContainerViewModel.navigateToSelectedStopDetail(stop) }
+                                } else {
+                                    null
                                 },
                             )
                         }

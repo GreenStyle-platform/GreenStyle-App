@@ -43,10 +43,14 @@ class BusRouteSearchViewModel @Inject constructor(
     }
 
     fun navigateToDetailRoute(routeId: String) {
+        if (routeId.isBlank()) return
         appNavigator.navigateTo(
             TransitRouteDetailRoute(
-                routeId = routeId, transitMode = TransitMode.BUS
+                routeId = routeId,
+                transitMode = TransitMode.BUS,
             )
-        )
+        ) {
+            launchSingleTop = true
+        }
     }
 }

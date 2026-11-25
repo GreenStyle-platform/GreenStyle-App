@@ -9,6 +9,7 @@ import com.vie.mit.data.model.common.map.TransitMode
 import com.vie.mit.data.model.domain.map.RoundTrip
 import com.vie.mit.data.repository.map.MapRepository
 import com.vie.mit.green.navigation.main_graph.TransitRouteDetailRoute
+import com.vie.mit.green.navigation.main_graph.TransitStopDetailRoute
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -33,6 +34,10 @@ class TransitRouteDetailViewModel @Inject constructor(
     val routeId: String = routeArgs?.routeId?.ifBlank { "" }?:""
 
     val typeId: TransitMode = routeArgs?.transitMode
+        ?: savedStateHandle.get<TransitMode>("transitMode")
+        ?: savedStateHandle.get<String>("transitMode")?.let { name ->
+            runCatching { TransitMode.valueOf(name) }.getOrNull()
+        }
         ?: savedStateHandle.get<String>("typeId")?.let { name ->
             runCatching { TransitMode.valueOf(name) }.getOrNull()
         }
@@ -279,6 +284,18 @@ class TransitRouteDetailViewModel @Inject constructor(
         }
 
         loadTripDetails(tripId)
+    }
+
+    fun navigateToTransitStopDetail(stopId: String) {
+        if (stopId.isBlank()) return
+        appNavigator.navigateTo(
+            TransitStopDetailRoute(
+                stopId = stopId,
+                transitMode = typeId,
+            )
+        ) {
+            launchSingleTop = true
+        }
     }
 
     fun navigateBack() {

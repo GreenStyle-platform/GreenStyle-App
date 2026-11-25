@@ -24,6 +24,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.SwapVert
@@ -130,6 +131,7 @@ fun TransitRouteDetailScreen(
                 onSelectRoundTrip = { roundTrip ->
                     viewModel.onSelectService(roundTrip.serviceId)
                 },
+                onStopClick = viewModel::navigateToTransitStopDetail,
                 onRetry = viewModel::loadRouteTrips,
             )
         },
@@ -152,6 +154,7 @@ private fun TransitRouteDetailSheetContent(
     uiState: TransitRouteDetailUiState,
     onDirectionSwap: () -> Unit,
     onSelectRoundTrip: (RoundTrip) -> Unit,
+    onStopClick: (String) -> Unit,
     onRetry: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -471,6 +474,7 @@ private fun TransitRouteDetailSheetContent(
                         totalStops = uiState.stops.size,
                         stop = stop,
                         accentColor = busColor,
+                        onClick = { onStopClick(stop.id) },
                     )
                 }
             }
@@ -488,15 +492,19 @@ private fun StopTimelineItem(
     totalStops: Int,
     stop: TransitStopMarker,
     accentColor: Color,
+    onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val isFirst = index == 0
     val isLast = index == totalStops - 1
+    val canNavigate = stop.id.isNotBlank()
 
     Row(
         modifier = modifier
             .fillMaxWidth()
+            .clip(RoundedCornerShape(10.dp))
             .background(Color.White, RoundedCornerShape(10.dp))
+            .clickable(enabled = canNavigate, onClick = onClick)
             .padding(horizontal = 14.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -540,6 +548,16 @@ private fun StopTimelineItem(
                     fontWeight = FontWeight.Medium,
                 )
             }
+        }
+
+        if (canNavigate) {
+            Spacer(modifier = Modifier.width(8.dp))
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                contentDescription = null,
+                tint = Color(0xFF9CA3AF),
+                modifier = Modifier.size(18.dp),
+            )
         }
     }
 }

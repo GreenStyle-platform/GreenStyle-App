@@ -78,10 +78,14 @@ class TransitStopDetailViewModel @Inject constructor(
     }
 
     fun navigateToDetailRoute(routeId: String) {
+        if (routeId.isBlank()) return
         appNavigator.navigateTo(
             TransitRouteDetailRoute(
-                routeId = routeId, transitMode = uiState.value.type
+                routeId = routeId,
+                transitMode = uiState.value.type,
             )
-        )
+        ) {
+            launchSingleTop = true
+        }
     }
 }

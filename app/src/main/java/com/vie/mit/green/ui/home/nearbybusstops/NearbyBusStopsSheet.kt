@@ -81,7 +81,8 @@ fun NearbyBusStopsSheet(
     selectedRadiusKm: Double = 1.0,
     onRefresh: () -> Unit = {},
     onFindBusRouteClick: () -> Unit = {},
-    onNavigateToTransitStopDetail: (String) -> Unit
+    onNavigateToTransitStopDetail: (String) -> Unit,
+    onNavigateToTransitRouteDetail: (String) -> Unit = {},
 ) {
     val busColor = AppTheme.colors.busColor
 
@@ -199,7 +200,8 @@ fun NearbyBusStopsSheet(
                         BusStopCard(
                             stopWithArrivals = stopWithArrivals,
                             busColor = busColor,
-                            onBusStopClick = onNavigateToTransitStopDetail
+                            onBusStopClick = onNavigateToTransitStopDetail,
+                            onRouteClick = onNavigateToTransitRouteDetail,
                         )
                     }
                 }
@@ -215,7 +217,8 @@ private fun BusStopCard(
     stopWithArrivals: NearbyBusStopWithArrivals,
     busColor: Color,
     modifier: Modifier = Modifier,
-    onBusStopClick: (String) -> Unit
+    onBusStopClick: (String) -> Unit,
+    onRouteClick: (String) -> Unit,
 ) {
 
     val formattedDistance = formatDistance(stopWithArrivals.stop.distanceMeters)
@@ -274,6 +277,7 @@ private fun BusStopCard(
                 ArrivalsContent(
                     stopWithArrivals = stopWithArrivals,
                     busColor = busColor,
+                    onRouteClick = onRouteClick,
                 )
             }
         }
@@ -286,6 +290,7 @@ private fun BusStopCard(
 private fun ArrivalsContent(
     stopWithArrivals: NearbyBusStopWithArrivals,
     busColor: Color,
+    onRouteClick: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -352,7 +357,11 @@ private fun ArrivalsContent(
                     ),
                 )
                 stopWithArrivals.routes.forEach { route ->
-                    RouteArrivalRow(route = route, busColor = busColor)
+                    RouteArrivalRow(
+                        route = route,
+                        busColor = busColor,
+                        onClick = { onRouteClick(route.routeId) },
+                    )
                 }
             }
         }
@@ -365,11 +374,14 @@ private fun ArrivalsContent(
 private fun RouteArrivalRow(
     route: StopArrival,
     busColor: Color,
+    onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Row(
         modifier = modifier
             .fillMaxWidth()
+            .clip(RoundedCornerShape(8.dp))
+            .clickable(enabled = route.routeId.isNotBlank(), onClick = onClick)
             .padding(horizontal = 4.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {

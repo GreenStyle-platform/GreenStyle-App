@@ -85,19 +85,27 @@ fun SheetNavHost(
                 onTransitTypeClick = { typeId ->
                     when {
                         typeId.equals(TransitMode.BUS.name, ignoreCase = true) -> {
-                            homeNavController.navigate(NearbyBusStopsSheetRoute)
+                            homeNavController.navigate(NearbyBusStopsSheetRoute) {
+                                launchSingleTop = true
+                            }
                         }
 
                         typeId.equals(TransitMode.SUBWAY.name, ignoreCase = true) -> {
-                            homeNavController.navigate(NearbySubwayStationsSheetRoute)
+                            homeNavController.navigate(NearbySubwayStationsSheetRoute) {
+                                launchSingleTop = true
+                            }
                         }
 
                         typeId.equals(TravelMode.BICYCLE_RENT.name, ignoreCase = true) -> {
-                            homeNavController.navigate(NearbyBikeStationsSheetRoute)
+                            homeNavController.navigate(NearbyBikeStationsSheetRoute) {
+                                launchSingleTop = true
+                            }
                         }
 
                         else -> {
-                            homeNavController.navigate(NearbyTransitStopsSheetRoute(transitTypeId = typeId))
+                            homeNavController.navigate(NearbyTransitStopsSheetRoute(transitTypeId = typeId)) {
+                                launchSingleTop = true
+                            }
                         }
                     }
                 },
@@ -125,7 +133,8 @@ fun SheetNavHost(
                 },
                 onRefresh = nearbyBusViewModel::refresh,
                 onFindBusRouteClick = homeContainerViewModel::navigateToBusRouteSearch,
-                onNavigateToTransitStopDetail = nearbyBusViewModel::navigateToTransitStopDetail
+                onNavigateToTransitStopDetail = nearbyBusViewModel::navigateToTransitStopDetail,
+                onNavigateToTransitRouteDetail = nearbyBusViewModel::navigateToTransitRouteDetail,
             )
         }
 

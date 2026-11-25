@@ -43,6 +43,7 @@ data class CameraFocusCommand(
     val location: LocationData,
     val zoom: Double = 14.5,
     val animate: Boolean = true,
+    val collapseExpandedSheet: Boolean = false,
 )
 
 private data class ParsedTransitStop(
@@ -374,6 +375,7 @@ class HomeContainerViewModel @Inject constructor(
                 transitSources = updatedSources,
                 // Clear stale stops from a previous transit type immediately to prevent cross-type flash
                 nearbyStops = if (isNearbySheet && typeChanged) emptyList() else state.nearbyStops,
+                selectedStop = null,
             )
         }
 
@@ -462,6 +464,7 @@ class HomeContainerViewModel @Inject constructor(
                 location = stop.location,
                 zoom = 16.0,
                 animate = true,
+                collapseExpandedSheet = true,
             )
         )
         _uiState.update {
@@ -478,18 +481,25 @@ class HomeContainerViewModel @Inject constructor(
     }
 
     /**
+     * Returns whether the given [typeId] is supported by [TransitStopDetailRoute].
+     */
+    fun canNavigateToStopDetail(typeId: String): Boolean = resolveTransitMode(typeId) != null
+
+    /**
      * Handles clicking a nearby stop item: navigates to [TransitStopDetailRoute] for supported
      * transit modes (BUS, SUBWAY, RAIL, etc.), or focuses the stop on the map for Bike stations.
      */
     fun onNearbyStopSelected(stop: NearbyStopItem) {
         val transitMode = resolveTransitMode(stop.typeId)
-        if (transitMode != null) {
+        if (transitMode != null && stop.stopId.isNotBlank()) {
             appNavigator.navigateTo(
                 TransitStopDetailRoute(
                     stopId = stop.stopId,
                     transitMode = transitMode,
                 )
-            )
+            ) {
+                launchSingleTop = true
+            }
         } else {
             focusOnNearbyStop(stop)
         }
@@ -499,6 +509,7 @@ class HomeContainerViewModel @Inject constructor(
      * Opens [TransitStopDetailRoute] from the floating stop detail card when supported.
      */
     fun navigateToSelectedStopDetail(stop: StopFeatureClick) {
+        if (stop.stopId.isBlank()) return
         val transitMode = resolveTransitMode(stop.typeId) ?: return
         dismissStopDetail()
         appNavigator.navigateTo(
@@ -506,7 +517,9 @@ class HomeContainerViewModel @Inject constructor(
                 stopId = stop.stopId,
                 transitMode = transitMode,
             )
-        )
+        ) {
+            launchSingleTop = true
+        }
     }
 
     private fun resolveTransitMode(typeId: String): TransitMode? = when (typeId.uppercase()) {
@@ -645,15 +658,21 @@ class HomeContainerViewModel @Inject constructor(
     }
 
     fun navigateToSettingScreen() {
-        appNavigator.navigateTo(SettingRoute)
+        appNavigator.navigateTo(SettingRoute) {
+            launchSingleTop = true
+        }
     }
 
     fun navigateToBusRouteSearch() {
-        appNavigator.navigateTo(BusRouteSearchRoute)
+        appNavigator.navigateTo(BusRouteSearchRoute) {
+            launchSingleTop = true
+        }
     }
 
     fun navigateToRouteLocationPicker() {
-        appNavigator.navigateTo(RoutePlannerContainerRoute)
+        appNavigator.navigateTo(RoutePlannerContainerRoute) {
+            launchSingleTop = true
+        }
     }
 }
 

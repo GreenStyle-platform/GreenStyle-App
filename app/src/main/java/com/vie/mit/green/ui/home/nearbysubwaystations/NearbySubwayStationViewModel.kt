@@ -85,20 +85,26 @@ class NearbySubwayStationViewModel @Inject constructor(
      * Navigates to the Transit Route Detail screen for the clicked subway route.
      */
     fun navigateToRouteDetail(routeId: String) {
+        if (routeId.isBlank()) return
         appNavigator.navigateTo(
             TransitRouteDetailRoute(
                 routeId = routeId,
                 transitMode = TransitMode.SUBWAY,
             )
-        )
+        ) {
+            launchSingleTop = true
+        }
     }
 
     fun navigateToTransitStopDetail(stopId: String) {
+        if (stopId.isBlank()) return
         appNavigator.navigateTo(
             TransitStopDetailRoute(
                 stopId = stopId,
                 transitMode = TransitMode.SUBWAY,
             )
-        )
+        ) {
+            launchSingleTop = true
+        }
     }
 }

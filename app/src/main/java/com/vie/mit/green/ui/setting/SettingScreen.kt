@@ -24,7 +24,7 @@ fun SettingScreen(
     Scaffold(
         modifier = modifier.fillMaxSize(), topBar = {
             TopAppBar(title = { Text("Cài đặt") }, navigationIcon = {
-                IconButton(onClick = {}) {
+                IconButton(onClick = viewModel::navigateBack) {
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                         contentDescription = "Back"

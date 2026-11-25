@@ -21,6 +21,7 @@ import com.vie.mit.green.ui.routeplanner.container.RoutePlannerContainerScreen
 import com.vie.mit.green.ui.routeplanner.container.RoutePlannerContainerViewModel
 import com.vie.mit.green.ui.setting.SettingScreen
 import com.vie.mit.green.ui.setting.SettingViewModel
+import com.vie.mit.green.ui.transitroutedetail.TransitRouteDetailScreen
 import com.vie.mit.green.ui.transitroutedetail.TransitRouteDetailViewModel
 import com.vie.mit.green.ui.transitroutedetail.TransitRoutePathScreen
 import com.vie.mit.green.ui.transitstopdetail.TransitStopDetailScreen
@@ -82,7 +83,7 @@ fun NavGraphBuilder.mainGraph() {
             popEnterTransition = { EnterTransition.None },
             popExitTransition = { fadeOut(tween(150)) },
         ) {
-            TransitRoutePathScreen(
+            TransitRouteDetailScreen(
                 viewModel = hiltViewModel<TransitRouteDetailViewModel>(),
             )
         }

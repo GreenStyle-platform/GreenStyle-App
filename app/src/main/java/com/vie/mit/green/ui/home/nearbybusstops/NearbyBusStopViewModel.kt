@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.vie.mit.common.navigation.AppNavigator
 import com.vie.mit.data.model.common.map.TransitMode
 import com.vie.mit.data.repository.map.MapRepository
+import com.vie.mit.green.navigation.main_graph.TransitRouteDetailRoute
 import com.vie.mit.green.navigation.main_graph.TransitStopDetailRoute
 import com.vie.mit.green.ui.home.nearbytransitsheet.NearbyStopItem
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -189,12 +190,27 @@ class NearbyBusStopViewModel @Inject constructor(
         loadBusStops(currentStops, forceReload = true)
     }
 
-    fun navigateToTransitStopDetail(stopId: String){
+    fun navigateToTransitStopDetail(stopId: String) {
+        if (stopId.isBlank()) return
         appNavigator.navigateTo(
             TransitStopDetailRoute(
                 stopId = stopId,
-                transitMode = TransitMode.BUS
+                transitMode = TransitMode.BUS,
             )
-        )
+        ) {
+            launchSingleTop = true
+        }
+    }
+
+    fun navigateToTransitRouteDetail(routeId: String) {
+        if (routeId.isBlank()) return
+        appNavigator.navigateTo(
+            TransitRouteDetailRoute(
+                routeId = routeId,
+                transitMode = TransitMode.BUS,
+            )
+        ) {
+            launchSingleTop = true
+        }
     }
 }
