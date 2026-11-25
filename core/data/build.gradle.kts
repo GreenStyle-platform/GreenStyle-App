@@ -53,4 +53,7 @@ plugins {
     implementation(libs.kotlinx.coroutines.android)
       //Data store
       implementation(libs.androidx.datastore.preferences)
+
+      // Paging
+      api(libs.androidx.paging.common)
   }

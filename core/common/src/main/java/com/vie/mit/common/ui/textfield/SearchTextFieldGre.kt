@@ -12,14 +12,15 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material3.Icon
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextField
-import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.vie.mit.common.theme.AppTheme
@@ -44,7 +45,7 @@ fun SearchTextFieldGre(
 ) {
     val keyboardController = LocalSoftwareKeyboardController.current
 
-    TextField(
+    OutlinedTextField(
         value = value,
         onValueChange = onValueChange,
         modifier = modifier
@@ -54,7 +55,9 @@ fun SearchTextFieldGre(
             Text(
                 text = placeholder,
                 style = AppTheme.typography.bodyLarge,
-                color = AppTheme.colors.secondaryText
+                color = AppTheme.colors.secondaryText,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
         },
         leadingIcon = {
@@ -79,14 +82,14 @@ fun SearchTextFieldGre(
             }
         },
         singleLine = true,
-        shape = RoundedCornerShape(28.dp),
-        colors = TextFieldDefaults.colors(
+        shape = RoundedCornerShape(16.dp),
+        colors = OutlinedTextFieldDefaults.colors(
             focusedContainerColor = AppTheme.colors.surfaceDim,
             unfocusedContainerColor = AppTheme.colors.surfaceDim,
             disabledContainerColor = AppTheme.colors.surfaceDim,
-            focusedIndicatorColor = Color.Transparent,
-            unfocusedIndicatorColor = Color.Transparent,
-            disabledIndicatorColor = Color.Transparent,
+            focusedBorderColor = AppTheme.colors.primary,
+            unfocusedBorderColor = Color.Transparent,
+            disabledBorderColor = Color.Transparent,
             cursorColor = AppTheme.colors.primary,
             focusedTextColor = AppTheme.colors.primaryText,
             unfocusedTextColor = AppTheme.colors.primaryText
@@ -99,7 +102,8 @@ fun SearchTextFieldGre(
             onSearch = {
                 onSearch(value)
                 keyboardController?.hide()
-            }))
+            })
+    )
 }
 
 @Preview(showBackground = true)

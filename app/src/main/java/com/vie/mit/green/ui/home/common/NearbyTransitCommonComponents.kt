@@ -4,7 +4,6 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import androidx.annotation.DrawableRes
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -15,16 +14,15 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MyLocation
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -45,6 +43,7 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import com.vie.mit.common.theme.AppTheme
 import java.util.Locale
+import kotlin.math.roundToInt
 
 /**
  * Converts any Android Drawable resource ID (including VectorDrawable, rasterized asset,
@@ -89,12 +88,13 @@ fun NearbySheetHeader(
     modifier: Modifier = Modifier,
     title: String,
     icon: Int? = null,
+    onRefresh: (() -> Unit)? = null,
     onBack: () -> Unit,
 ) {
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .padding(8.dp),
+            .padding(horizontal = 8.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.Start,
     ) {
@@ -115,56 +115,28 @@ fun NearbySheetHeader(
         )
         Spacer(modifier = Modifier.weight(1f))
 
-        Image(
-            modifier = Modifier
-                .size(12.dp)
-                .clickable(enabled = true, onClick = onBack),
-            painter = painterResource(com.vie.mit.common.R.drawable.ic_close),
-            contentDescription = "Close"
-        )
-    }
-}
-
-/**
- * Standard Radius Filter Chips row (0.5km, 1.0km, 2.0km, 5.0km).
- */
-@Composable
-fun RadiusFilterChipsRow(
-    selectedRadiusKm: Double,
-    onRadiusSelected: (Double) -> Unit,
-    accentColor: Color,
-    modifier: Modifier = Modifier,
-    availableRadii: List<Double> = listOf(0.5, 1.0, 2.0, 5.0),
-) {
-    LazyRow(
-        modifier = modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        item {
-            Text(
-                text = "Bán kính:",
-                style = AppTheme.typography.titleMedium,
-            )
+        if (onRefresh != null) {
+            IconButton(
+                onClick = onRefresh, modifier = Modifier.size(36.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Refresh,
+                    contentDescription = "Refresh",
+                    tint = AppTheme.colors.white,
+                    modifier = Modifier.size(24.dp)
+                )
+            }
+            Spacer(modifier = Modifier.width(12.dp))
         }
-        items(availableRadii) { radius ->
-            val isSelected = selectedRadiusKm == radius
-            FilterChip(
-                selected = isSelected,
-                onClick = { onRadiusSelected(radius) },
-                label = {
-                    Text(
-                        text = "$radius km",
-                        style = AppTheme.typography.bodyMedium,
-                    )
-                },
-                colors = FilterChipDefaults.filterChipColors(
-                    containerColor = Color.White.copy(alpha = 0.15f),
-                    labelColor = Color.White,
-                    selectedContainerColor = accentColor,
-                    selectedLabelColor = Color.White,
-                ),
-                shape = RoundedCornerShape(12.dp),
+
+        IconButton(
+            onClick = onBack,
+            modifier = Modifier.size(40.dp),
+        ) {
+            Image(
+                modifier = Modifier.size(18.dp),
+                painter = painterResource(com.vie.mit.common.R.drawable.ic_close),
+                contentDescription = "Close"
             )
         }
     }
@@ -200,8 +172,9 @@ fun NearbyLocationInfoCard(
                 modifier = Modifier.size(20.dp),
             )
             Spacer(modifier = Modifier.width(10.dp))
+            val formattedRadius = formatDistance((selectedRadiusKm * 1000).toFloat())
             Text(
-                text = "Tìm thấy $itemCount $itemTypeName trong bán kính $selectedRadiusKm km",
+                text = "Tìm thấy $itemCount $itemTypeName trong bán kính $formattedRadius",
                 style = AppTheme.typography.bodyMedium,
                 color = AppTheme.colors.secondaryText,
             )
@@ -250,10 +223,52 @@ fun NearbyEmptyStateCard(
 }
 
 /**
- * Standard distance formatting helper (e.g. "350 m" or "1.2 km").
+ * Standard Loading State Card when transit stops are being fetched for the current viewport.
  */
-fun formatDistance(meters: Float): String = if (meters < 1000) {
-    "${meters.toInt()} m"
-} else {
-    String.format(Locale.getDefault(), "%.1f km", meters / 1000f)
+@Composable
+fun NearbyLoadingStateCard(
+    accentColor: Color,
+    message: String,
+    modifier: Modifier = Modifier,
+) {
+    Card(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(vertical = 12.dp),
+        shape = RoundedCornerShape(14.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.9f)),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(24.dp),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            CircularProgressIndicator(
+                color = accentColor,
+                modifier = Modifier.size(20.dp),
+                strokeWidth = 2.dp,
+            )
+            Spacer(modifier = Modifier.width(12.dp))
+            Text(
+                text = message,
+                style = MaterialTheme.typography.bodyMedium,
+                color = Color(0xFF6B7280),
+            )
+        }
+    }
+}
+
+/**
+ * Standard distance formatting helper (e.g. "350 m" or "1.2 km").
+ * Uses [roundToInt] consistently with map radius overlay formatting.
+ */
+fun formatDistance(meters: Float): String {
+    val roundedMeters = meters.roundToInt()
+    return if (roundedMeters < 1000) {
+        "$roundedMeters m"
+    } else {
+        String.format(Locale.getDefault(), "%.1f km", roundedMeters / 1000f)
+    }
 }

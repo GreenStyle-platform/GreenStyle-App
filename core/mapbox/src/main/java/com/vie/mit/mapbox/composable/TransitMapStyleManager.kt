@@ -57,6 +57,7 @@ fun setupTransitSourcesAndLayers(
     transitConfigs: List<TransitTypeConfig>,
     clusterConfig: TransitClusterConfig,
     appColors: AppColors? = null,
+    lastAppliedGeoJsonBySourceId: MutableMap<String, String>? = null,
 ) {
     val configMap = transitConfigs.associateBy { it.typeId }
 
@@ -67,12 +68,16 @@ fun setupTransitSourcesAndLayers(
         val clusterCountLayerId = getClusterCountLayerIdForType(sourceData.typeId)
         val stopSymbolLayerId = getStopSymbolLayerIdForType(sourceData.typeId)
 
-        // 1. Add or Update GeoJsonSource
+        // 1. Add or Update GeoJsonSource only when GeoJSON data actually changed
         if (sourceData.geoJson.isNotBlank()) {
             val existingSource = style.getSourceAs<GeoJsonSource>(sourceId)
             if (existingSource != null) {
-                existingSource.data(sourceData.geoJson)
-                Timber.d("TransitMapStyleManager: updated data for GeoJsonSource '$sourceId'")
+                val previousGeoJson = lastAppliedGeoJsonBySourceId?.get(sourceId)
+                if (lastAppliedGeoJsonBySourceId == null || previousGeoJson != sourceData.geoJson) {
+                    existingSource.data(sourceData.geoJson)
+                    lastAppliedGeoJsonBySourceId?.put(sourceId, sourceData.geoJson)
+                    Timber.d("TransitMapStyleManager: updated data for GeoJsonSource '$sourceId'")
+                }
             } else {
                 val newSource = geoJsonSource(sourceId) {
                     data(sourceData.geoJson)
@@ -83,86 +88,94 @@ fun setupTransitSourcesAndLayers(
                     }
                 }
                 style.addSource(newSource)
+                lastAppliedGeoJsonBySourceId?.put(sourceId, sourceData.geoJson)
                 Timber.d("TransitMapStyleManager: added GeoJsonSource '$sourceId' (clustering=${clusterConfig.isEnabled})")
             }
         }
 
         val targetVisibility = if (sourceData.isVisible) Visibility.VISIBLE else Visibility.NONE
         val clusterVisibility = if (sourceData.isVisible && clusterConfig.isEnabled) Visibility.VISIBLE else Visibility.NONE
+        val sourceExists = style.styleSourceExists(sourceId)
 
-        // 2. Add Cluster Circle Layer (if not exists)
+        // 2. Add or update Cluster Circle Layer
         if (!style.styleLayerExists(clusterCircleLayerId)) {
-            val circleLayer = circleLayer(clusterCircleLayerId, sourceId) {
-                filter(Expression.fromRaw("""["has", "point_count"]"""))
-                circleColor(config.clusterColor)
-                circleRadius(
-                    Expression.fromRaw(
-                        """["step", ["get", "point_count"], 18.0, 10, 24.0, 50, 30.0, 100, 36.0]"""
+            if (sourceExists) {
+                val circleLayer = circleLayer(clusterCircleLayerId, sourceId) {
+                    filter(Expression.fromRaw("""["has", "point_count"]"""))
+                    circleColor(config.clusterColor)
+                    circleRadius(
+                        Expression.fromRaw(
+                            """["step", ["get", "point_count"], 18.0, 10, 24.0, 50, 30.0, 100, 36.0]"""
+                        )
                     )
-                )
-                circleStrokeWidth(2.5)
-                circleStrokeColor("#FFFFFF")
-                circleOpacity(0.9)
-                visibility(clusterVisibility)
+                    circleStrokeWidth(2.5)
+                    circleStrokeColor("#FFFFFF")
+                    circleOpacity(0.9)
+                    visibility(clusterVisibility)
+                }
+                style.addLayer(circleLayer)
             }
-            style.addLayer(circleLayer)
         } else {
             style.getLayer(clusterCircleLayerId)?.visibility(clusterVisibility)
         }
 
-        // 3. Add Cluster Text Count Layer (if not exists)
+        // 3. Add or update Cluster Text Count Layer
         if (!style.styleLayerExists(clusterCountLayerId)) {
-            val countLayer = symbolLayer(clusterCountLayerId, sourceId) {
-                filter(Expression.fromRaw("""["has", "point_count"]"""))
-                textField(Expression.fromRaw("""["get", "point_count_abbreviated"]"""))
-                textSize(12.0)
-                textColor(config.clusterTextColor)
-                textIgnorePlacement(true)
-                textAllowOverlap(true)
-                visibility(clusterVisibility)
+            if (sourceExists) {
+                val countLayer = symbolLayer(clusterCountLayerId, sourceId) {
+                    filter(Expression.fromRaw("""["has", "point_count"]"""))
+                    textField(Expression.fromRaw("""["get", "point_count_abbreviated"]"""))
+                    textSize(12.0)
+                    textColor(config.clusterTextColor)
+                    textIgnorePlacement(true)
+                    textAllowOverlap(true)
+                    visibility(clusterVisibility)
+                }
+                style.addLayer(countLayer)
             }
-            style.addLayer(countLayer)
         } else {
-            style.getLayer(clusterCountLayerId)?.visibility(targetVisibility)
+            style.getLayer(clusterCountLayerId)?.visibility(clusterVisibility)
         }
 
-        // 4. Add Unclustered Stop Symbol Layer (if not exists)
+        // 4. Add or update Unclustered Stop Symbol Layer
         if (!style.styleLayerExists(stopSymbolLayerId)) {
-            val resolvedTextColor = config.textColor
-                ?: appColors?.getTransitTextColor(config.typeId)
-                ?: 0xFF0369D8.toInt()
+            if (sourceExists) {
+                val resolvedTextColor = config.textColor
+                    ?: appColors?.getTransitTextColor(config.typeId)
+                    ?: 0xFF0369D8.toInt()
 
-            val stopSymbolLayer = symbolLayer(stopSymbolLayerId, sourceId) {
-                filter(Expression.fromRaw("""["!", ["has", "point_count"]]"""))
-                iconImage(config.iconName)
-                iconSize(
-                    Expression.fromRaw(
-                        """["interpolate", ["linear"], ["zoom"], 10.0, ${0.3 * config.iconSize}, 13.0, ${0.75 * config.iconSize}, 15.0, ${1.0 * config.iconSize}, 18.0, ${1.3 * config.iconSize}]"""
-                    )
-                )
-                iconAllowOverlap(true)
-                iconIgnorePlacement(false)
-
-                if (config.showStopName) {
-                    textField(Expression.fromRaw("""["get", "name"]"""))
-                    textSize(
+                val stopSymbolLayer = symbolLayer(stopSymbolLayerId, sourceId) {
+                    filter(Expression.fromRaw("""["!", ["has", "point_count"]]"""))
+                    iconImage(config.iconName)
+                    iconSize(
                         Expression.fromRaw(
-                            """["step", ["zoom"], 0.0, ${config.textMinZoom}, ${config.textSize}]"""
+                            """["interpolate", ["linear"], ["zoom"], 10.0, ${0.3 * config.iconSize}, 13.0, ${0.75 * config.iconSize}, 15.0, ${1.0 * config.iconSize}, 18.0, ${1.3 * config.iconSize}]"""
                         )
                     )
-                    textAnchor(TextAnchor.TOP)
-                    textOffset(listOf(0.0, 1.1))
-                    textColor(resolvedTextColor)
-                    textHaloColor(config.textHaloColor)
-                    textHaloWidth(config.textHaloWidth)
-                    textMaxWidth(9.0)
-                    textAllowOverlap(false)
-                    textOptional(true)
-                }
+                    iconAllowOverlap(true)
+                    iconIgnorePlacement(false)
 
-                visibility(targetVisibility)
+                    if (config.showStopName) {
+                        textField(Expression.fromRaw("""["get", "name"]"""))
+                        textSize(
+                            Expression.fromRaw(
+                                """["step", ["zoom"], 0.0, ${config.textMinZoom}, ${config.textSize}]"""
+                            )
+                        )
+                        textAnchor(TextAnchor.TOP)
+                        textOffset(listOf(0.0, 1.1))
+                        textColor(resolvedTextColor)
+                        textHaloColor(config.textHaloColor)
+                        textHaloWidth(config.textHaloWidth)
+                        textMaxWidth(9.0)
+                        textAllowOverlap(false)
+                        textOptional(true)
+                    }
+
+                    visibility(targetVisibility)
+                }
+                style.addLayer(stopSymbolLayer)
             }
-            style.addLayer(stopSymbolLayer)
         } else {
             style.getLayer(stopSymbolLayerId)?.visibility(targetVisibility)
         }
@@ -171,6 +184,7 @@ fun setupTransitSourcesAndLayers(
 
 /**
  * Handles clicks on either a cluster circle or an individual stop symbol.
+ * Invokes [onEmptyMapClick] only when no cluster or stop feature was hit.
  */
 fun handleMapClick(
     mapboxMap: MapboxMap,
@@ -179,18 +193,27 @@ fun handleMapClick(
     transitConfigs: List<TransitTypeConfig>,
     onStopClick: (StopFeatureClick) -> Unit,
     onClusterClick: (Point, Double) -> Unit,
+    onEmptyMapClick: (() -> Unit)? = null,
 ) {
     val clusterCircleLayerIds = transitConfigs.map { getClusterCircleLayerIdForType(it.typeId) }
     val clusterCountLayerIds = transitConfigs.map { getClusterCountLayerIdForType(it.typeId) }
     val stopLayerIds = transitConfigs.map { getStopSymbolLayerIdForType(it.typeId) }
     val allLayerIds = clusterCircleLayerIds + clusterCountLayerIds + stopLayerIds
 
+    if (allLayerIds.isEmpty()) {
+        onEmptyMapClick?.invoke()
+        return
+    }
+
     val queryOptions = RenderedQueryOptions(allLayerIds, null)
     val queryGeometry = RenderedQueryGeometry(screenCoordinate)
 
     mapboxMap.queryRenderedFeatures(queryGeometry, queryOptions) { expected ->
-        val features = expected.value ?: return@queryRenderedFeatures
-        if (features.isEmpty()) return@queryRenderedFeatures
+        val features = expected.value
+        if (features.isNullOrEmpty()) {
+            onEmptyMapClick?.invoke()
+            return@queryRenderedFeatures
+        }
 
         val topFeature = features.first().queriedFeature.feature
         val topLayerId = features.first().layers.firstOrNull() ?: ""
@@ -230,7 +253,10 @@ fun handleMapClick(
 
         val propertyMap = mutableMapOf<String, String>()
         topFeature.properties()?.entrySet()?.forEach { entry ->
-            propertyMap[entry.key] = entry.value.asString
+            val value = entry.value
+            if (!value.isJsonNull) {
+                propertyMap[entry.key] = if (value.isJsonPrimitive) value.asString else value.toString()
+            }
         }
 
         val point = (topFeature.geometry() as? Point) ?: clickPoint

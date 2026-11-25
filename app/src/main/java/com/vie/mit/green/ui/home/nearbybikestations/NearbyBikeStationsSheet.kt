@@ -39,9 +39,9 @@ import androidx.compose.ui.unit.dp
 import com.vie.mit.common.theme.AppTheme
 import com.vie.mit.green.R
 import com.vie.mit.green.ui.home.common.NearbyEmptyStateCard
+import com.vie.mit.green.ui.home.common.NearbyLoadingStateCard
 import com.vie.mit.green.ui.home.common.NearbyLocationInfoCard
 import com.vie.mit.green.ui.home.common.NearbySheetHeader
-import com.vie.mit.green.ui.home.common.RadiusFilterChipsRow
 import com.vie.mit.green.ui.home.common.formatDistance
 import com.vie.mit.green.ui.home.nearbytransitsheet.NearbyStopItem
 
@@ -56,8 +56,8 @@ fun NearbyBikeStationsSheet(
     nearbyStops: List<NearbyStopItem>,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
+    isLoadingStops: Boolean = false,
     selectedRadiusKm: Double = 1.0,
-    onRadiusSelected: (Double) -> Unit = {},
     onStopClick: (NearbyStopItem) -> Unit = {},
 ) {
     val bikeColor = AppTheme.colors.bikeColor
@@ -76,15 +76,6 @@ fun NearbyBikeStationsSheet(
 
         Spacer(modifier = Modifier.height(10.dp))
 
-        // 2. Radius Filter Chips
-        RadiusFilterChipsRow(
-            selectedRadiusKm = selectedRadiusKm,
-            onRadiusSelected = onRadiusSelected,
-            accentColor = bikeColor,
-        )
-
-        Spacer(modifier = Modifier.height(10.dp))
-
         // 3. Info Card
         NearbyLocationInfoCard(
             itemCount = nearbyStops.size,
@@ -95,31 +86,43 @@ fun NearbyBikeStationsSheet(
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        // 4. Stations List or Empty State
-        if (nearbyStops.isEmpty()) {
-            NearbyEmptyStateCard(
-                icon = Icons.AutoMirrored.Filled.DirectionsBike,
-                message = "Không tìm thấy trạm xe đạp nào\ntrong bán kính $selectedRadiusKm km",
-            )
-        } else {
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f),
-                contentPadding = PaddingValues(
-                    bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 16.dp
-                ),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                items(
-                    items = nearbyStops,
-                    key = { it.stopId },
-                ) { stop ->
-                    BikeStationCard(
-                        stop = stop,
-                        bikeColor = bikeColor,
-                        onClick = { onStopClick(stop) },
-                    )
+        // 4. Stations List, Loading State, or Empty State
+        when {
+            nearbyStops.isEmpty() && isLoadingStops -> {
+                NearbyLoadingStateCard(
+                    accentColor = bikeColor,
+                    message = "Đang tìm trạm xe đạp gần đây...",
+                )
+            }
+
+            nearbyStops.isEmpty() -> {
+                val formattedRadius = formatDistance((selectedRadiusKm * 1000).toFloat())
+                NearbyEmptyStateCard(
+                    icon = Icons.AutoMirrored.Filled.DirectionsBike,
+                    message = "Không tìm thấy trạm xe đạp nào\ntrong bán kính $formattedRadius",
+                )
+            }
+
+            else -> {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f),
+                    contentPadding = PaddingValues(
+                        bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 16.dp
+                    ),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    items(
+                        items = nearbyStops,
+                        key = { "${it.typeId}_${it.stopId}" },
+                    ) { stop ->
+                        BikeStationCard(
+                            stop = stop,
+                            bikeColor = bikeColor,
+                            onClick = { onStopClick(stop) },
+                        )
+                    }
                 }
             }
         }

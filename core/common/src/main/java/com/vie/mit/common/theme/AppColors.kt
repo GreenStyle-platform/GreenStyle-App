@@ -21,13 +21,15 @@ data class AppColors(
     val success: Color,
     val isLight: Boolean = true,
     val navyBlue: Color,
-    val overlayColor: Color,
+    val blackOverlay20: Color,
+    val blackOverlay10: Color,
     val backgroundGreenCard: Color,
     val black: Color,
     val white: Color,
     val busColor: Color,
     val metroColor: Color,
-    val bikeColor: Color
+    val bikeColor: Color,
+    val railColor: Color,
 )
 
 fun lightAppColors(): AppColors = AppColors(
@@ -47,11 +49,13 @@ fun lightAppColors(): AppColors = AppColors(
     success = SuccessGreen,
     isLight = true,
     navyBlue = NavyBlue,
-    overlayColor = OverlayColor,
+    blackOverlay20 = BlackOverlay20,
+    blackOverlay10 = BlackOverlay10,
     backgroundGreenCard = GreenBackgroundCard,
     black = Color.Black,
     white = Color.White,
     busColor = BlueBusColor,
     metroColor = GreenMetroColor,
-    bikeColor = BlueBikeColor
+    bikeColor = BlueBikeColor,
+    railColor = PurpleRailColor
 )

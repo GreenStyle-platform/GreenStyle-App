@@ -1,11 +1,5 @@
 package com.vie.mit.green.ui.home.nearbybusstops
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -30,7 +24,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DirectionsBus
-import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -41,13 +34,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -58,9 +47,9 @@ import com.vie.mit.common.theme.AppTheme
 import com.vie.mit.data.model.domain.map.StopArrival
 import com.vie.mit.green.R
 import com.vie.mit.green.ui.home.common.NearbyEmptyStateCard
+import com.vie.mit.green.ui.home.common.NearbyLoadingStateCard
 import com.vie.mit.green.ui.home.common.NearbyLocationInfoCard
 import com.vie.mit.green.ui.home.common.NearbySheetHeader
-import com.vie.mit.green.ui.home.common.RadiusFilterChipsRow
 import com.vie.mit.green.ui.home.common.formatDistance
 
 // Arrival ETA status colors
@@ -88,10 +77,11 @@ fun NearbyBusStopsSheet(
     uiState: NearbyBusStopsUiState,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
+    isLoadingStops: Boolean = false,
     selectedRadiusKm: Double = 1.0,
-    onRadiusSelected: (Double) -> Unit = {},
     onRefresh: () -> Unit = {},
     onFindBusRouteClick: () -> Unit = {},
+    onNavigateToTransitStopDetail: (String) -> Unit
 ) {
     val busColor = AppTheme.colors.busColor
 
@@ -105,6 +95,7 @@ fun NearbyBusStopsSheet(
             title = stringResource(R.string.nearby_bus_title),
             icon = com.vie.mit.mapbox.R.drawable.ic_transit_bus,
             onBack = onBack,
+            onRefresh = onRefresh
         )
 
         Spacer(modifier = Modifier.height(10.dp))
@@ -112,29 +103,18 @@ fun NearbyBusStopsSheet(
         // ── 1.5 Mode Switcher Buttons (Stops / Find Bus Route) ─────────────
         Row(
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 4.dp),
+                .fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Surface(
-                modifier = Modifier
-                    .weight(1f)
-                    .height(40.dp),
-                shape = RoundedCornerShape(12.dp),
-                color = busColor,
-            ) {
                 Row(
-                    modifier = Modifier.fillMaxSize(),
+                    modifier = Modifier
+                        .weight(1f)
+                        .clip(shape = RoundedCornerShape(8.dp))
+                        .background(AppTheme.colors.blackOverlay20)
+                        .padding(vertical = 12.dp),
                     horizontalArrangement = Arrangement.Center,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.DirectionsBus,
-                        contentDescription = null,
-                        tint = Color.White,
-                        modifier = Modifier.size(18.dp),
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
                     Text(
                         text = "Trạm dừng",
                         style = AppTheme.typography.bodyMedium.copy(
@@ -143,18 +123,16 @@ fun NearbyBusStopsSheet(
                         ),
                     )
                 }
-            }
 
-            Surface(
-                onClick = onFindBusRouteClick,
-                modifier = Modifier
-                    .weight(1f)
-                    .height(40.dp),
-                shape = RoundedCornerShape(12.dp),
-                color = Color.White.copy(alpha = 0.2f),
-            ) {
                 Row(
-                    modifier = Modifier.fillMaxSize(),
+                    modifier = Modifier
+                        .weight(1f)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(AppTheme.colors.blackOverlay10)
+                        .clickable(
+                            enabled = true, onClick = onFindBusRouteClick
+                        )
+                        .padding(vertical = 12.dp),
                     horizontalArrangement = Arrangement.Center,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
@@ -172,18 +150,8 @@ fun NearbyBusStopsSheet(
                             color = Color.White,
                         ),
                     )
-                }
             }
         }
-
-        Spacer(modifier = Modifier.height(10.dp))
-
-        // ── 2. Radius Filter Chips ─────────────────────────────────────────
-        RadiusFilterChipsRow(
-            selectedRadiusKm = selectedRadiusKm,
-            onRadiusSelected = onRadiusSelected,
-            accentColor = busColor,
-        )
 
         Spacer(modifier = Modifier.height(10.dp))
 
@@ -197,30 +165,43 @@ fun NearbyBusStopsSheet(
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        // ── 4. Stop List or Empty State ────────────────────────────────────
-        if (uiState.busStopsWithArrivals.isEmpty() && !uiState.isLoadingArrivals) {
-            NearbyEmptyStateCard(
-                icon = Icons.Default.DirectionsBus,
-                message = "Không tìm thấy trạm xe buýt nào\ntrong bán kính $selectedRadiusKm km",
-            )
-        } else {
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f),
-                contentPadding = PaddingValues(
-                    bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 16.dp
-                ),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                items(
-                    items = uiState.busStopsWithArrivals,
-                    key = { it.stop.stopId },
-                ) { stopWithArrivals ->
-                    BusStopCard(
-                        stopWithArrivals = stopWithArrivals,
-                        busColor = busColor,
-                    )
+        // ── 4. Stop List, Loading State, or Empty State ────────────────────
+        when {
+            uiState.busStopsWithArrivals.isEmpty() && (isLoadingStops || uiState.isLoadingArrivals) -> {
+                NearbyLoadingStateCard(
+                    accentColor = busColor,
+                    message = "Đang tìm trạm xe buýt gần đây...",
+                )
+            }
+
+            uiState.busStopsWithArrivals.isEmpty() -> {
+                val formattedRadius = formatDistance((selectedRadiusKm * 1000).toFloat())
+                NearbyEmptyStateCard(
+                    icon = Icons.Default.DirectionsBus,
+                    message = "Không tìm thấy trạm xe buýt nào\ntrong bán kính $formattedRadius",
+                )
+            }
+
+            else -> {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f),
+                    contentPadding = PaddingValues(
+                        bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 16.dp
+                    ),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    items(
+                        items = uiState.busStopsWithArrivals,
+                        key = { "${it.stop.typeId}_${it.stop.stopId}" },
+                    ) { stopWithArrivals ->
+                        BusStopCard(
+                            stopWithArrivals = stopWithArrivals,
+                            busColor = busColor,
+                            onBusStopClick = onNavigateToTransitStopDetail
+                        )
+                    }
                 }
             }
         }
@@ -234,18 +215,15 @@ private fun BusStopCard(
     stopWithArrivals: NearbyBusStopWithArrivals,
     busColor: Color,
     modifier: Modifier = Modifier,
+    onBusStopClick: (String) -> Unit
 ) {
-    var expanded by rememberSaveable(stopWithArrivals.stop.stopId) { mutableStateOf(false) }
-    val rotationAngle by animateFloatAsState(
-        targetValue = if (expanded) 180f else 0f,
-        animationSpec = tween(durationMillis = 250, easing = FastOutSlowInEasing),
-        label = "expand_arrow",
-    )
 
     val formattedDistance = formatDistance(stopWithArrivals.stop.distanceMeters)
 
     Card(
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier
+            .fillMaxWidth()
+            .clickable { onBusStopClick.invoke(stopWithArrivals.stop.stopId) },
         shape = RoundedCornerShape(14.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.97f)),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
@@ -255,73 +233,48 @@ private fun BusStopCard(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable { expanded = !expanded }
                     .padding(12.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 // Bus icon badge
-                    Image(
-                       painter = painterResource(R.drawable.ic_bus_stop),
-                        contentDescription = "Xe buýt",
-                        modifier = Modifier.size(32.dp),
-                    )
+                Image(
+                    painter = painterResource(R.drawable.ic_bus_stop),
+                    contentDescription = "Xe buýt",
+                    modifier = Modifier.size(32.dp),
+                )
 
                 Spacer(modifier = Modifier.width(12.dp))
 
-                    Text(
-                        modifier = Modifier.weight(1f),
-                        text = stopWithArrivals.stop.name,
-                        style = MaterialTheme.typography.bodyMedium.copy(
-                            fontWeight = FontWeight.Bold,
-                            color = Color(0xFF111827),
-                        ),
-                        maxLines = 2,
-                    )
+                Text(
+                    modifier = Modifier.weight(1f),
+                    text = stopWithArrivals.stop.name,
+                    style = MaterialTheme.typography.bodyMedium.copy(
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF111827),
+                    ),
+                    maxLines = 2,
+                )
 
                 Spacer(modifier = Modifier.width(8.dp))
 
-                // Distance + expand arrow
-                Column(horizontalAlignment = Alignment.End) {
-                    Text(
-                        text = formattedDistance,
-                        style = MaterialTheme.typography.labelMedium.copy(
-                            fontWeight = FontWeight.Bold,
-                            color = busColor,
-                        ),
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Icon(
-                        imageVector = Icons.Default.ExpandMore,
-                        contentDescription = if (expanded) "Thu gọn" else "Xem tuyến xe",
-                        tint = Color(0xFF9CA3AF),
-                        modifier = Modifier
-                            .size(20.dp)
-                            .rotate(rotationAngle),
-                    )
-                }
+                Text(
+                    text = formattedDistance,
+                    style = MaterialTheme.typography.labelMedium.copy(
+                        fontWeight = FontWeight.Bold,
+                        color = busColor,
+                    ),
+                )
             }
-
-            // ── Arrivals Section (Expandable) ─────────────────────────────
-            AnimatedVisibility(
-                visible = expanded,
-                enter = expandVertically(
-                    animationSpec = tween(durationMillis = 250, easing = FastOutSlowInEasing),
-                ),
-                exit = shrinkVertically(
-                    animationSpec = tween(durationMillis = 200, easing = FastOutSlowInEasing),
-                ),
-            ) {
-                Column(modifier = Modifier.fillMaxWidth()) {
-                    HorizontalDivider(
-                        color = Color(0xFFE5E7EB),
-                        thickness = 1.dp,
-                        modifier = Modifier.padding(horizontal = 12.dp),
-                    )
-                    ArrivalsContent(
-                        stopWithArrivals = stopWithArrivals,
-                        busColor = busColor,
-                    )
-                }
+            Column(modifier = Modifier.fillMaxWidth()) {
+                HorizontalDivider(
+                    color = Color(0xFFE5E7EB),
+                    thickness = 1.dp,
+                    modifier = Modifier.padding(horizontal = 12.dp),
+                )
+                ArrivalsContent(
+                    stopWithArrivals = stopWithArrivals,
+                    busColor = busColor,
+                )
             }
         }
     }
@@ -414,85 +367,88 @@ private fun RouteArrivalRow(
     busColor: Color,
     modifier: Modifier = Modifier,
 ) {
-        Row(
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 4.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        // Route number badge
+        Box(
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 4.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
+                .background(busColor, RoundedCornerShape(6.dp))
+                .padding(horizontal = 6.dp, vertical = 4.dp),
+            contentAlignment = Alignment.Center,
         ) {
-            // Route number badge
-            Box(
-                modifier = Modifier
-                    .background(busColor, RoundedCornerShape(6.dp))
-                    .padding( horizontal = 4.dp, vertical = 4.dp),
-                contentAlignment = Alignment.Center,
+            Text(
+                text = route.routeShortName,
+                style = MaterialTheme.typography.labelMedium.copy(
+                    fontWeight = FontWeight.ExtraBold,
+                    color = Color.White,
+                ),
+            )
+        }
+
+        Spacer(modifier = Modifier.width(10.dp))
+
+        // Route info (takes flexible middle space so arrival chips stay right-aligned)
+        if (route.routeLongName.isNotBlank()) {
+            Text(
+                modifier = Modifier.weight(1f),
+                text = route.routeLongName,
+                style = MaterialTheme.typography.labelSmall,
+                color = AppTheme.colors.primaryText,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+        } else {
+            Spacer(modifier = Modifier.weight(1f))
+        }
+        Spacer(modifier = Modifier.width(8.dp))
+
+        // Arrival times list
+        if (route.arrivals.isEmpty()) {
+            Surface(
+                shape = RoundedCornerShape(8.dp),
+                color = Color(0xFFE5E7EB),
             ) {
                 Text(
-                    text = route.routeShortName,
-                    style = MaterialTheme.typography.labelMedium.copy(
-                        fontWeight = FontWeight.ExtraBold,
-                        color = Color.White,
+                    text = "Chưa có xe",
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        color = Color(0xFF6B7280),
                     ),
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                 )
             }
+        } else {
+            LazyRow(
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                val isSingle = route.arrivals.size == 1
+                items(route.arrivals) { arrival ->
+                    val (etaText, etaColor) = when {
+                        arrival.etaMinutes <= 1 -> "Sắp đến" to EtaRed
+                        arrival.etaMinutes <= 5 -> (if (isSingle) "${arrival.etaMinutes} phút" else "${arrival.etaMinutes}p") to EtaOrange
+                        arrival.etaMinutes <= 15 -> (if (isSingle) "${arrival.etaMinutes} phút" else "${arrival.etaMinutes}p") to EtaGreen
+                        else -> (if (isSingle) "${arrival.etaMinutes} phút" else "${arrival.etaMinutes}p") to Color(0xFF6B7280)
+                    }
 
-            Spacer(modifier = Modifier.width(10.dp))
-
-            // Route info
-            if (route.routeLongName.isNotBlank()) {
-                Text(modifier = Modifier.fillMaxWidth(0.5f),
-                    text = route.routeLongName,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = AppTheme.colors.primaryText,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-            Spacer(modifier = Modifier.width(4.dp))
-
-            // Arrival times list
-            if (route.arrivals.isEmpty()) {
-                Surface(
-                    shape = RoundedCornerShape(8.dp),
-                    color = Color(0xFFE5E7EB),
-                ) {
-                    Text(
-                        text = "Chưa có xe",
-                        style = MaterialTheme.typography.labelSmall.copy(
-                            color = Color(0xFF6B7280),
-                        ),
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                    )
-                }
-            } else {
-                LazyRow(
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    val isSingle = route.arrivals.size == 1
-                    items(route.arrivals) { arrival ->
-                        val (etaText, etaColor) = when {
-                            arrival.etaMinutes <= 1 -> "Sắp đến" to EtaRed
-                            arrival.etaMinutes <= 5 -> (if (isSingle) "${arrival.etaMinutes} phút" else "${arrival.etaMinutes}p") to EtaOrange
-                            arrival.etaMinutes <= 15 -> (if (isSingle) "${arrival.etaMinutes} phút" else "${arrival.etaMinutes}p") to EtaGreen
-                            else -> (if (isSingle) "${arrival.etaMinutes} phút" else "${arrival.etaMinutes}p") to Color(0xFF6B7280)
-                        }
-
-                        Surface(
-                            shape = RoundedCornerShape(8.dp),
-                            color = etaColor.copy(alpha = 0.12f),
-                        ) {
-                            Text(
-                                text = etaText,
-                                style = MaterialTheme.typography.labelSmall.copy(
-                                    fontWeight = FontWeight.Bold,
-                                    color = etaColor,
-                                ),
-                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp),
-                            )
-                        }
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = etaColor.copy(alpha = 0.12f),
+                    ) {
+                        Text(
+                            text = etaText,
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                fontWeight = FontWeight.Bold,
+                                color = etaColor,
+                            ),
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp),
+                        )
                     }
                 }
             }
         }
+    }
 }

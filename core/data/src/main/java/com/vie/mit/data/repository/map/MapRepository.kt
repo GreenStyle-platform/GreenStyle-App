@@ -1,27 +1,39 @@
 package com.vie.mit.data.repository.map
 
-import com.vie.mit.data.model.common.map.PublicTransportType
+import androidx.paging.Pager
+import androidx.paging.PagingConfig
+import androidx.paging.PagingData
+import com.vie.mit.data.model.common.map.TransitMode
 import com.vie.mit.data.model.common.map.TravelMode
+import com.vie.mit.data.model.common.map.toTransitTypeConfig
+import com.vie.mit.data.model.domain.map.AutosuggestPlace
 import com.vie.mit.data.model.domain.map.BusRoute
 import com.vie.mit.data.model.domain.map.Location
 import com.vie.mit.data.model.domain.map.PublicTransportSuggestion
+import com.vie.mit.data.model.domain.map.RouteTrip
+import com.vie.mit.data.model.domain.map.ShapePoint
 import com.vie.mit.data.model.domain.map.StopArrival
 import com.vie.mit.data.model.domain.map.TransitStopDetail
+import com.vie.mit.data.model.domain.map.TransitStopMarker
 import com.vie.mit.data.model.domain.map.TransitStopsGeoJsonLoad
 import com.vie.mit.data.model.mapper.toDomain
 import com.vie.mit.data.model.mapper.toLocationRequest
-import com.vie.mit.data.model.remote.request.map.BusRouteSearchRequest
 import com.vie.mit.data.model.remote.request.map.BusStopArrivalsRequest
+import com.vie.mit.data.model.remote.request.map.HereAutocompleteRequest
+import com.vie.mit.data.model.remote.request.map.HereAutosuggestRequest
 import com.vie.mit.data.model.remote.request.map.TransitStopBoundsRequest
+import com.vie.mit.data.model.remote.response.map.BusRoutePageResponse
 import com.vie.mit.data.model.remote.response.map.TransitStopMarkerResponse
 import com.vie.mit.data.network.api.map.MapApi
 import com.vie.mit.data.network.util.handleApiCall
+import com.vie.mit.data.paging.BusRoutePagingSource
 import com.vie.mit.mapbox.model.TransitTypeConfig
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.supervisorScope
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.add
@@ -39,27 +51,9 @@ class MapRepository @Inject constructor(
     private val mapApi: MapApi,
 ) {
     val defaultConfigs: List<TransitTypeConfig> = listOf(
-        TransitTypeConfig(
-            typeId = PublicTransportType.BUS.name,
-            iconResId = com.vie.mit.mapbox.R.drawable.ic_transit_bus,
-            clusterColor = 0xFF1E88E5.toInt(),
-            clusterTextColor = 0xFFFFFFFF.toInt(),
-            iconSize = 1.0,
-        ),
-        TransitTypeConfig(
-            typeId = PublicTransportType.SUBWAY.name,
-            iconResId = com.vie.mit.mapbox.R.drawable.ic_transit_metro,
-            clusterColor = 0xFFE53935.toInt(),
-            clusterTextColor = 0xFFFFFFFF.toInt(),
-            iconSize = 1.0,
-        ),
-        TransitTypeConfig(
-            typeId = PublicTransportType.RAIL.name,
-            iconResId = com.vie.mit.mapbox.R.drawable.ic_transit_train,
-            clusterColor = 0xFF8E24AA.toInt(),
-            clusterTextColor = 0xFFFFFFFF.toInt(),
-            iconSize = 1.0,
-        ),
+        TransitMode.BUS.toTransitTypeConfig(iconSize = 1.0),
+        TransitMode.SUBWAY.toTransitTypeConfig(iconSize = 1.0),
+        TransitMode.RAIL.toTransitTypeConfig(iconSize = 1.0),
         TransitTypeConfig(
             typeId = TravelMode.BICYCLE_RENT.name,
             iconResId = com.vie.mit.mapbox.R.drawable.ic_transit_bike,
@@ -73,6 +67,40 @@ class MapRepository @Inject constructor(
         location: Location,
     ): Result<List<PublicTransportSuggestion>> = handleApiCall {
         mapApi.getPublicTransportSuggestions(location.toLocationRequest()).map { it.toDomain() }
+    }
+
+    /**
+     * Searches places and locations using HERE Autosuggest API (returns coordinates).
+     */
+    suspend fun getAutosuggest(
+        query: String,
+        latitude: Double,
+        longitude: Double,
+    ): Result<List<AutosuggestPlace>> = handleApiCall {
+        mapApi.getAutosuggest(
+            HereAutosuggestRequest(
+                query = query,
+                latitude = latitude,
+                longitude = longitude,
+            )
+        ).items.map { it.toDomain() }
+    }
+
+    /**
+     * Suggests keywords and text completions using HERE Autocomplete API.
+     */
+    suspend fun getAutocomplete(
+        query: String,
+        latitude: Double,
+        longitude: Double,
+    ): Result<List<AutosuggestPlace>> = handleApiCall {
+        mapApi.getAutocomplete(
+            HereAutocompleteRequest(
+                query = query,
+                latitudeIn = latitude,
+                longitudeIn = longitude,
+            )
+        ).items.map { it.toDomain() }
     }
 
     /**
@@ -103,63 +131,152 @@ class MapRepository @Inject constructor(
     suspend fun getStopArrivalsForMode(
         stopId: String,
         mode: String = "bus",
-    ): Result<List<StopArrival>> =
-        if (stopId.isEmpty()) {
-            Result.success(emptyList())
-        } else {
-            handleApiCall {
-                mapApi.getStopArrivals(
-                    mode = mode,
-                    request = BusStopArrivalsRequest(stopIds = listOf(stopId)),
-                ).toDomain()
-            }
+    ): Result<List<StopArrival>> = if (stopId.isEmpty()) {
+        Result.success(emptyList())
+    } else {
+        handleApiCall {
+            mapApi.getStopArrivals(
+                mode = mode,
+                request = BusStopArrivalsRequest(stopIds = listOf(stopId)),
+            ).toDomain()
         }
+    }
 
     /**
      * Fetches detailed information for a specific transit stop.
      *
-     * Currently uses [getStopArrivals] API as the backend stop-detail endpoint
-     * is not yet available. When the backend is ready, switch to [mapApi.getTransitStopDetail].
+     * Calls [mapApi.getTransitStopDetail] to retrieve stop details including coordinates,
+     * name, and routes with arrival schedules. Falls back to [getStopArrivals] if the
+     * detail endpoint is unreachable.
      *
      * @param stopId The unique ID of the transit stop.
-     * @param mode Transit mode: "bus", "subway", "rail", etc.
-     * @return A [Result] containing a [TransitStopDetail] with route arrivals.
+     * @param type Transit type: BUS, SUBWAY, RAIL, etc.
+     * @return A [Result] containing a [TransitStopDetail] with coordinates, stop info, and route arrivals.
      */
     suspend fun getTransitStopDetail(
         stopId: String,
-        mode: String = "bus",
+        type: TransitMode = TransitMode.BUS,
     ): Result<TransitStopDetail> = handleApiCall {
-        // TODO: Replace with direct API call when backend stop-detail endpoint is ready:
-        // mapApi.getTransitStopDetail(
-        //     mode = mode,
-        //     request = TransitStopDetailRequest(stopId = stopId),
-        // ).toDomain()
+        val mode = when (type) {
+            TransitMode.BUS, TransitMode.TROLLEYBUS -> "bus"
+            TransitMode.SUBWAY, TransitMode.MONORAIL -> "subway"
+            TransitMode.RAIL, TransitMode.TRAM, TransitMode.CABLE_TRAM, TransitMode.AERIAL_LIFT -> "rail"
+            TransitMode.FERRY -> "ferry"
+        }
 
-        // Temporary: use existing getStopArrivals to get route/arrival data
-        val arrivalsMap = mapApi.getStopArrivals(
-            mode = mode,
-            request = BusStopArrivalsRequest(stopIds = listOf(stopId)),
-        )
-        val arrivals = arrivalsMap.toDomain()
+        try {
+            mapApi.getTransitStopDetail(
+                mode = mode,
+                stopId = stopId,
+            ).toDomain()
+        } catch (e: Exception) {
+            if (e is CancellationException) throw e
+            Timber.w(
+                e,
+                "getTransitStopDetail endpoint failed, falling back to getStopArrivals for stopId: $stopId"
+            )
+            val arrivalsMap = mapApi.getStopArrivals(
+                mode = mode,
+                request = BusStopArrivalsRequest(stopIds = listOf(stopId)),
+            )
+            TransitStopDetail(
+                id = stopId,
+                name = "",
+                latitude = 0.0,
+                longitude = 0.0,
+                type = type.name,
+                routeArrivals = arrivalsMap.toDomain(),
+            )
+        }
+    }
 
-        TransitStopDetail(
-            id = stopId,
-            name = "",       // Populated from navigation args in ViewModel
-            latitude = 0.0,  // Populated from navigation args in ViewModel
-            longitude = 0.0, // Populated from navigation args in ViewModel
-            type = mode.uppercase(),
-            routeArrivals = arrivals,
-        )
+    suspend fun getTransitStopDetail(
+        stopId: String,
+        mode: String,
+    ): Result<TransitStopDetail> {
+        val type = when (mode.lowercase()) {
+            "subway", "metro" -> TransitMode.SUBWAY
+            "rail", "train" -> TransitMode.RAIL
+            "tram" -> TransitMode.TRAM
+            "ferry" -> TransitMode.FERRY
+            else -> TransitMode.BUS
+        }
+        return getTransitStopDetail(stopId = stopId, type = type)
     }
 
     /**
-     * Searches bus routes by query keyword or route number.
+     * Searches bus routes by query keyword or route number with Paging 3 pagination.
      *
      * @param query Search query string (e.g. "01", "Bến Thành")
-     * @return A [Result] containing a list of matching [BusRoute] domain objects.
+     * @return A [Flow] of [PagingData] containing matching [BusRoute] domain objects.
      */
-    suspend fun searchBusRoutes(query: String): Result<List<BusRoute>> = handleApiCall {
-        mapApi.searchBusRoutes(BusRouteSearchRequest(query = query)).map { it.toDomain() }
+    fun getBusRoutesStream(query: String): Flow<PagingData<BusRoute>> {
+        return Pager(
+            config = PagingConfig(
+                pageSize = 20,
+                enablePlaceholders = false,
+            ),
+            pagingSourceFactory = { BusRoutePagingSource(mapApi, query) },
+        ).flow
+    }
+
+    /**
+     * Searches subway (metro) routes by query string.
+     */
+    suspend fun searchSubwayRoutes(
+        query: String = "",
+        page: Int = 1,
+    ): Result<BusRoutePageResponse> = handleApiCall {
+        mapApi.searchSubwayRoutes(query = query, page = page)
+    }
+
+    /**
+     * Fetches all subway (metro) routes matching a query (or all if empty) as a list of [BusRoute].
+     */
+    suspend fun getSubwayRoutes(
+        query: String = "",
+        page: Int = 1,
+    ): Result<List<BusRoute>> = handleApiCall {
+        mapApi.searchSubwayRoutes(query = query, page = page).content.map { it.toDomain() }
+    }
+
+    /**
+     * Fetches GTFS trips for a route.
+     *
+     * @param mode Transit mode (default: "bus").
+     * @param routeId Route identifier (e.g. "r12997260").
+     */
+    suspend fun getRouteTrips(
+        mode: String = "bus",
+        routeId: String,
+    ): Result<List<RouteTrip>> = handleApiCall {
+        mapApi.getRouteTrips(mode = mode, routeId = routeId).map { it.toDomain() }
+    }
+
+    /**
+     * Fetches shape points for a specific trip.
+     *
+     * @param mode Transit mode (default: "bus").
+     * @param tripId Trip identifier.
+     */
+    suspend fun getTripShape(
+        mode: String = "bus",
+        tripId: String,
+    ): Result<List<ShapePoint>> = handleApiCall {
+        mapApi.getTripShape(mode = mode, tripId = tripId).mapNotNull { it.toDomain() }
+    }
+
+    /**
+     * Fetches transit stops for a specific trip.
+     *
+     * @param mode Transit mode (default: "bus").
+     * @param tripId Trip identifier.
+     */
+    suspend fun getTripStops(
+        mode: String = "bus",
+        tripId: String,
+    ): Result<List<TransitStopMarker>> = handleApiCall {
+        mapApi.getTripStops(mode = mode, tripId = tripId).map { it.toDomain() }
     }
 
     suspend fun getTransitStopsGeoJson(
@@ -215,8 +332,8 @@ class MapRepository @Inject constructor(
         typeId: String,
         bounds: TransitStopBoundsRequest,
     ): List<TransitStopMarkerResponse> = when (typeId) {
-        PublicTransportType.BUS.name -> mapApi.searchBusStopsInBounds(bounds = bounds)
-        PublicTransportType.SUBWAY.name -> mapApi.searchMetroStopsInBounds(bounds = bounds)
+        TransitMode.BUS.name -> mapApi.searchBusStopsInBounds(bounds = bounds)
+        TransitMode.SUBWAY.name -> mapApi.searchMetroStopsInBounds(bounds = bounds)
         TravelMode.BICYCLE_RENT.name -> try {
             mapApi.searchBikeStopsInBounds(bounds = bounds)
         } catch (e: Exception) {

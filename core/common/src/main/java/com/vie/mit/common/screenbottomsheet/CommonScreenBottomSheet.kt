@@ -47,9 +47,18 @@ fun CommonScreenBottomSheet(
         if (totalHeightPx > 0f) {
             initState.updateAnchors(totalHeightPx, config)
         }
-        // NestedScrollConnection liên kết giữa scrollable content bên trong và BottomSheet
+        // NestedScrollConnection liên kết giữa scrollable content bên trong và BottomSheet.
+        // Điều phối cử chỉ kéo (scroll) và vuốt nhanh (fling) giữa danh sách bên trong (LazyColumn/Scrollable) và BottomSheet.
         val nestedScrollConnection = remember(initState.anchoredState) {
             object : NestedScrollConnection {
+
+                /**
+                 * Tiêu thụ độ dời cuộn (scroll delta) TRƯỚC KHI (Pre) danh sách con bên trong tiêu thụ.
+                 *
+                 * - Trường hợp kéo lên (delta < 0f): Nếu BottomSheet chưa mở rộng hoàn toàn (chưa đạt anchor Expanded),
+                 *   hàm sẽ ưu tiên kéo mở rộng BottomSheet lên trước. Danh sách con chỉ cuộn khi Sheet đã mở hết cỡ.
+                 * - Trường hợp kéo xuống (delta >= 0f): Trả về Offset.Zero để nhường quyền cuộn cho danh sách con trước.
+                 */
                 override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
                     val delta = available.y
                     // Khi kéo ngón tay UP (delta < 0) và sheet chưa mở hết tối đa: ưu tiên kéo sheet lên
@@ -61,6 +70,13 @@ fun CommonScreenBottomSheet(
                     }
                 }
 
+                /**
+                 * Tiêu thụ độ dời cuộn (scroll delta) SAU KHI (Post) danh sách con bên trong đã tiêu thụ xong.
+                 *
+                 * - Trường hợp kéo xuống (delta > 0f): Khi danh sách con đã cuộn lên trên cùng (không thể cuộn thêm),
+                 *   lượng delta dư thừa (available.y) sẽ được dùng để kéo thu nhỏ BottomSheet xuống.
+                 * - Sử dụng hệ số 0.6f để giảm tốc / tạo lực cản (friction) giúp hiệu ứng cuộn mượt mà tự nhiên hơn.
+                 */
                 override fun onPostScroll(
                     consumed: Offset,
                     available: Offset,
@@ -69,13 +85,20 @@ fun CommonScreenBottomSheet(
                     val delta = available.y
                     // Khi kéo ngón tay DOWN (delta > 0) và danh sách bên trong đã cuộn lên top: kéo sheet thu nhỏ lại
                     return if (delta > 0f) {
-                        val consumedDelta = initState.anchoredState.dispatchRawDelta(delta)
+                        val consumedDelta = initState.anchoredState.dispatchRawDelta(delta) * 0.6f
                         Offset(0f, consumedDelta)
                     } else {
                         Offset.Zero
                     }
                 }
 
+                /**
+                 * Tiêu thụ vận tốc cuộn đà (fling velocity) TRƯỚC KHI (Pre) danh sách con thực hiện hiệu ứng fling.
+                 *
+                 * - Trường hợp vuốt nhanh lên trên (toFling < 0f): Nếu BottomSheet chưa đạt vị trí trần (minPosition / Expanded),
+                 *   BottomSheet sẽ bắt lấy vận tốc này và gọi `initState.settle` để chạy animation hít (snap) Sheet lên trạng thái tiếp theo.
+                 * - Trả về lượng vận tốc đã tiêu thụ để danh sách con không cuộn đà đè lên trong lúc Sheet đang di chuyển.
+                 */
                 override suspend fun onPreFling(available: Velocity): Velocity {
                     val toFling = available.y
                     val currentOffset = initState.offset
@@ -88,10 +111,17 @@ fun CommonScreenBottomSheet(
                     }
                 }
 
+                /**
+                 * Tiêu thụ vận tốc cuộn đà (fling velocity) SAU KHI (Post) danh sách con đã fling hết hoặc chạm đỉnh.
+                 *
+                 * - Trường hợp vuốt nhanh xuống dưới (toFling > 0f): Khi danh sách đã ở đỉnh và không thể fling tiếp,
+                 *   vận tốc còn lại (available.y) sẽ chuyển cho BottomSheet để gọi `initState.settle` đưa Sheet về trạng thái thu nhỏ/ẩn.
+                 * - Nhân hệ số 0.6f để giảm chấn vận tốc fling xuống.
+                 */
                 override suspend fun onPostFling(consumed: Velocity, available: Velocity): Velocity {
                     val toFling = available.y
                     return if (toFling > 0f) {
-                        val consumedY = initState.settle(toFling)
+                        val consumedY = initState.settle(toFling) * 0.6f
                         Velocity(0f, consumedY)
                     } else {
                         Velocity.Zero
@@ -124,12 +154,21 @@ fun CommonScreenBottomSheet(
                     .fillMaxWidth()
                     .layout { measurable, constraints ->
                         val currentOffset = initState.offset
-                        val y = if (currentOffset.isNaN()) totalHeightPx.roundToInt() else currentOffset.roundToInt()
+                        val fallbackY = if (totalHeightPx > 0f) {
+                            val ratio = when (initState.targetValue) {
+                                CustomBottomSheetValue.Expanded -> config.expandedRatio
+                                CustomBottomSheetValue.PartiallyExpanded -> config.partiallyExpandedRatio
+                                CustomBottomSheetValue.Peeked -> config.peekedRatio
+                                CustomBottomSheetValue.Hidden -> 0f
+                            }
+                            totalHeightPx * (1f - ratio)
+                        } else totalHeightPx
+                        val y =
+                            if (currentOffset.isNaN()) fallbackY.roundToInt() else currentOffset.roundToInt()
                         val visibleHeight = (totalHeightPx - y).coerceAtLeast(0f).roundToInt()
                         val placeable = measurable.measure(
                             constraints.copy(
-                                minHeight = visibleHeight,
-                                maxHeight = visibleHeight
+                                minHeight = visibleHeight, maxHeight = visibleHeight
                             )
                         )
                         layout(placeable.width, placeable.height) {
@@ -138,11 +177,10 @@ fun CommonScreenBottomSheet(
                     }
                     .nestedScroll(nestedScrollConnection)
                     .anchoredDraggable(
-                        state = initState.anchoredState,
-                        orientation = Orientation.Vertical
+                        state = initState.anchoredState, orientation = Orientation.Vertical
                     ),
                 shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
-                color = AppTheme.colors.primary,
+                color = AppTheme.colors.backgroundGreenCard,
                 shadowElevation = 8.dp
             ) {
                 sheetContent()

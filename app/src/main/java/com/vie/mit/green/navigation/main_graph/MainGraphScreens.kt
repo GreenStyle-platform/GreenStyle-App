@@ -1,5 +1,6 @@
 package com.vie.mit.green.navigation.main_graph
 
+import com.vie.mit.data.model.common.map.TransitMode
 import kotlinx.serialization.Serializable
 
 @Serializable
@@ -13,7 +14,9 @@ object MapContainerRoute
 object HomeSheetRoute
 
 @Serializable
-data object NearbyTransitStopsSheetRoute
+data class NearbyTransitStopsSheetRoute(
+    val transitTypeId: String? = null,
+)
 
 /**
  * Route to NearbyBusStopsSheet — dedicated screen for nearby bus stops with arrival info.
@@ -34,17 +37,20 @@ data object NearbySubwayStationsSheetRoute
 data object NearbyBikeStationsSheetRoute
 
 @Serializable
-data class StopDetailSheetRoute(
-    val stopId: String,
-    val typeId: String = "",
-    val name: String = "",
-)
-
-@Serializable
 object SettingRoute
 
 @Serializable
 object BusRouteSearchRoute
+
+@Serializable
+object RoutePlannerContainerRoute
+
+// RoutePlanner nested sheet routes
+@Serializable
+object RouteLocationPickerSheetRoute
+
+@Serializable
+object RouteOptionsRouteSheet
 
 @Serializable
 object JourneyDetailRoute
@@ -53,13 +59,16 @@ object JourneyDetailRoute
 object JourneyNavigationRoute
 
 @Serializable
+data class TransitRouteDetailRoute(
+    val routeId: String = "",
+    val transitMode: TransitMode = TransitMode.BUS,
+)
+
+@Serializable
 object TransitRoutePathRoute
 
 @Serializable
 data class TransitStopDetailRoute(
     val stopId: String,
-    val typeId: String = "",
-    val name: String = "",
-    val latitude: Double = 0.0,
-    val longitude: Double = 0.0,
+    val transitMode: TransitMode = TransitMode.BUS,
 )

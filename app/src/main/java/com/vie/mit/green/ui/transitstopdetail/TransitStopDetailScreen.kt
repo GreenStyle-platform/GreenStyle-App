@@ -16,15 +16,13 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.DirectionsBus
 import androidx.compose.material.icons.filled.DirectionsSubway
-import androidx.compose.material.icons.filled.PedalBike
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material.icons.filled.Train
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -32,7 +30,6 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -53,10 +50,12 @@ import com.vie.mit.common.screenbottomsheet.CommonScreenBottomSheet
 import com.vie.mit.common.screenbottomsheet.CustomBottomSheetValue
 import com.vie.mit.common.screenbottomsheet.rememberCustomBottomSheetState
 import com.vie.mit.common.theme.AppTheme
+import com.vie.mit.common.ui.button.FloatingBackButton
+import com.vie.mit.data.model.common.map.TransitMode
+import com.vie.mit.data.model.common.map.toTransitTypeConfig
 import com.vie.mit.data.model.domain.map.StopArrival
 import com.vie.mit.data.model.domain.map.VehicleArrival
 import com.vie.mit.mapbox.composable.TransitStopFocusMap
-import com.vie.mit.mapbox.model.TransitTypeConfig
 
 /**
  * Screen displaying the details of a transit stop/station.
@@ -78,8 +77,8 @@ fun TransitStopDetailScreen(
     val sheetConfig = remember {
         BottomSheetConfig(
             peekedRatio = 0.20f,
-            partiallyExpandedRatio = 0.50f,
-            expandedRatio = 0.90f,
+            partiallyExpandedRatio = 0.72f,
+            expandedRatio = 0.80f,
         )
     }
 
@@ -99,33 +98,8 @@ fun TransitStopDetailScreen(
         }
     }
 
-    val transitTypeConfig = remember(uiState.typeId) {
-        when (uiState.typeId.uppercase()) {
-            "SUBWAY", "METRO" -> TransitTypeConfig(
-                typeId = "SUBWAY",
-                iconResId = com.vie.mit.mapbox.R.drawable.ic_transit_metro,
-                clusterColor = 0xFFE53935.toInt(),
-                iconSize = 1.2,
-            )
-            "BICYCLE", "BICYCLE_RENT", "BIKE" -> TransitTypeConfig(
-                typeId = "BICYCLE_RENT",
-                iconResId = com.vie.mit.mapbox.R.drawable.ic_transit_bike,
-                clusterColor = 0xFF43A047.toInt(),
-                iconSize = 1.2,
-            )
-            "RAIL", "TRAIN" -> TransitTypeConfig(
-                typeId = "RAIL",
-                iconResId = com.vie.mit.mapbox.R.drawable.ic_transit_train,
-                clusterColor = 0xFF8E24AA.toInt(),
-                iconSize = 1.2,
-            )
-            else -> TransitTypeConfig(
-                typeId = "BUS",
-                iconResId = com.vie.mit.mapbox.R.drawable.ic_transit_bus,
-                clusterColor = 0xFF1E88E5.toInt(),
-                iconSize = 1.2,
-            )
-        }
+    val transitTypeConfig = remember(uiState.type) {
+        uiState.type.toTransitTypeConfig(iconSize = 1.2).copy(textMinZoom = 8.0)
     }
 
     CommonScreenBottomSheet(
@@ -142,36 +116,23 @@ fun TransitStopDetailScreen(
                     transitTypeConfig = transitTypeConfig,
                     cameraBottomPadding = cameraBottomPadding,
                     showUserLocation = true,
-                    zoom = 16.5,
+                    zoom = 14.2,
                 )
 
                 // Top-Left Floating Back Button
-                Surface(
+                FloatingBackButton(
                     onClick = viewModel::navigateBack,
-                    shape = CircleShape,
-                    color = Color.White,
-                    shadowElevation = 6.dp,
                     modifier = Modifier
                         .align(Alignment.TopStart)
-                        .padding(top = 48.dp, start = 16.dp)
-                        .size(40.dp)
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Quay lại",
-                            tint = AppTheme.colors.black,
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
-                }
+                        .padding(top = 48.dp, start = 16.dp),
+                )
             }
         },
         sheetContent = {
             TransitStopDetailSheetContent(
                 uiState = uiState,
-                onBack = viewModel::navigateBack,
                 onRetry = viewModel::loadStopDetail,
+                onRouteClick = viewModel:: navigateToDetailRoute
             )
         }
     )
@@ -180,9 +141,9 @@ fun TransitStopDetailScreen(
 @Composable
 private fun TransitStopDetailSheetContent(
     uiState: TransitStopDetailUiState,
-    onBack: () -> Unit,
     onRetry: () -> Unit,
     modifier: Modifier = Modifier,
+    onRouteClick: (String)->Unit
 ) {
     Column(
         modifier = modifier
@@ -199,54 +160,17 @@ private fun TransitStopDetailSheetContent(
         )
 
         // Header: Back icon + Title
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 4.dp, bottom = 8.dp)
-        ) {
-            IconButton(
-                onClick = onBack,
-                modifier = Modifier.size(32.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = "Quay lại",
-                    tint = Color.White,
-                )
-            }
-            Spacer(modifier = Modifier.width(8.dp))
-            Column(modifier = Modifier.weight(1f)) {
                 Text(
+                    modifier = Modifier.padding(top = 8.dp),
                     text = uiState.stopName.ifEmpty { "Chi tiết trạm dừng" },
                     style = AppTheme.typography.headlineMedium.copy(
                         fontWeight = FontWeight.Bold,
                         color = Color.White,
                         fontSize = 18.sp,
                     ),
-                    maxLines = 1,
+                    maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.padding(top = 2.dp)
-                ) {
-                    Icon(
-                        imageVector = getTransitIcon(uiState.typeId),
-                        contentDescription = null,
-                        tint = Color.White.copy(alpha = 0.85f),
-                        modifier = Modifier.size(14.dp)
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(
-                        text = "Mã trạm: ${uiState.stopId}",
-                        style = AppTheme.typography.bodySmall.copy(
-                            color = Color.White.copy(alpha = 0.85f)
-                        ),
-                    )
-                }
-            }
-        }
 
         // Optional address
         if (!uiState.address.isNullOrBlank()) {
@@ -365,7 +289,7 @@ private fun TransitStopDetailSheetContent(
                         items = uiState.routeArrivals,
                         key = { it.routeId },
                     ) { routeArrival ->
-                        RouteArrivalCard(routeArrival = routeArrival)
+                        RouteArrivalCard(routeArrival = routeArrival, onRouteClick = onRouteClick)
                     }
                 }
             }
@@ -377,12 +301,15 @@ private fun TransitStopDetailSheetContent(
 private fun RouteArrivalCard(
     routeArrival: StopArrival,
     modifier: Modifier = Modifier,
+    onRouteClick: (String) ->Unit
 ) {
-    val routeColor = remember(routeArrival.routeColor) {
-        parseHexColor(routeArrival.routeColor, defaultColor = Color(0xFF1E88E5))
+    val defaultBusColor = AppTheme.colors.busColor
+    val routeColor = remember(routeArrival.routeColor, defaultBusColor) {
+        parseHexColor(routeArrival.routeColor, defaultColor = defaultBusColor)
     }
 
     Card(
+        onClick = {onRouteClick.invoke(routeArrival.routeId)},
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(14.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),
@@ -515,10 +442,10 @@ private fun ArrivalChip(
     }
 }
 
-private fun getTransitIcon(typeId: String): ImageVector {
-    return when (typeId.uppercase()) {
-        "SUBWAY", "METRO" -> Icons.Default.DirectionsSubway
-        "BICYCLE", "BICYCLE_RENT", "BIKE" -> Icons.Default.PedalBike
+private fun getTransitIcon(type: TransitMode): ImageVector {
+    return when (type) {
+        TransitMode.SUBWAY, TransitMode.MONORAIL -> Icons.Default.DirectionsSubway
+        TransitMode.RAIL, TransitMode.TRAM, TransitMode.CABLE_TRAM, TransitMode.AERIAL_LIFT -> Icons.Default.Train
         else -> Icons.Default.DirectionsBus
     }
 }
