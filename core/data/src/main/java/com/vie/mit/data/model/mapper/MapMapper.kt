@@ -1,5 +1,7 @@
 package com.vie.mit.data.model.mapper
 
+import android.os.Build
+import androidx.annotation.RequiresApi
 import com.vie.mit.data.model.common.map.TransitMode
 import com.vie.mit.data.model.domain.map.AutosuggestPlace
 import com.vie.mit.data.model.domain.map.BusRoute
@@ -65,6 +67,7 @@ fun BusRouteResponse.toDomain(): BusRoute = BusRoute(
     routeTextColor = routeTextColor,
 )
 
+@RequiresApi(Build.VERSION_CODES.O)
 fun Map<String, List<RouteArrivalResponse>>.toDomain(): List<StopArrival> {
     val now = LocalTime.now()
     val nowSeconds = now.toSecondOfDay()

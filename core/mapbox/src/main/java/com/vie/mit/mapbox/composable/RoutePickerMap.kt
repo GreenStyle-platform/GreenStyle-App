@@ -6,8 +6,10 @@ import android.Manifest
 import android.content.pm.PackageManager
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -17,8 +19,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
 import androidx.core.content.ContextCompat
 import com.mapbox.android.gestures.MoveGestureDetector
 import com.mapbox.geojson.Feature
@@ -94,6 +99,7 @@ fun RoutePickerMap(
     routeSegments: List<RouteMapSegment> = emptyList(),
     transferStops: List<RouteMapStopPoint> = emptyList(),
     cameraBottomPadding: Float = 0f,
+    routeFitBottomRatio: Float = 0.60f,
     showUserLocation: Boolean = true,
     fitRouteBounds: Boolean = false,
     mapViewportState: MapViewportState = rememberMapViewportState {
@@ -110,13 +116,15 @@ fun RoutePickerMap(
     centerOverlay: (@Composable () -> Unit)? = null,
 ) {
     val context = LocalContext.current
+    val density = LocalDensity.current
+    val statusBarTopPx = WindowInsets.statusBars.getTop(density).toDouble()
     val primaryColor = AppTheme.colors.navyBlue
     val currentOnCameraCenterChanged by rememberUpdatedState(onCameraCenterChanged)
     val currentOnLocationUpdate by rememberUpdatedState(onLocationUpdate)
     val currentOnMapClick by rememberUpdatedState(onMapClick)
     val currentOnMapMoveStateChanged by rememberUpdatedState(onMapMoveStateChanged)
     val currentOnCameraIdle by rememberUpdatedState(onCameraIdle)
-    val currentCameraBottomPadding by rememberUpdatedState(cameraBottomPadding)
+    var mapSizePx by remember { mutableStateOf(IntSize.Zero) }
 
     val isPermissionGrantedInitially = remember(context) {
         (ContextCompat.checkSelfPermission(
@@ -144,12 +152,17 @@ fun RoutePickerMap(
             .background(MapPlaceholderBackgroundColor)
     ) {
         MapboxMap(
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier
+                .fillMaxSize()
+                .onSizeChanged { mapSizePx = it },
             composeMapInitOptions = mapInitOptions,
             mapViewportState = mapViewportState,
         ) {
-            // 1. Đồng bộ Camera Bottom Padding theo BottomSheet (không gián đoạn flyTo animation đang chạy)
-            MapEffect(cameraBottomPadding) { mapView ->
+            // 1. Đồng bộ Camera Bottom Padding theo BottomSheet khi ở chế độ chọn điểm (Picker mode).
+            // Khi ở chế độ xem toàn tuyến (fitRouteBounds == true), dừng ghi đè padding từng frame
+            // để không hủy ngang animation easeTo của fitRouteBounds và không làm lệch khung nhìn tuyến.
+            MapEffect(cameraBottomPadding, fitRouteBounds) { mapView ->
+                if (fitRouteBounds) return@MapEffect
                 val mapboxMap = mapView.mapboxMap
                 val currentCamera = mapboxMap.cameraState
                 val maxSafeBottom = if (mapView.height > 0) {
@@ -431,8 +444,12 @@ fun RoutePickerMap(
             }
 
             // 5. Khi ở chế độ xem phương án di chuyển (fitRouteBounds), tự động zoom bao trọn toàn bộ lộ trình đang chọn
-            MapEffect(startPoint, endPoint, routeSegments, fitRouteBounds) { mapView ->
+            MapEffect(startPoint, endPoint, routeSegments, fitRouteBounds, routeFitBottomRatio, mapSizePx) { mapView ->
                 if (!fitRouteBounds || startPoint == null || endPoint == null) return@MapEffect
+                val mapWidth = mapSizePx.width.takeIf { it > 0 } ?: mapView.width
+                val mapHeight = mapSizePx.height.takeIf { it > 0 } ?: mapView.height
+                if (mapWidth <= 0 || mapHeight <= 0) return@MapEffect
+
                 val mapboxMap = mapView.mapboxMap
                 val segmentPoints = routeSegments
                     .flatMap { it.points }
@@ -443,26 +460,30 @@ fun RoutePickerMap(
                 )
                 val points = if (segmentPoints.isNotEmpty()) segmentPoints + endpointPoints else endpointPoints
 
-                val mapHeight = mapView.height.toDouble()
-                val safeTop = 140.0
-                val maxSafeBottom = if (mapHeight > 320.0) {
-                    (mapHeight - safeTop - 160.0).coerceAtLeast(140.0)
-                } else {
-                    140.0
-                }
-                val safeBottom = (currentCameraBottomPadding.toDouble() + 80.0)
-                    .coerceIn(140.0, maxSafeBottom)
+                val insets = computeRouteFitEdgeInsets(
+                    mapWidthPx = mapWidth,
+                    mapHeightPx = mapHeight,
+                    statusBarTopPx = statusBarTopPx,
+                    routeFitBottomRatio = routeFitBottomRatio,
+                    density = density.density,
+                )
 
                 val camera = mapboxMap.cameraForCoordinates(
-                    points,
-                    EdgeInsets(safeTop, 100.0, safeBottom, 100.0),
-                    null,
-                    null,
+                    coordinates = points,
+                    camera = cameraOptions {
+                        padding(EdgeInsets(0.0, 0.0, 0.0, 0.0))
+                        bearing(0.0)
+                        pitch(0.0)
+                    },
+                    coordinatesPadding = insets,
+                    maxZoom = 16.0,
+                    offset = null,
                 )
-                mapView.camera.easeTo(
-                    camera,
-                    MapAnimationOptions.mapAnimationOptions {
+                mapViewportState.easeTo(
+                    cameraOptions = camera,
+                    animationOptions = MapAnimationOptions.mapAnimationOptions {
                         duration(500L)
+                        owner("FIT_ROUTE_BOUNDS")
                     },
                 )
             }
@@ -482,4 +503,49 @@ fun RoutePickerMap(
             }
         }
     }
+}
+
+/**
+ * Computes safe screen-edge [EdgeInsets] (in pixels) for framing a full route itinerary above
+ * the BottomSheet while clearing the status bar and floating back button.
+ */
+internal fun computeRouteFitEdgeInsets(
+    mapWidthPx: Int,
+    mapHeightPx: Int,
+    statusBarTopPx: Double,
+    routeFitBottomRatio: Float,
+    density: Float,
+): EdgeInsets {
+    val width = mapWidthPx.toDouble().coerceAtLeast(1.0)
+    val height = mapHeightPx.toDouble().coerceAtLeast(1.0)
+    val safeDensity = density.toDouble().coerceAtLeast(1.0)
+
+    val topExtraPx = 64.0 * safeDensity
+    val horizontalPx = 40.0 * safeDensity
+    val bottomExtraPx = 32.0 * safeDensity
+    val minVisibleHeightPx = 120.0 * safeDensity
+    val minVisibleWidthPx = 100.0 * safeDensity
+
+    val desiredTop = statusBarTopPx.coerceAtLeast(0.0) + topExtraPx
+    val desiredBottom = height * routeFitBottomRatio.coerceIn(0f, 0.85f) + bottomExtraPx
+
+    val maxVerticalPadding = (height - minVisibleHeightPx).coerceAtLeast(0.0)
+    val safeTop: Double
+    val safeBottom: Double
+    if (desiredTop + desiredBottom <= maxVerticalPadding) {
+        safeTop = desiredTop
+        safeBottom = desiredBottom
+    } else if (desiredTop + desiredBottom > 0.0) {
+        val scale = maxVerticalPadding / (desiredTop + desiredBottom)
+        safeTop = desiredTop * scale
+        safeBottom = desiredBottom * scale
+    } else {
+        safeTop = 0.0
+        safeBottom = 0.0
+    }
+
+    val maxHorizontalPadding = ((width - minVisibleWidthPx) / 2.0).coerceAtLeast(0.0)
+    val safeHorizontal = horizontalPx.coerceAtMost(maxHorizontalPadding)
+
+    return EdgeInsets(safeTop, safeHorizontal, safeBottom, safeHorizontal)
 }

@@ -30,7 +30,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
@@ -47,6 +49,7 @@ import com.vie.mit.common.screenbottomsheet.BottomSheetConfig
 import com.vie.mit.common.screenbottomsheet.CommonScreenBottomSheet
 import com.vie.mit.common.screenbottomsheet.CustomBottomSheetValue
 import com.vie.mit.common.screenbottomsheet.rememberCustomBottomSheetState
+import com.vie.mit.common.theme.AppColors
 import com.vie.mit.common.theme.AppTheme
 import com.vie.mit.common.ui.button.FloatingBackButton
 import com.vie.mit.data.model.common.map.TransitMode
@@ -60,6 +63,7 @@ import com.vie.mit.mapbox.model.RouteMapStopPoint
 import com.vie.mit.mapbox.util.focusUserLocationBoundingBox
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
+import java.util.Locale
 import kotlin.math.roundToInt
 
 /**
@@ -256,22 +260,38 @@ fun RoutePlannerContainerScreen(
         }
     }
 
+    val colors = AppTheme.colors
+    val routeFitBottomRatio by remember(bottomSheetState, sheetConfig, isLocationPickerActive) {
+        derivedStateOf {
+            if (isLocationPickerActive) {
+                0f
+            } else {
+                when (bottomSheetState.targetValue) {
+                    CustomBottomSheetValue.Peeked -> sheetConfig.peekedRatio
+                    CustomBottomSheetValue.Hidden -> 0f
+                    CustomBottomSheetValue.PartiallyExpanded,
+                    CustomBottomSheetValue.Expanded,
+                    -> sheetConfig.partiallyExpandedRatio
+                }
+            }
+        }
+    }
     val selectedRouteOption = if (!isLocationPickerActive) uiState.selectedRouteOption else null
-    val routeMapSegments = remember(selectedRouteOption) {
+    val routeMapSegments = remember(selectedRouteOption, colors) {
         selectedRouteOption?.legs.orEmpty().mapNotNull { leg ->
             if (leg.points.size < 2) return@mapNotNull null
             RouteMapSegment(
                 points = leg.points.map { LocationData(latitude = it.latitude, longitude = it.longitude) },
-                colorHex = leg.mode.toMapLineColorHex(),
+                colorHex = leg.mode.toRouteColor(colors).toHexRgb(),
                 isDashed = leg.mode == TransitMode.WALK,
             )
         }
     }
-    val transferStops = remember(selectedRouteOption) {
+    val transferStops = remember(selectedRouteOption, colors) {
         selectedRouteOption?.legs.orEmpty()
             .filter { it.mode.isTransit }
             .flatMap { leg ->
-                val colorHex = leg.mode.toMapLineColorHex()
+                val colorHex = leg.mode.toRouteColor(colors).toHexRgb()
                 listOfNotNull(leg.from, leg.to).map { place ->
                     RouteMapStopPoint(
                         name = place.name,
@@ -299,6 +319,7 @@ fun RoutePlannerContainerScreen(
                         }
                     },
                     cameraBottomPadding = cameraBottomPadding,
+                    routeFitBottomRatio = routeFitBottomRatio,
                     fitRouteBounds = !isLocationPickerActive,
                     mapViewportState = mapViewportState,
                     onLocationUpdate = containerViewModel::onLocationUpdated,
@@ -446,11 +467,13 @@ private fun CenterLocationMarker(
     )
 }
 
-private fun TransitMode.toMapLineColorHex(): String = when (this) {
-    TransitMode.BUS, TransitMode.TROLLEYBUS -> "#10B981"
-    TransitMode.SUBWAY, TransitMode.MONORAIL -> "#3B82F6"
-    TransitMode.RAIL, TransitMode.TRAM, TransitMode.CABLE_TRAM, TransitMode.AERIAL_LIFT -> "#8B5CF6"
-    TransitMode.FERRY -> "#06B6D4"
-    TransitMode.BIKE -> "#F59E0B"
-    TransitMode.WALK -> "#64748B"
+internal fun TransitMode.toRouteColor(colors: AppColors): Color = when (this) {
+    TransitMode.BUS, TransitMode.TROLLEYBUS -> colors.busColor
+    TransitMode.SUBWAY, TransitMode.MONORAIL -> colors.metroColor
+    TransitMode.RAIL, TransitMode.TRAM, TransitMode.CABLE_TRAM, TransitMode.AERIAL_LIFT -> colors.railColor
+    TransitMode.BIKE -> colors.bikeColor
+    TransitMode.FERRY -> colors.navyBlue
+    TransitMode.WALK -> colors.secondaryText
 }
+
+private fun Color.toHexRgb(): String = String.format(Locale.US, "#%06X", toArgb() and 0xFFFFFF)

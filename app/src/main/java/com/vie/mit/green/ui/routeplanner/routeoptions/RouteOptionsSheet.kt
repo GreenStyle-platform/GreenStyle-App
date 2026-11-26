@@ -59,6 +59,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.vie.mit.common.theme.AppColors
 import com.vie.mit.common.theme.AppTheme
 import com.vie.mit.data.model.common.map.TransitMode
 import com.vie.mit.data.model.domain.map.RouteLeg
@@ -68,6 +69,7 @@ import com.vie.mit.green.ui.routeplanner.components.DepartureTimeSelectorBar
 import com.vie.mit.green.ui.routeplanner.container.LocationPickerField
 import com.vie.mit.green.ui.routeplanner.container.RouteOptionFilter
 import com.vie.mit.green.ui.routeplanner.container.RoutePlannerContainerViewModel
+import com.vie.mit.green.ui.routeplanner.container.toRouteColor
 import com.vie.mit.mapbox.model.distanceTo
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -398,14 +400,18 @@ private fun RouteOptionFilter.toLabel(): String = when (this) {
     RouteOptionFilter.WALK -> "Đi bộ"
 }
 
-private fun TransitMode.toIconAndColor(): Pair<ImageVector, Color> = when (this) {
-    TransitMode.BUS, TransitMode.TROLLEYBUS -> Icons.Default.DirectionsBus to Color(0xFF10B981)
-    TransitMode.SUBWAY, TransitMode.MONORAIL -> Icons.Default.DirectionsSubway to Color(0xFF3B82F6)
-    TransitMode.RAIL, TransitMode.TRAM, TransitMode.CABLE_TRAM, TransitMode.AERIAL_LIFT ->
-        Icons.Default.Train to Color(0xFF8B5CF6)
-    TransitMode.FERRY -> Icons.Default.DirectionsBoat to Color(0xFF06B6D4)
-    TransitMode.BIKE -> Icons.AutoMirrored.Filled.DirectionsBike to Color(0xFFF59E0B)
-    TransitMode.WALK -> Icons.AutoMirrored.Filled.DirectionsWalk to Color(0xFF6B7280)
+private fun TransitMode.toIconAndColor(colors: AppColors): Pair<ImageVector, Color> = when (this) {
+    TransitMode.BUS, TransitMode.TROLLEYBUS -> Icons.Default.DirectionsBus to toRouteColor(colors)
+    TransitMode.SUBWAY, TransitMode.MONORAIL -> Icons.Default.DirectionsSubway to toRouteColor(
+        colors
+    )
+    TransitMode.RAIL, TransitMode.TRAM, TransitMode.CABLE_TRAM, TransitMode.AERIAL_LIFT -> Icons.Default.Train to toRouteColor(
+        colors
+    )
+
+    TransitMode.FERRY -> Icons.Default.DirectionsBoat to toRouteColor(colors)
+    TransitMode.BIKE -> Icons.AutoMirrored.Filled.DirectionsBike to toRouteColor(colors)
+    TransitMode.WALK -> Icons.AutoMirrored.Filled.DirectionsWalk to toRouteColor(colors)
 }
 
 private fun formatDurationLabel(durationMinutes: Int): String {
@@ -429,8 +435,9 @@ private fun RouteOptionCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val (icon, iconColor) = remember(option.transportType) {
-        option.transportType.toIconAndColor()
+    val colors = AppTheme.colors
+    val (icon, iconColor) = remember(option.transportType, colors) {
+        option.transportType.toIconAndColor(colors)
     }
     val timeRangeText = remember(option.startTimeMillis, option.endTimeMillis) {
         formatTimeRange(option.startTimeMillis, option.endTimeMillis)
@@ -624,7 +631,8 @@ private fun RouteLegBadge(
     leg: RouteLeg,
     modifier: Modifier = Modifier,
 ) {
-    val (icon, color) = remember(leg.mode) { leg.mode.toIconAndColor() }
+    val colors = AppTheme.colors
+    val (icon, color) = remember(leg.mode, colors) { leg.mode.toIconAndColor(colors) }
     val isTransit = leg.mode.isTransit
     val label = if (isTransit) {
         leg.routeShortName?.takeIf { it.isNotBlank() } ?: "${leg.durationMinutes}p"
