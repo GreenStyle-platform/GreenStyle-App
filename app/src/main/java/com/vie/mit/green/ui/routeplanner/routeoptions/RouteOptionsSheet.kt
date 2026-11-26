@@ -47,7 +47,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -61,6 +63,8 @@ import com.vie.mit.common.theme.AppTheme
 import com.vie.mit.data.model.common.map.TransitMode
 import com.vie.mit.data.model.domain.map.RouteLeg
 import com.vie.mit.data.model.domain.map.RouteOption
+import com.vie.mit.green.ui.routeplanner.components.DepartureTimePickerDialog
+import com.vie.mit.green.ui.routeplanner.components.DepartureTimeSelectorBar
 import com.vie.mit.green.ui.routeplanner.container.LocationPickerField
 import com.vie.mit.green.ui.routeplanner.container.RouteOptionFilter
 import com.vie.mit.green.ui.routeplanner.container.RoutePlannerContainerViewModel
@@ -82,6 +86,7 @@ fun RouteOptionsSheet(
 ) {
     val uiState by containerViewModel.uiState.collectAsStateWithLifecycle()
     val selectedFilter = uiState.selectedRouteFilter
+    var showDepartureTimeDialog by remember { mutableStateOf(false) }
 
     // Đảm bảo dữ liệu được tải nếu chưa có khi mở trực tiếp sheet
     LaunchedEffect(uiState.startPoint, uiState.endPoint) {
@@ -235,6 +240,20 @@ fun RouteOptionsSheet(
 
         Spacer(modifier = Modifier.height(10.dp))
 
+        // Thanh thời điểm xuất phát (chạm để đổi giờ khởi hành và tải lại phương án ngay)
+        DepartureTimeSelectorBar(
+            selectedDepartureTimeMillis = uiState.selectedDepartureTimeMillis,
+            onClick = { showDepartureTimeDialog = true },
+            onResetToNow = {
+                containerViewModel.onSelectDepartureTime(
+                    departureTimeMillis = null,
+                    reloadIfValidRoute = true,
+                )
+            },
+        )
+
+        Spacer(modifier = Modifier.height(10.dp))
+
         // Filter chips row (cuộn ngang được cho mọi kích thước màn hình)
         LazyRow(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -354,6 +373,20 @@ fun RouteOptionsSheet(
                 }
             }
         }
+    }
+
+    if (showDepartureTimeDialog) {
+        DepartureTimePickerDialog(
+            initialDepartureTimeMillis = uiState.selectedDepartureTimeMillis,
+            onDismiss = { showDepartureTimeDialog = false },
+            onConfirm = { selectedMillis ->
+                showDepartureTimeDialog = false
+                containerViewModel.onSelectDepartureTime(
+                    departureTimeMillis = selectedMillis,
+                    reloadIfValidRoute = true,
+                )
+            },
+        )
     }
 }
 

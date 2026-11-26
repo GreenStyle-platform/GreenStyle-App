@@ -444,10 +444,33 @@ class RoutePlannerContainerViewModel internal constructor(
     // ── Route Options (OTP2 Backend) ───────────────────────────────
 
     /**
+     * Cập nhật thời điểm xuất phát do người dùng chọn (`null` = Khởi hành ngay).
+     * Khi [reloadIfValidRoute] = true và đã có đủ Start/End, tự động tải lại danh sách phương án.
+     */
+    fun onSelectDepartureTime(
+        departureTimeMillis: Long?,
+        reloadIfValidRoute: Boolean = false,
+    ) {
+        routeOptionsJob?.cancel()
+        _uiState.update { state ->
+            state.copy(
+                selectedDepartureTimeMillis = departureTimeMillis,
+                routeOptions = emptyList(),
+                isLoadingRoutes = false,
+                routeOptionsError = null,
+                selectedRouteOptionId = null,
+            )
+        }
+        if (reloadIfValidRoute && _uiState.value.hasValidRoute) {
+            loadRouteOptions(departureTimeMillis = departureTimeMillis)
+        }
+    }
+
+    /**
      * Tải danh sách phương án di chuyển giữa điểm xuất phát và điểm đích từ repository.
      */
     fun loadRouteOptions(
-        departureTimeMillis: Long? = null,
+        departureTimeMillis: Long? = _uiState.value.selectedDepartureTimeMillis,
         maxItineraries: Int = RoutePlannerRepository.DEFAULT_MAX_ITINERARIES,
     ) {
         val start = _uiState.value.startPoint
@@ -462,6 +485,11 @@ class RoutePlannerContainerViewModel internal constructor(
                 )
             }
             return
+        }
+
+        // Nếu thời điểm người dùng chọn trước đó đã trôi qua, tự động chuyển về "Khởi hành ngay"
+        val effectiveDepartureMillis = departureTimeMillis?.takeIf {
+            it > System.currentTimeMillis() + 5_000L
         }
 
         routeOptionsJob?.cancel()
@@ -479,7 +507,7 @@ class RoutePlannerContainerViewModel internal constructor(
                 startLng = start.longitude,
                 endLat = end.latitude,
                 endLng = end.longitude,
-                departureTimeMillis = departureTimeMillis,
+                departureTimeMillis = effectiveDepartureMillis,
                 maxItineraries = maxItineraries,
             ).onSuccess { options ->
                 _uiState.update { state ->

@@ -49,6 +49,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -66,6 +67,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.vie.mit.common.theme.AppTheme
 import com.vie.mit.common.ui.textfield.LocationInputTextFieldGre
 import com.vie.mit.data.model.domain.map.AutosuggestPlace
+import com.vie.mit.green.ui.routeplanner.components.DepartureTimePickerDialog
+import com.vie.mit.green.ui.routeplanner.components.DepartureTimeSelectorBar
 import com.vie.mit.green.ui.routeplanner.container.LocationPickerField
 import com.vie.mit.green.ui.routeplanner.container.RoutePlannerContainerViewModel
 import java.util.Locale
@@ -95,6 +98,7 @@ fun RouteLocationPickerSheet(
     val endInteractionSource = remember { MutableInteractionSource() }
 
     var swapRotationTarget by remember { mutableFloatStateOf(0f) }
+    var showDepartureTimeDialog by remember { mutableStateOf(false) }
     val swapRotation by animateFloatAsState(
         targetValue = swapRotationTarget,
         animationSpec = tween(durationMillis = 250),
@@ -289,6 +293,20 @@ fun RouteLocationPickerSheet(
             )
         }
 
+        Spacer(modifier = Modifier.height(8.dp))
+
+        // Thanh chọn thời điểm xuất phát (mặc định: "Khởi hành ngay")
+        DepartureTimeSelectorBar(
+            selectedDepartureTimeMillis = uiState.selectedDepartureTimeMillis,
+            onClick = {
+                keyboardController?.hide()
+                showDepartureTimeDialog = true
+            },
+            onResetToNow = {
+                containerViewModel.onSelectDepartureTime(null)
+            },
+        )
+
         Spacer(modifier = Modifier.height(10.dp))
 
         // Nút "Xem phương án di chuyển" hiển thị khi cả 2 điểm đã được chọn
@@ -391,6 +409,17 @@ fun RouteLocationPickerSheet(
                 }
             }
         }
+    }
+
+    if (showDepartureTimeDialog) {
+        DepartureTimePickerDialog(
+            initialDepartureTimeMillis = uiState.selectedDepartureTimeMillis,
+            onDismiss = { showDepartureTimeDialog = false },
+            onConfirm = { selectedMillis ->
+                showDepartureTimeDialog = false
+                containerViewModel.onSelectDepartureTime(selectedMillis)
+            },
+        )
     }
 }
 

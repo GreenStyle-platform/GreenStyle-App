@@ -57,6 +57,7 @@ data class RoutePlannerContainerUiState(
     val isLoadingSuggestions: Boolean = false,
     val errorMessage: String? = null,
     val selectedRouteFilter: RouteOptionFilter = RouteOptionFilter.ALL,
+    val selectedDepartureTimeMillis: Long? = null,
     val routeOptions: List<RouteOption> = emptyList(),
     val isLoadingRoutes: Boolean = false,
     val routeOptionsError: String? = null,

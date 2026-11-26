@@ -20,6 +20,9 @@ import com.vie.mit.data.network.api.geocode.GeocodeApi
 import com.vie.mit.data.network.api.routeplanner.RoutePlannerApi
 import com.vie.mit.data.repository.geocode.GeocodeRepository
 import com.vie.mit.data.repository.routeplanner.RoutePlannerRepository
+import com.vie.mit.green.ui.routeplanner.components.combineLocalDateAndTimeMillis
+import com.vie.mit.green.ui.routeplanner.components.formatDepartureTimeLabel
+import com.vie.mit.green.ui.routeplanner.components.toUtcDatePickerMillis
 import com.vie.mit.green.ui.routeplanner.container.RouteOptionFilter
 import com.vie.mit.green.ui.routeplanner.container.RoutePlannerContainerViewModel
 import com.vie.mit.mapbox.model.LocationData
@@ -35,6 +38,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.util.TimeZone
 
 class RoutePlannerRouteOptionsTest {
 
@@ -174,6 +178,81 @@ class RoutePlannerRouteOptionsTest {
             scope.cancel()
         }
     }
+
+    @Test
+    fun onSelectDepartureTime_passesSelectedUtcTimestampToSearchApi() = runBlocking {
+        val fakeRouteApi = FakeTransitRoutePlannerApi()
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
+        try {
+            val viewModel = RoutePlannerContainerViewModel(
+                appNavigator = StubAppNavigator(),
+                geocodeRepository = GeocodeRepository(StubGeocodeApi()),
+                routePlannerRepository = RoutePlannerRepository(fakeRouteApi),
+                customScope = scope,
+                searchDebounceMs = 20L,
+            )
+
+            // 2026-11-27 15:46:00+07:00 == 2026-11-27T08:46:00.000Z (future relative to 2026-11-26)
+            val vietnamTz = TimeZone.getTimeZone("Asia/Ho_Chi_Minh")
+            val nov27UtcDate = toUtcDatePickerMillis(1795769160000L, vietnamTz)
+            val chosenDepartureMillis = combineLocalDateAndTimeMillis(
+                utcDateMillis = nov27UtcDate,
+                hourOfDay = 15,
+                minute = 46,
+                localTimeZone = vietnamTz,
+            )
+
+            viewModel.updateStartLocation(LocationData(21.02817, 105.74122), "Xuất phát")
+            viewModel.updateEndLocation(LocationData(20.97815, 105.78476), "Điểm đến")
+            viewModel.onSelectDepartureTime(chosenDepartureMillis)
+
+            assertEquals(chosenDepartureMillis, viewModel.uiState.value.selectedDepartureTimeMillis)
+
+            viewModel.loadRouteOptions()
+
+            assertEquals(
+                "2026-11-27T08:46:00.000Z",
+                fakeRouteApi.lastRequest?.departureTime,
+            )
+
+            // Changing time with reloadIfValidRoute = true triggers immediate reload with new timestamp
+            val updatedMillis = chosenDepartureMillis + 30 * 60_000L
+            viewModel.onSelectDepartureTime(updatedMillis, reloadIfValidRoute = true)
+            assertEquals(
+                "2026-11-27T09:16:00.000Z",
+                fakeRouteApi.lastRequest?.departureTime,
+            )
+        } finally {
+            scope.cancel()
+        }
+    }
+
+    @Test
+    fun departureTimeHelpers_preserveVietnamCalendarDateAcrossUtcConversion() {
+        val vietnamTz = TimeZone.getTimeZone("Asia/Ho_Chi_Minh")
+        // 2026-11-27 00:30:00+07:00 (still Nov 26 in UTC, must stay Nov 27 in Vietnam)
+        val nov27EarlyMorningVn = 1795714200000L
+        val utcDateMillis = toUtcDatePickerMillis(nov27EarlyMorningVn, vietnamTz)
+        val combined = combineLocalDateAndTimeMillis(
+            utcDateMillis = utcDateMillis,
+            hourOfDay = 8,
+            minute = 15,
+            localTimeZone = vietnamTz,
+        )
+
+        assertEquals(
+            "2026-11-27T01:15:00.000Z",
+            RoutePlannerRepository.formatUtcIsoTimestamp(combined),
+        )
+        assertEquals(
+            "Khởi hành ngay",
+            formatDepartureTimeLabel(null, nowMillis = nov27EarlyMorningVn, localTimeZone = vietnamTz),
+        )
+        assertEquals(
+            "Khởi hành: Hôm nay, 08:15",
+            formatDepartureTimeLabel(combined, nowMillis = nov27EarlyMorningVn, localTimeZone = vietnamTz),
+        )
+    }
 }
 
 private class StubAppNavigator : AppNavigator {
@@ -202,6 +281,8 @@ private class FakeTransitRoutePlannerApi(
     private val response: TransitRouteSearchResponse = TransitRouteSearchResponse(),
     private val error: Throwable? = null,
 ) : RoutePlannerApi {
+    var lastRequest: TransitRouteSearchRequest? = null
+
     override suspend fun getPublicTransportSuggestions(
         location: LocationRequest,
     ): List<PublicTransportSuggestionResponse> = emptyList()
@@ -209,6 +290,7 @@ private class FakeTransitRoutePlannerApi(
     override suspend fun searchTransitRoutes(
         request: TransitRouteSearchRequest,
     ): TransitRouteSearchResponse {
+        lastRequest = request
         error?.let { throw it }
         return response
     }
