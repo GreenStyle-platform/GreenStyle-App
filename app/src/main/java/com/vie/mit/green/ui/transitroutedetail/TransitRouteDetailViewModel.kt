@@ -7,7 +7,7 @@ import androidx.navigation.toRoute
 import com.vie.mit.common.navigation.AppNavigator
 import com.vie.mit.data.model.common.map.TransitMode
 import com.vie.mit.data.model.domain.map.RoundTrip
-import com.vie.mit.data.repository.map.MapRepository
+import com.vie.mit.data.repository.transit.TransitRouteRepository
 import com.vie.mit.green.navigation.main_graph.TransitRouteDetailRoute
 import com.vie.mit.green.navigation.main_graph.TransitStopDetailRoute
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -23,7 +23,7 @@ import javax.inject.Inject
 @HiltViewModel
 class TransitRouteDetailViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
-    private val mapRepository: MapRepository,
+    private val transitRouteRepository: TransitRouteRepository,
     private val appNavigator: AppNavigator,
 ) : ViewModel() {
 
@@ -72,7 +72,7 @@ class TransitRouteDetailViewModel @Inject constructor(
         _uiState.update { it.copy(isLoading = true, error = null) }
 
         viewModelScope.launch {
-            val result = mapRepository.getRouteTrips(mode = mode, routeId = routeId)
+            val result = transitRouteRepository.getRouteTrips(mode = mode, routeId = routeId)
             result.onSuccess { trips ->
                 if (trips.isEmpty()) {
                     _uiState.update {
@@ -140,7 +140,7 @@ class TransitRouteDetailViewModel @Inject constructor(
     fun loadTripShape(tripId: String) {
         _uiState.update { it.copy(isShapeLoading = true) }
         viewModelScope.launch {
-            val result = mapRepository.getTripShape(mode = mode, tripId = tripId)
+            val result = transitRouteRepository.getTripShape(mode = mode, tripId = tripId)
             result.onSuccess { shapePoints ->
                 _uiState.update { it.copy(shapes = shapePoints, isShapeLoading = false) }
             }.onFailure { throwable ->
@@ -156,7 +156,7 @@ class TransitRouteDetailViewModel @Inject constructor(
     fun loadTripStops(tripId: String) {
         _uiState.update { it.copy(isStopsLoading = true) }
         viewModelScope.launch {
-            val result = mapRepository.getTripStops(mode = mode, tripId = tripId)
+            val result = transitRouteRepository.getTripStops(mode = mode, tripId = tripId)
             result.onSuccess { stopMarkers ->
                 _uiState.update { it.copy(stops = stopMarkers, isStopsLoading = false) }
             }.onFailure { throwable ->
@@ -178,8 +178,8 @@ class TransitRouteDetailViewModel @Inject constructor(
             )
         }
         viewModelScope.launch {
-            val shapeDeferred = async { mapRepository.getTripShape(mode = mode, tripId = tripId) }
-            val stopsDeferred = async { mapRepository.getTripStops(mode = mode, tripId = tripId) }
+            val shapeDeferred = async { transitRouteRepository.getTripShape(mode = mode, tripId = tripId) }
+            val stopsDeferred = async { transitRouteRepository.getTripStops(mode = mode, tripId = tripId) }
 
             val shapeResult = shapeDeferred.await()
             val stopsResult = stopsDeferred.await()

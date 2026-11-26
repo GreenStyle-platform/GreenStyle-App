@@ -2,7 +2,10 @@ package com.vie.mit.data.di
 
 import com.vie.mit.data.Constants
 import com.vie.mit.data.network.api.auth.AuthApi
-import com.vie.mit.data.network.api.map.MapApi
+import com.vie.mit.data.network.api.geocode.GeocodeApi
+import com.vie.mit.data.network.api.routeplanner.RoutePlannerApi
+import com.vie.mit.data.network.api.transit.TransitRouteApi
+import com.vie.mit.data.network.api.transit.TransitStopApi
 import com.vie.mit.data.network.interceptor.AuthInterceptor
 import com.vie.mit.data.network.interceptor.TokenProvider
 import dagger.Module
@@ -60,5 +63,17 @@ object NetworkModule {
 
     @Provides
     @Singleton
-    fun provideMapApi(retrofit: Retrofit): MapApi = retrofit.create()
+    fun provideGeocodeApi(retrofit: Retrofit): GeocodeApi = retrofit.create()
+
+    @Provides
+    @Singleton
+    fun provideTransitStopApi(retrofit: Retrofit): TransitStopApi = retrofit.create()
+
+    @Provides
+    @Singleton
+    fun provideTransitRouteApi(retrofit: Retrofit): TransitRouteApi = retrofit.create()
+
+    @Provides
+    @Singleton
+    fun provideRoutePlannerApi(retrofit: Retrofit): RoutePlannerApi = retrofit.create()
 }

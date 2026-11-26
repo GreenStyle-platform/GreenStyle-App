@@ -4,7 +4,7 @@ import com.vie.mit.data.model.mapper.toDomain
 import com.vie.mit.data.model.remote.response.map.RouteTripResponse
 import com.vie.mit.data.model.remote.response.map.ShapePointResponse
 import com.vie.mit.data.model.remote.response.map.TripStopResponse
-import com.vie.mit.data.network.api.map.MapApi
+import com.vie.mit.data.network.api.transit.TransitRouteApi
 import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -139,10 +139,10 @@ class RouteTripAndShapeApiModelTest {
     }
 
     @Test
-    fun mapApi_endpointsAnnotationsAreCorrect() {
-        val getRouteTripsMethod = MapApi::class.java.methods.single { it.name == "getRouteTrips" }
-        val getTripShapeMethod = MapApi::class.java.methods.single { it.name == "getTripShape" }
-        val getTripStopsMethod = MapApi::class.java.methods.single { it.name == "getTripStops" }
+    fun transitRouteApi_endpointsAnnotationsAreCorrect() {
+        val getRouteTripsMethod = TransitRouteApi::class.java.methods.single { it.name == "getRouteTrips" }
+        val getTripShapeMethod = TransitRouteApi::class.java.methods.single { it.name == "getTripShape" }
+        val getTripStopsMethod = TransitRouteApi::class.java.methods.single { it.name == "getTripStops" }
         val routeTripsAnnotation =
             requireNotNull(getRouteTripsMethod.getAnnotation(GET::class.java))
         assertEquals("transits/{mode}/search-trip-route", routeTripsAnnotation.value)

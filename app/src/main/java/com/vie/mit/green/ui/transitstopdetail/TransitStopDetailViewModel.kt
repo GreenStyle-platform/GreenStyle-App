@@ -5,7 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.navigation.toRoute
 import com.vie.mit.common.navigation.AppNavigator
-import com.vie.mit.data.repository.map.MapRepository
+import com.vie.mit.data.repository.transit.TransitStopRepository
 import com.vie.mit.green.navigation.main_graph.TransitRouteDetailRoute
 import com.vie.mit.green.navigation.main_graph.TransitStopDetailRoute
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -20,7 +20,7 @@ import javax.inject.Inject
 @HiltViewModel
 class TransitStopDetailViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
-    private val mapRepository: MapRepository,
+    private val transitStopRepository: TransitStopRepository,
     private val appNavigator: AppNavigator,
 ) : ViewModel() {
     private val route: TransitStopDetailRoute = savedStateHandle.toRoute<TransitStopDetailRoute>()
@@ -48,7 +48,7 @@ class TransitStopDetailViewModel @Inject constructor(
         _uiState.update { it.copy(isLoading = true, error = null) }
 
         viewModelScope.launch {
-            mapRepository.getTransitStopDetail(stopId = stopId, type = route.transitMode)
+            transitStopRepository.getTransitStopDetail(stopId = stopId, type = route.transitMode)
                 .onSuccess { detail ->
                     _uiState.update { current ->
                         current.copy(

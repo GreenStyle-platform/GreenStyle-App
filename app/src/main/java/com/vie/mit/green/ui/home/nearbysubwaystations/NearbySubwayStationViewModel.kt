@@ -4,7 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.vie.mit.common.navigation.AppNavigator
 import com.vie.mit.data.model.common.map.TransitMode
-import com.vie.mit.data.repository.map.MapRepository
+import com.vie.mit.data.repository.transit.TransitRouteRepository
 import com.vie.mit.green.navigation.main_graph.TransitRouteDetailRoute
 import com.vie.mit.green.navigation.main_graph.TransitStopDetailRoute
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -22,13 +22,13 @@ import javax.inject.Inject
  *
  * Responsibilities:
  * - Manages active tab state ([SubwaySheetTab.STATIONS] vs [SubwaySheetTab.ROUTES]).
- * - Calls [MapRepository] to fetch all subway/metro routes from the backend.
+ * - Calls [TransitRouteRepository] to fetch all subway/metro routes from the backend.
  * - Handles navigation to metro route details.
  */
 @HiltViewModel
 class NearbySubwayStationViewModel @Inject constructor(
     private val appNavigator: AppNavigator,
-    private val mapRepository: MapRepository,
+    private val transitRouteRepository: TransitRouteRepository,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(NearbySubwayStationUiState())
     val uiState: StateFlow<NearbySubwayStationUiState> = _uiState.asStateFlow()
@@ -59,7 +59,7 @@ class NearbySubwayStationViewModel @Inject constructor(
         }
 
         loadRoutesJob = viewModelScope.launch {
-            mapRepository.getSubwayRoutes(query = query).onSuccess { routes ->
+            transitRouteRepository.getSubwayRoutes(query = query).onSuccess { routes ->
                 _uiState.update {
                     it.copy(
                         subwayRoutes = routes,

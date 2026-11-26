@@ -4,7 +4,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.vie.mit.common.navigation.AppNavigator
 import com.vie.mit.data.model.domain.map.AutosuggestPlace
-import com.vie.mit.data.repository.map.MapRepository
+import com.vie.mit.data.repository.geocode.GeocodeRepository
+import com.vie.mit.data.repository.routeplanner.RoutePlannerRepository
 import com.vie.mit.mapbox.model.LocationData
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CoroutineScope
@@ -36,7 +37,8 @@ private data class SearchParams(
 @HiltViewModel
 class RoutePlannerContainerViewModel internal constructor(
     private val appNavigator: AppNavigator,
-    private val mapRepository: MapRepository,
+    private val geocodeRepository: GeocodeRepository,
+    private val routePlannerRepository: RoutePlannerRepository,
     private val customScope: CoroutineScope?,
     private val searchDebounceMs: Long,
     private val reverseGeocodeDebounceMs: Long = 250L,
@@ -49,10 +51,12 @@ class RoutePlannerContainerViewModel internal constructor(
     @Inject
     constructor(
         appNavigator: AppNavigator,
-        mapRepository: MapRepository,
+        geocodeRepository: GeocodeRepository,
+        routePlannerRepository: RoutePlannerRepository,
     ) : this(
         appNavigator = appNavigator,
-        mapRepository = mapRepository,
+        geocodeRepository = geocodeRepository,
+        routePlannerRepository = routePlannerRepository,
         customScope = null,
         searchDebounceMs = 350L,
         reverseGeocodeDebounceMs = 250L,
@@ -73,6 +77,8 @@ class RoutePlannerContainerViewModel internal constructor(
     private var reverseGeocodeJob: Job? = null
     private var routeOptionsJob: Job? = null
     private var isUserDraggingMap: Boolean = false
+    private var startTypedQuery: String? = null
+    private var endTypedQuery: String? = null
 
     init {
         // Lắng nghe thay đổi từ khoá tìm kiếm với Debounce 350ms
@@ -100,6 +106,7 @@ class RoutePlannerContainerViewModel internal constructor(
         cancelMapDragAndReverseGeocode()
         val mapCenter = _uiState.value.mapCenter
         if (newQuery.isBlank()) {
+            setTypedQuery(field, null)
             cancelActiveSearch()
             _uiState.update { state ->
                 if (field == LocationPickerField.START) {
@@ -126,6 +133,14 @@ class RoutePlannerContainerViewModel internal constructor(
             }
             return
         }
+
+        val currentState = _uiState.value
+        val keepExistingPoint = if (field == LocationPickerField.START) {
+            newQuery == currentState.startAddress
+        } else {
+            newQuery == currentState.endAddress
+        }
+        setTypedQuery(field, if (keepExistingPoint) null else newQuery)
 
         _uiState.update { state ->
             if (field == LocationPickerField.START) {
@@ -165,6 +180,7 @@ class RoutePlannerContainerViewModel internal constructor(
         val lng = place.longitude
         val label = place.title
         val currentField = _uiState.value.focusedField
+        setTypedQuery(currentField, null)
 
         if (currentField == LocationPickerField.START) {
             if (lat != null && lng != null) {
@@ -220,7 +236,7 @@ class RoutePlannerContainerViewModel internal constructor(
         searchJob = scope.launch {
             _uiState.update { it.copy(isLoadingSuggestions = true, errorMessage = null) }
 
-            val result = mapRepository.getAutosuggest(
+            val result = geocodeRepository.getAutosuggest(
                 query = query,
                 latitude = latitude,
                 longitude = longitude,
@@ -236,7 +252,7 @@ class RoutePlannerContainerViewModel internal constructor(
                 }
             }.onFailure { error ->
                 Timber.e(error, "getAutosuggest failed for query: $query, fallback to autocomplete")
-                val fallbackResult = mapRepository.getAutocomplete(
+                val fallbackResult = geocodeRepository.getAutocomplete(
                     query = query,
                     latitude = latitude,
                     longitude = longitude,
@@ -275,6 +291,7 @@ class RoutePlannerContainerViewModel internal constructor(
     ) {
         cancelActiveSearch()
         cancelMapDragAndReverseGeocode()
+        startTypedQuery = null
         _uiState.update { state ->
             state.copy(
                 startPoint = point,
@@ -304,6 +321,7 @@ class RoutePlannerContainerViewModel internal constructor(
     ) {
         cancelActiveSearch()
         cancelMapDragAndReverseGeocode()
+        endTypedQuery = null
         _uiState.update { state ->
             state.copy(
                 endPoint = point,
@@ -337,6 +355,7 @@ class RoutePlannerContainerViewModel internal constructor(
         cancelActiveSearch()
         cancelMapDragAndReverseGeocode()
         routeOptionsJob?.cancel()
+        startTypedQuery = null
         _uiState.update {
             it.copy(
                 focusedField = LocationPickerField.START,
@@ -358,6 +377,7 @@ class RoutePlannerContainerViewModel internal constructor(
         cancelActiveSearch()
         cancelMapDragAndReverseGeocode()
         routeOptionsJob?.cancel()
+        endTypedQuery = null
         _uiState.update {
             it.copy(
                 focusedField = LocationPickerField.END,
@@ -378,6 +398,9 @@ class RoutePlannerContainerViewModel internal constructor(
     fun swapLocations() {
         cancelActiveSearch()
         cancelMapDragAndReverseGeocode()
+        val previousStartTypedQuery = startTypedQuery
+        startTypedQuery = endTypedQuery
+        endTypedQuery = previousStartTypedQuery
         _uiState.update { state ->
             state.copy(
                 startPoint = state.endPoint,
@@ -431,7 +454,7 @@ class RoutePlannerContainerViewModel internal constructor(
                 )
             }
 
-            mapRepository.getRouteOptions(
+            routePlannerRepository.getRouteOptions(
                 startLat = start.latitude,
                 startLng = start.longitude,
                 endLat = end.latitude,
@@ -462,7 +485,7 @@ class RoutePlannerContainerViewModel internal constructor(
     /**
      * Cập nhật bộ lọc phương tiện trong RouteOptionsSheet.
      */
-    fun onSelectRouteFilter(filter: String) {
+    fun onSelectRouteFilter(filter: RouteOptionFilter) {
         _uiState.update { it.copy(selectedRouteFilter = filter) }
     }
 
@@ -543,6 +566,7 @@ class RoutePlannerContainerViewModel internal constructor(
     fun onConfirmMapCenterLocation() {
         val currentCenter = _uiState.value.mapCenter
         val currentField = _uiState.value.focusedField
+        val queryHint = getTypedQuery(currentField)
         val fallbackLabel = formatCoordinateLabel(currentCenter)
 
         if (currentField == LocationPickerField.START) {
@@ -555,6 +579,7 @@ class RoutePlannerContainerViewModel internal constructor(
             point = currentCenter,
             field = currentField,
             debounceMs = 0L,
+            queryHint = queryHint,
         )
     }
 
@@ -592,6 +617,7 @@ class RoutePlannerContainerViewModel internal constructor(
                 point = point,
                 field = currentField,
                 debounceMs = if (immediate) 0L else reverseGeocodeDebounceMs,
+                queryHint = getTypedQuery(currentField),
             )
         }
     }
@@ -600,6 +626,7 @@ class RoutePlannerContainerViewModel internal constructor(
         point: LocationData,
         field: LocationPickerField,
         debounceMs: Long,
+        queryHint: String? = getTypedQuery(field),
     ) {
         reverseGeocodeJob?.cancel()
         reverseGeocodeJob = scope.launch {
@@ -607,9 +634,10 @@ class RoutePlannerContainerViewModel internal constructor(
                 delay(debounceMs)
                 isUserDraggingMap = false
             }
-            mapRepository.reverseGeocode(
+            geocodeRepository.reverseGeocode(
                 latitude = point.latitude,
                 longitude = point.longitude,
+                queryHint = queryHint,
             ).onSuccess { resolvedLabel ->
                 if (resolvedLabel.isBlank()) return@onSuccess
                 _uiState.update { state ->
@@ -622,6 +650,17 @@ class RoutePlannerContainerViewModel internal constructor(
                     }
                 }
             }
+        }
+    }
+
+    private fun getTypedQuery(field: LocationPickerField): String? =
+        if (field == LocationPickerField.START) startTypedQuery else endTypedQuery
+
+    private fun setTypedQuery(field: LocationPickerField, query: String?) {
+        if (field == LocationPickerField.START) {
+            startTypedQuery = query
+        } else {
+            endTypedQuery = query
         }
     }
 

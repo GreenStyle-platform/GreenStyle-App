@@ -7,7 +7,7 @@ import androidx.paging.cachedIn
 import com.vie.mit.common.navigation.AppNavigator
 import com.vie.mit.data.model.common.map.TransitMode
 import com.vie.mit.data.model.domain.map.BusRoute
-import com.vie.mit.data.repository.map.MapRepository
+import com.vie.mit.data.repository.transit.TransitRouteRepository
 import com.vie.mit.green.navigation.main_graph.TransitRouteDetailRoute
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -25,13 +25,13 @@ import kotlin.time.Duration.Companion.milliseconds
 @HiltViewModel
 class BusRouteSearchViewModel @Inject constructor(
     private val appNavigator: AppNavigator,
-    private val mapRepository: MapRepository,
+    private val transitRouteRepository: TransitRouteRepository,
 ) : ViewModel() {
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
     val busRoutesState: Flow<PagingData<BusRoute>> =
         _searchQuery.debounce(300L.milliseconds).flatMapLatest { query ->
-            mapRepository.getBusRoutesStream(query)
+            transitRouteRepository.getBusRoutesStream(query)
         }.cachedIn(viewModelScope)
 
     fun onSearchQueryChanged(query: String) {

@@ -1,7 +1,9 @@
 package com.vie.mit.green.ui.routeplanner.container
 
+import com.vie.mit.data.model.common.map.TransitMode
 import com.vie.mit.data.model.domain.map.AutosuggestPlace
 import com.vie.mit.data.model.domain.map.RouteOption
+import com.vie.mit.data.model.domain.map.RouteOptionTransportType
 import com.vie.mit.mapbox.model.LocationData
 
 /**
@@ -10,6 +12,24 @@ import com.vie.mit.mapbox.model.LocationData
 enum class LocationPickerField {
     START,
     END,
+}
+
+/**
+ * Bộ lọc phương tiện cho danh sách phương án di chuyển trong RouteOptionsSheet.
+ */
+enum class RouteOptionFilter(
+    val transportType: RouteOptionTransportType?,
+    val transitMode: TransitMode? = null,
+) {
+    ALL(transportType = null, transitMode = null),
+    BUS(transportType = RouteOptionTransportType.BUS, transitMode = TransitMode.BUS),
+    SUBWAY(transportType = RouteOptionTransportType.SUBWAY, transitMode = TransitMode.SUBWAY),
+    BIKE(transportType = RouteOptionTransportType.BIKE, transitMode = null),
+    WALK(transportType = RouteOptionTransportType.WALK, transitMode = null),
+    ;
+
+    fun matches(type: RouteOptionTransportType): Boolean =
+        transportType == null || transportType == type
 }
 
 /**
@@ -30,7 +50,7 @@ data class RoutePlannerContainerUiState(
     val suggestions: List<AutosuggestPlace> = emptyList(),
     val isLoadingSuggestions: Boolean = false,
     val errorMessage: String? = null,
-    val selectedRouteFilter: String = "Tất cả",
+    val selectedRouteFilter: RouteOptionFilter = RouteOptionFilter.ALL,
     val routeOptions: List<RouteOption> = emptyList(),
     val isLoadingRoutes: Boolean = false,
     val routeOptionsError: String? = null,
@@ -41,4 +61,10 @@ data class RoutePlannerContainerUiState(
      */
     val hasValidRoute: Boolean
         get() = startPoint != null && endPoint != null
+
+    /**
+     * Danh sách phương án di chuyển đã áp dụng [selectedRouteFilter].
+     */
+    val filteredRouteOptions: List<RouteOption>
+        get() = routeOptions.filter { selectedRouteFilter.matches(it.transportType) }
 }

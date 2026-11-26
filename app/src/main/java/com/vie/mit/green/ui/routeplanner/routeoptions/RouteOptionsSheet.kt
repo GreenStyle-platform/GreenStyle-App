@@ -55,6 +55,7 @@ import com.vie.mit.common.theme.AppTheme
 import com.vie.mit.data.model.domain.map.RouteOption
 import com.vie.mit.data.model.domain.map.RouteOptionTransportType
 import com.vie.mit.green.ui.routeplanner.container.LocationPickerField
+import com.vie.mit.green.ui.routeplanner.container.RouteOptionFilter
 import com.vie.mit.green.ui.routeplanner.container.RoutePlannerContainerViewModel
 import com.vie.mit.mapbox.model.distanceTo
 import java.util.Locale
@@ -91,13 +92,7 @@ fun RouteOptionsSheet(
     }
 
     val filteredOptions = remember(selectedFilter, uiState.routeOptions) {
-        when (selectedFilter) {
-            "Xe buýt" -> uiState.routeOptions.filter { it.transportType == RouteOptionTransportType.BUS }
-            "Tàu điện" -> uiState.routeOptions.filter { it.transportType == RouteOptionTransportType.SUBWAY }
-            "Xe đạp" -> uiState.routeOptions.filter { it.transportType == RouteOptionTransportType.BIKE }
-            "Đi bộ" -> uiState.routeOptions.filter { it.transportType == RouteOptionTransportType.WALK }
-            else -> uiState.routeOptions
-        }
+        uiState.filteredRouteOptions
     }
 
     Column(
@@ -227,19 +222,21 @@ fun RouteOptionsSheet(
         Spacer(modifier = Modifier.height(10.dp))
 
         // Filter chips row (cuộn ngang được cho mọi kích thước màn hình)
-        val filters = remember { listOf("Tất cả", "Xe buýt", "Tàu điện", "Xe đạp", "Đi bộ") }
         LazyRow(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             modifier = Modifier.fillMaxWidth(),
         ) {
-            items(filters) { filter ->
+            items(
+                items = RouteOptionFilter.entries,
+                key = { it.name },
+            ) { filter ->
                 val isSelected = selectedFilter == filter
                 FilterChip(
                     selected = isSelected,
                     onClick = { containerViewModel.onSelectRouteFilter(filter) },
                     label = {
                         Text(
-                            text = filter,
+                            text = filter.toLabel(),
                             fontSize = 12.sp,
                             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
                         )
@@ -339,6 +336,14 @@ fun RouteOptionsSheet(
             }
         }
     }
+}
+
+private fun RouteOptionFilter.toLabel(): String = when (this) {
+    RouteOptionFilter.ALL -> "Tất cả"
+    RouteOptionFilter.BUS -> "Xe buýt"
+    RouteOptionFilter.SUBWAY -> "Tàu điện"
+    RouteOptionFilter.BIKE -> "Xe đạp"
+    RouteOptionFilter.WALK -> "Đi bộ"
 }
 
 private fun RouteOptionTransportType.toIconAndColor(): Pair<ImageVector, Color> = when (this) {

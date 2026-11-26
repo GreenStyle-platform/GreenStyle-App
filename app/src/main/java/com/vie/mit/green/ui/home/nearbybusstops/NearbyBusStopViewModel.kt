@@ -4,7 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.vie.mit.common.navigation.AppNavigator
 import com.vie.mit.data.model.common.map.TransitMode
-import com.vie.mit.data.repository.map.MapRepository
+import com.vie.mit.data.repository.transit.TransitStopRepository
 import com.vie.mit.green.navigation.main_graph.TransitRouteDetailRoute
 import com.vie.mit.green.navigation.main_graph.TransitStopDetailRoute
 import com.vie.mit.green.ui.home.nearbytransitsheet.NearbyStopItem
@@ -24,14 +24,14 @@ import javax.inject.Inject
  *
  * Responsibilities:
  * - Receives a list of nearby bus stops from the parent (HomeContainerViewModel via SheetNavHost)
- * - Sends stop IDs to MapRepository to fetch routes passing through those stops
+ * - Sends stop IDs to TransitStopRepository to fetch routes passing through those stops
  * - Maps returned routes to each stop using stopId
  * - Exposes a combined UiState: list of stops with their routes and arrival times
  */
 @HiltViewModel
 class NearbyBusStopViewModel @Inject constructor(
     private val appNavigator: AppNavigator,
-    private val mapRepository: MapRepository,
+    private val transitStopRepository: TransitStopRepository,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(NearbyBusStopsUiState())
@@ -114,7 +114,7 @@ class NearbyBusStopViewModel @Inject constructor(
                     return@launch
                 }
 
-                mapRepository.getBusStopArrivals(stopIds)
+                transitStopRepository.getBusStopArrivals(stopIds)
                     .onSuccess { allRoutes ->
                         // 2. Group returned routes by stopId
                         val routesByStopId = allRoutes.groupBy { it.stopId }

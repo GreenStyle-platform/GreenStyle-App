@@ -3,7 +3,7 @@ package com.vie.mit.data.network.domainmodel.map
 import com.vie.mit.data.model.remote.request.map.TransitStopBoundsRequest
 import com.vie.mit.data.model.remote.response.map.TransitStopDetailResponse
 import com.vie.mit.data.model.remote.response.map.TransitStopMarkerResponse
-import com.vie.mit.data.network.api.map.MapApi
+import com.vie.mit.data.network.api.transit.TransitStopApi
 import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
 import org.junit.Test
@@ -89,11 +89,11 @@ class TransitStopApiModelTest {
     }
 
     @Test
-    fun mapApi_usesTransitStopBoundsEndpoints() {
-        val busMethod = MapApi::class.java.methods.single { it.name == "searchBusStopsInBounds" }
+    fun transitStopApi_usesTransitStopBoundsEndpoints() {
+        val busMethod = TransitStopApi::class.java.methods.single { it.name == "searchBusStopsInBounds" }
         val metroMethod =
-            MapApi::class.java.methods.single { it.name == "searchMetroStopsInBounds" }
-        val detailMethod = MapApi::class.java.methods.single { it.name == "getTransitStopDetail" }
+            TransitStopApi::class.java.methods.single { it.name == "searchMetroStopsInBounds" }
+        val detailMethod = TransitStopApi::class.java.methods.single { it.name == "getTransitStopDetail" }
 
         assertEquals(
             "transits/bus/search-in-bounds",

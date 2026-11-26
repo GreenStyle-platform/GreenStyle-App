@@ -8,7 +8,7 @@ import com.vie.mit.data.model.common.map.TransitMode
 import com.vie.mit.data.model.common.map.TravelMode
 import com.vie.mit.data.model.domain.map.TransitStopsGeoJsonLoad
 import com.vie.mit.data.model.remote.request.map.TransitStopBoundsRequest
-import com.vie.mit.data.repository.map.MapRepository
+import com.vie.mit.data.repository.transit.TransitStopRepository
 import com.vie.mit.green.navigation.main_graph.BusRouteSearchRoute
 import com.vie.mit.green.navigation.main_graph.RoutePlannerContainerRoute
 import com.vie.mit.green.navigation.main_graph.SettingRoute
@@ -57,11 +57,11 @@ private data class ParsedTransitStop(
 
 @HiltViewModel
 class HomeContainerViewModel @Inject constructor(
-    private val mapRepository: MapRepository, private val appNavigator: AppNavigator
+    private val transitStopRepository: TransitStopRepository, private val appNavigator: AppNavigator
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(
-        HomeContainerUiState(transitConfigs = mapRepository.defaultConfigs)
+        HomeContainerUiState(transitConfigs = transitStopRepository.defaultConfigs)
     )
     val uiState: StateFlow<HomeContainerUiState> = _uiState.asStateFlow()
 
@@ -240,7 +240,7 @@ class HomeContainerViewModel @Inject constructor(
         fetchTransitDataJob = viewModelScope.launch {
             _uiState.update { it.copy(isLoadingTransit = true, errorMessage = null) }
 
-            mapRepository.getTransitStopsGeoJson(requestBounds, typeIdsToFetch)
+            transitStopRepository.getTransitStopsGeoJson(requestBounds, typeIdsToFetch)
                 .onSuccess { load: TransitStopsGeoJsonLoad ->
                     val fetchedGeoJsonMap = load.geoJsonByType
 

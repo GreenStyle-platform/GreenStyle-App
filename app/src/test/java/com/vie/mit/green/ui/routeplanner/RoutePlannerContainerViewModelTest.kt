@@ -3,29 +3,28 @@ package com.vie.mit.green.ui.routeplanner
 import androidx.navigation.NavOptionsBuilder
 import com.vie.mit.common.navigation.AppNavigator
 import com.vie.mit.common.navigation.NavigationEvent
+import com.vie.mit.data.model.common.map.TransitMode
 import com.vie.mit.data.model.domain.map.AutosuggestPlace
-import com.vie.mit.data.model.remote.request.map.BusStopArrivalsRequest
+import com.vie.mit.data.model.domain.map.RouteOptionTransportType
 import com.vie.mit.data.model.remote.request.map.HereAutocompleteRequest
 import com.vie.mit.data.model.remote.request.map.HereAutosuggestRequest
 import com.vie.mit.data.model.remote.request.map.LocationRequest
-import com.vie.mit.data.model.remote.request.map.TransitStopBoundsRequest
-import com.vie.mit.data.model.remote.response.map.BusRoutePageResponse
 import com.vie.mit.data.model.remote.response.map.HereAddressResponse
 import com.vie.mit.data.model.remote.response.map.HereAutocompleteItemResponse
 import com.vie.mit.data.model.remote.response.map.HereAutocompleteResponse
 import com.vie.mit.data.model.remote.response.map.HereAutosuggestItemResponse
 import com.vie.mit.data.model.remote.response.map.HereAutosuggestResponse
+import com.vie.mit.data.model.remote.response.map.HereCategoryResponse
 import com.vie.mit.data.model.remote.response.map.HerePositionResponse
+import com.vie.mit.data.model.remote.response.map.HereReverseGeocodeItemResponse
+import com.vie.mit.data.model.remote.response.map.HereReverseGeocodeResponse
 import com.vie.mit.data.model.remote.response.map.PublicTransportSuggestionResponse
-import com.vie.mit.data.model.remote.response.map.RouteArrivalResponse
-import com.vie.mit.data.model.remote.response.map.RouteTripResponse
-import com.vie.mit.data.model.remote.response.map.ShapePointResponse
-import com.vie.mit.data.model.remote.response.map.TransitStopDetailResponse
-import com.vie.mit.data.model.remote.response.map.TransitStopMarkerResponse
-import com.vie.mit.data.model.remote.response.map.TripStopResponse
-import com.vie.mit.data.network.api.map.MapApi
-import com.vie.mit.data.repository.map.MapRepository
+import com.vie.mit.data.network.api.geocode.GeocodeApi
+import com.vie.mit.data.network.api.routeplanner.RoutePlannerApi
+import com.vie.mit.data.repository.geocode.GeocodeRepository
+import com.vie.mit.data.repository.routeplanner.RoutePlannerRepository
 import com.vie.mit.green.ui.routeplanner.container.LocationPickerField
+import com.vie.mit.green.ui.routeplanner.container.RouteOptionFilter
 import com.vie.mit.green.ui.routeplanner.container.RoutePlannerContainerViewModel
 import com.vie.mit.mapbox.model.LocationData
 import kotlinx.coroutines.CoroutineScope
@@ -46,7 +45,7 @@ class RoutePlannerContainerViewModelTest {
 
     @Test
     fun onQueryChanged_triggersAutosuggestAndUpdatesSuggestions() = runBlocking {
-        val fakeApi = FakeMapApi(
+        val fakeApi = FakeGeocodeApi(
             autosuggestHandler = {
                 HereAutosuggestResponse(
                     items = listOf(
@@ -65,7 +64,8 @@ class RoutePlannerContainerViewModelTest {
         try {
             val viewModel = RoutePlannerContainerViewModel(
                 appNavigator = FakeAppNavigator(),
-                mapRepository = MapRepository(fakeApi),
+                geocodeRepository = GeocodeRepository(fakeApi),
+                routePlannerRepository = RoutePlannerRepository(FakeRoutePlannerApi()),
                 customScope = scope,
                 searchDebounceMs = 20L,
             )
@@ -86,7 +86,7 @@ class RoutePlannerContainerViewModelTest {
 
     @Test
     fun onQueryChanged_fallsBackToAutocompleteWhenAutosuggestFails() = runBlocking {
-        val fakeApi = FakeMapApi(
+        val fakeApi = FakeGeocodeApi(
             autosuggestHandler = { throw RuntimeException("Autosuggest unavailable") },
             autocompleteHandler = {
                 HereAutocompleteResponse(
@@ -104,7 +104,8 @@ class RoutePlannerContainerViewModelTest {
         try {
             val viewModel = RoutePlannerContainerViewModel(
                 appNavigator = FakeAppNavigator(),
-                mapRepository = MapRepository(fakeApi),
+                geocodeRepository = GeocodeRepository(fakeApi),
+                routePlannerRepository = RoutePlannerRepository(FakeRoutePlannerApi()),
                 customScope = scope,
                 searchDebounceMs = 20L,
             )
@@ -126,7 +127,7 @@ class RoutePlannerContainerViewModelTest {
 
     @Test
     fun onSelectSuggestion_updatesLocationAndDoesNotRetriggerSearch() = runBlocking {
-        val fakeApi = FakeMapApi(
+        val fakeApi = FakeGeocodeApi(
             autosuggestHandler = {
                 HereAutosuggestResponse(
                     items = listOf(
@@ -144,7 +145,8 @@ class RoutePlannerContainerViewModelTest {
         try {
             val viewModel = RoutePlannerContainerViewModel(
                 appNavigator = FakeAppNavigator(),
-                mapRepository = MapRepository(fakeApi),
+                geocodeRepository = GeocodeRepository(fakeApi),
+                routePlannerRepository = RoutePlannerRepository(FakeRoutePlannerApi()),
                 customScope = scope,
                 searchDebounceMs = 20L,
             )
@@ -181,7 +183,8 @@ class RoutePlannerContainerViewModelTest {
         try {
             val viewModel = RoutePlannerContainerViewModel(
                 appNavigator = FakeAppNavigator(),
-                mapRepository = MapRepository(FakeMapApi()),
+                geocodeRepository = GeocodeRepository(FakeGeocodeApi()),
+                routePlannerRepository = RoutePlannerRepository(FakeRoutePlannerApi()),
                 customScope = scope,
                 searchDebounceMs = 20L,
             )
@@ -211,8 +214,8 @@ class RoutePlannerContainerViewModelTest {
             assertEquals(startBefore, viewModel.uiState.value.endQuery)
 
             // RouteOptions filter state shared in container UiState
-            viewModel.onSelectRouteFilter("Xe buýt")
-            assertEquals("Xe buýt", viewModel.uiState.value.selectedRouteFilter)
+            viewModel.onSelectRouteFilter(RouteOptionFilter.BUS)
+            assertEquals(RouteOptionFilter.BUS, viewModel.uiState.value.selectedRouteFilter)
 
             // Clear start location resets point, address, and query
             viewModel.clearStartLocation()
@@ -237,7 +240,8 @@ class RoutePlannerContainerViewModelTest {
         try {
             val viewModel = RoutePlannerContainerViewModel(
                 appNavigator = FakeAppNavigator(),
-                mapRepository = MapRepository(FakeMapApi()),
+                geocodeRepository = GeocodeRepository(FakeGeocodeApi()),
+                routePlannerRepository = RoutePlannerRepository(FakeRoutePlannerApi()),
                 customScope = scope,
                 searchDebounceMs = 20L,
             )
@@ -262,7 +266,8 @@ class RoutePlannerContainerViewModelTest {
         try {
             val viewModel = RoutePlannerContainerViewModel(
                 appNavigator = FakeAppNavigator(),
-                mapRepository = MapRepository(FakeMapApi()),
+                geocodeRepository = GeocodeRepository(FakeGeocodeApi()),
+                routePlannerRepository = RoutePlannerRepository(FakeRoutePlannerApi()),
                 customScope = scope,
                 searchDebounceMs = 20L,
             )
@@ -282,12 +287,61 @@ class RoutePlannerContainerViewModelTest {
     }
 
     @Test
+    fun onSelectRouteFilter_filtersRouteOptionsByEnumAndMapsTransitMode() = runBlocking {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
+        try {
+            val viewModel = RoutePlannerContainerViewModel(
+                appNavigator = FakeAppNavigator(),
+                geocodeRepository = GeocodeRepository(FakeGeocodeApi()),
+                routePlannerRepository = RoutePlannerRepository(FakeRoutePlannerApi()),
+                customScope = scope,
+                searchDebounceMs = 20L,
+            )
+
+            viewModel.updateStartLocation(LocationData(10.7725, 106.6980), "Chợ Bến Thành")
+            viewModel.updateEndLocation(LocationData(10.7769, 106.7009), "Nhà thờ Đức Bà")
+            viewModel.loadRouteOptions()
+
+            // Default ALL returns all loaded options
+            assertEquals(RouteOptionFilter.ALL, viewModel.uiState.value.selectedRouteFilter)
+            assertEquals(viewModel.uiState.value.routeOptions.size, viewModel.uiState.value.filteredRouteOptions.size)
+
+            // BUS filter
+            viewModel.onSelectRouteFilter(RouteOptionFilter.BUS)
+            assertEquals(TransitMode.BUS, RouteOptionFilter.BUS.transitMode)
+            assertTrue(viewModel.uiState.value.filteredRouteOptions.isNotEmpty())
+            assertTrue(viewModel.uiState.value.filteredRouteOptions.all { it.transportType == RouteOptionTransportType.BUS })
+
+            // SUBWAY filter
+            viewModel.onSelectRouteFilter(RouteOptionFilter.SUBWAY)
+            assertEquals(TransitMode.SUBWAY, RouteOptionFilter.SUBWAY.transitMode)
+            assertTrue(viewModel.uiState.value.filteredRouteOptions.isNotEmpty())
+            assertTrue(viewModel.uiState.value.filteredRouteOptions.all { it.transportType == RouteOptionTransportType.SUBWAY })
+
+            // BIKE filter
+            viewModel.onSelectRouteFilter(RouteOptionFilter.BIKE)
+            assertNull(RouteOptionFilter.BIKE.transitMode)
+            assertTrue(viewModel.uiState.value.filteredRouteOptions.isNotEmpty())
+            assertTrue(viewModel.uiState.value.filteredRouteOptions.all { it.transportType == RouteOptionTransportType.BIKE })
+
+            // WALK filter
+            viewModel.onSelectRouteFilter(RouteOptionFilter.WALK)
+            assertNull(RouteOptionFilter.WALK.transitMode)
+            assertTrue(viewModel.uiState.value.filteredRouteOptions.isNotEmpty())
+            assertTrue(viewModel.uiState.value.filteredRouteOptions.all { it.transportType == RouteOptionTransportType.WALK })
+        } finally {
+            scope.cancel()
+        }
+    }
+
+    @Test
     fun mapDrag_whenStartFocused_updatesStartLocationLiveAndKeepsStartFocus() = runBlocking {
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
         try {
             val viewModel = RoutePlannerContainerViewModel(
                 appNavigator = FakeAppNavigator(),
-                mapRepository = MapRepository(FakeMapApi()),
+                geocodeRepository = GeocodeRepository(FakeGeocodeApi()),
+                routePlannerRepository = RoutePlannerRepository(FakeRoutePlannerApi()),
                 customScope = scope,
                 searchDebounceMs = 20L,
                 reverseGeocodeDebounceMs = 30L,
@@ -324,7 +378,8 @@ class RoutePlannerContainerViewModelTest {
         try {
             val viewModel = RoutePlannerContainerViewModel(
                 appNavigator = FakeAppNavigator(),
-                mapRepository = MapRepository(FakeMapApi()),
+                geocodeRepository = GeocodeRepository(FakeGeocodeApi()),
+                routePlannerRepository = RoutePlannerRepository(FakeRoutePlannerApi()),
                 customScope = scope,
                 searchDebounceMs = 20L,
                 reverseGeocodeDebounceMs = 30L,
@@ -355,7 +410,8 @@ class RoutePlannerContainerViewModelTest {
         try {
             val viewModel = RoutePlannerContainerViewModel(
                 appNavigator = FakeAppNavigator(),
-                mapRepository = MapRepository(FakeMapApi()),
+                geocodeRepository = GeocodeRepository(FakeGeocodeApi()),
+                routePlannerRepository = RoutePlannerRepository(FakeRoutePlannerApi()),
                 customScope = scope,
                 searchDebounceMs = 20L,
                 reverseGeocodeDebounceMs = 20L,
@@ -386,7 +442,8 @@ class RoutePlannerContainerViewModelTest {
         try {
             val viewModel = RoutePlannerContainerViewModel(
                 appNavigator = FakeAppNavigator(),
-                mapRepository = MapRepository(FakeMapApi()),
+                geocodeRepository = GeocodeRepository(FakeGeocodeApi()),
+                routePlannerRepository = RoutePlannerRepository(FakeRoutePlannerApi()),
                 customScope = scope,
                 searchDebounceMs = 20L,
                 reverseGeocodeDebounceMs = 80L,
@@ -409,6 +466,125 @@ class RoutePlannerContainerViewModelTest {
             scope.cancel()
         }
     }
+
+    @Test
+    fun mapDrag_afterTypingQuery_usesTypedQueryHintToSelectBestReverseGeocodeResult() = runBlocking {
+        val fakeApi = FakeGeocodeApi(
+            reverseGeocodeHandler = { _, _, _ ->
+                HereReverseGeocodeResponse(
+                    items = listOf(
+                        HereReverseGeocodeItemResponse(
+                            title = "Nội Thất HT",
+                            resultType = "place",
+                            address = HereAddressResponse(
+                                label = "Nội Thất HT, Ngách 56/26 Lê Quang Đạo, Hà Nội",
+                            ),
+                            distance = 59L,
+                            categories = listOf(
+                                HereCategoryResponse(
+                                    name = "Phụ kiện nội thất và gia đình",
+                                    primary = true,
+                                ),
+                            ),
+                        ),
+                        HereReverseGeocodeItemResponse(
+                            title = "Duy Linh Quán",
+                            resultType = "place",
+                            address = HereAddressResponse(
+                                label = "Duy Linh Quán, Đường Châu Văn Liêm, Hà Nội",
+                            ),
+                            distance = 112L,
+                            categories = listOf(
+                                HereCategoryResponse(
+                                    name = "Nhà hàng",
+                                    primary = true,
+                                ),
+                            ),
+                        ),
+                    ),
+                )
+            },
+        )
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
+        try {
+            val viewModel = RoutePlannerContainerViewModel(
+                appNavigator = FakeAppNavigator(),
+                geocodeRepository = GeocodeRepository(fakeApi),
+                routePlannerRepository = RoutePlannerRepository(FakeRoutePlannerApi()),
+                customScope = scope,
+                searchDebounceMs = 20L,
+                reverseGeocodeDebounceMs = 20L,
+            )
+
+            viewModel.onQueryChanged(LocationPickerField.END, "nha hang")
+            viewModel.onMapMoveStateChanged(true)
+            viewModel.onMapCameraMoved(21.00971, 105.76938)
+            viewModel.onMapMoveStateChanged(false)
+            viewModel.onMapCameraIdle(21.00971, 105.76938)
+            delay(80L)
+
+            val state = viewModel.uiState.value
+            assertEquals(LocationData(21.00971, 105.76938), state.endPoint)
+            assertEquals("Duy Linh Quán, Đường Châu Văn Liêm, Hà Nội", state.endAddress)
+            assertEquals("Duy Linh Quán, Đường Châu Văn Liêm, Hà Nội", state.endQuery)
+            assertEquals(20, fakeApi.lastReverseGeocodeLimit)
+        } finally {
+            scope.cancel()
+        }
+    }
+
+    @Test
+    fun mapDrag_withoutTypedQuery_usesClosestReverseGeocodeResultAndSmallerLimit() = runBlocking {
+        val fakeApi = FakeGeocodeApi(
+            reverseGeocodeHandler = { _, _, _ ->
+                HereReverseGeocodeResponse(
+                    items = listOf(
+                        HereReverseGeocodeItemResponse(
+                            title = "Nội Thất HT",
+                            resultType = "place",
+                            address = HereAddressResponse(
+                                label = "Nội Thất HT, Ngách 56/26 Lê Quang Đạo, Hà Nội",
+                            ),
+                            distance = 59L,
+                        ),
+                        HereReverseGeocodeItemResponse(
+                            title = "Duy Linh Quán",
+                            resultType = "place",
+                            address = HereAddressResponse(
+                                label = "Duy Linh Quán, Đường Châu Văn Liêm, Hà Nội",
+                            ),
+                            distance = 112L,
+                        ),
+                    ),
+                )
+            },
+        )
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
+        try {
+            val viewModel = RoutePlannerContainerViewModel(
+                appNavigator = FakeAppNavigator(),
+                geocodeRepository = GeocodeRepository(fakeApi),
+                routePlannerRepository = RoutePlannerRepository(FakeRoutePlannerApi()),
+                customScope = scope,
+                searchDebounceMs = 20L,
+                reverseGeocodeDebounceMs = 20L,
+            )
+
+            viewModel.setFocusedField(LocationPickerField.START)
+            viewModel.onMapMoveStateChanged(true)
+            viewModel.onMapCameraMoved(21.00971, 105.76938)
+            viewModel.onMapMoveStateChanged(false)
+            viewModel.onMapCameraIdle(21.00971, 105.76938)
+            delay(80L)
+
+            val state = viewModel.uiState.value
+            assertEquals("Nội Thất HT, Ngách 56/26 Lê Quang Đạo, Hà Nội", state.startAddress)
+            assertEquals("Nội Thất HT, Ngách 56/26 Lê Quang Đạo, Hà Nội", state.startQuery)
+            assertEquals(5, fakeApi.lastReverseGeocodeLimit)
+        } finally {
+            scope.cancel()
+        }
+    }
 }
 
 private class FakeAppNavigator : AppNavigator {
@@ -424,16 +600,21 @@ private class FakeAppNavigator : AppNavigator {
     override fun popBackStack(route: Any?, inclusive: Boolean) = Unit
 }
 
-private class FakeMapApi(
+private class FakeGeocodeApi(
     private val autosuggestHandler: suspend (HereAutosuggestRequest) -> HereAutosuggestResponse = {
         HereAutosuggestResponse()
     },
     private val autocompleteHandler: suspend (HereAutocompleteRequest) -> HereAutocompleteResponse = {
         HereAutocompleteResponse()
     },
-) : MapApi {
+    private val reverseGeocodeHandler: suspend (Double, Double, Int?) -> HereReverseGeocodeResponse = { _, _, _ ->
+        HereReverseGeocodeResponse()
+    },
+) : GeocodeApi {
     var autosuggestCallCount: Int = 0
     var autocompleteCallCount: Int = 0
+    var reverseGeocodeCallCount: Int = 0
+    var lastReverseGeocodeLimit: Int? = null
 
     override suspend fun getAutosuggest(request: HereAutosuggestRequest): HereAutosuggestResponse {
         autosuggestCallCount++
@@ -445,38 +626,19 @@ private class FakeMapApi(
         return autocompleteHandler(request)
     }
 
-    override suspend fun getPublicTransportSuggestions(location: LocationRequest): List<PublicTransportSuggestionResponse> =
-        emptyList()
+    override suspend fun reverseGeocode(
+        latitude: Double,
+        longitude: Double,
+        limit: Int?,
+    ): HereReverseGeocodeResponse {
+        reverseGeocodeCallCount++
+        lastReverseGeocodeLimit = limit
+        return reverseGeocodeHandler(latitude, longitude, limit)
+    }
+}
 
-    override suspend fun searchBusStopsInBounds(bounds: TransitStopBoundsRequest): List<TransitStopMarkerResponse> =
-        emptyList()
-
-    override suspend fun searchMetroStopsInBounds(bounds: TransitStopBoundsRequest): List<TransitStopMarkerResponse> =
-        emptyList()
-
-    override suspend fun searchBikeStopsInBounds(bounds: TransitStopBoundsRequest): List<TransitStopMarkerResponse> =
-        emptyList()
-
-    override suspend fun getStopArrivals(
-        mode: String,
-        request: BusStopArrivalsRequest,
-    ): Map<String, List<RouteArrivalResponse>> = emptyMap()
-
-    override suspend fun getTransitStopDetail(mode: String, stopId: String): TransitStopDetailResponse =
-        error("Not used in test")
-
-    override suspend fun searchBusRoutes(query: String, page: Int): BusRoutePageResponse =
-        error("Not used in test")
-
-    override suspend fun searchSubwayRoutes(query: String, page: Int): BusRoutePageResponse =
-        error("Not used in test")
-
-    override suspend fun getRouteTrips(mode: String, routeId: String): List<RouteTripResponse> =
-        emptyList()
-
-    override suspend fun getTripShape(mode: String, tripId: String): List<ShapePointResponse> =
-        emptyList()
-
-    override suspend fun getTripStops(mode: String, tripId: String): List<TripStopResponse> =
-        emptyList()
+private class FakeRoutePlannerApi : RoutePlannerApi {
+    override suspend fun getPublicTransportSuggestions(
+        location: LocationRequest,
+    ): List<PublicTransportSuggestionResponse> = emptyList()
 }

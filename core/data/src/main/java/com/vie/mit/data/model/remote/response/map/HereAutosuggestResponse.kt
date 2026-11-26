@@ -44,23 +44,6 @@ data class HereCategoryResponse(
 @Serializable
 data class HereAddressResponse(
     @SerialName("label") val label: String? = null,
-    @SerialName("countryCode") val countryCode: String? = null,
-    @SerialName("countryName") val countryName: String? = null,
-    @SerialName("stateCode") val stateCode: String? = null,
-    @SerialName("state") val state: String? = null,
-    @SerialName("countyCode") val countyCode: String? = null,
-    @SerialName("county") val county: String? = null,
-    @SerialName("city") val city: String? = null,
-    @SerialName("district") val district: String? = null,
-    @SerialName("subdistrict") val subdistrict: String? = null,
-    @SerialName("street") val street: String? = null,
-    @SerialName("streets") val streets: List<String>? = null,
-    @SerialName("block") val block: String? = null,
-    @SerialName("subblock") val subblock: String? = null,
-    @SerialName("postalCode") val postalCode: String? = null,
-    @SerialName("houseNumber") val houseNumber: String? = null,
-    @SerialName("building") val building: String? = null,
-    @SerialName("unit") val unit: String? = null,
 )
 
 @Serializable
