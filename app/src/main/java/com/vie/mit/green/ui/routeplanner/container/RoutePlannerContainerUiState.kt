@@ -3,7 +3,6 @@ package com.vie.mit.green.ui.routeplanner.container
 import com.vie.mit.data.model.common.map.TransitMode
 import com.vie.mit.data.model.domain.map.AutosuggestPlace
 import com.vie.mit.data.model.domain.map.RouteOption
-import com.vie.mit.data.model.domain.map.RouteOptionTransportType
 import com.vie.mit.mapbox.model.LocationData
 
 /**
@@ -18,18 +17,25 @@ enum class LocationPickerField {
  * Bộ lọc phương tiện cho danh sách phương án di chuyển trong RouteOptionsSheet.
  */
 enum class RouteOptionFilter(
-    val transportType: RouteOptionTransportType?,
     val transitMode: TransitMode? = null,
 ) {
-    ALL(transportType = null, transitMode = null),
-    BUS(transportType = RouteOptionTransportType.BUS, transitMode = TransitMode.BUS),
-    SUBWAY(transportType = RouteOptionTransportType.SUBWAY, transitMode = TransitMode.SUBWAY),
-    BIKE(transportType = RouteOptionTransportType.BIKE, transitMode = null),
-    WALK(transportType = RouteOptionTransportType.WALK, transitMode = null),
+    ALL(transitMode = null),
+    BUS(transitMode = TransitMode.BUS),
+    SUBWAY(transitMode = TransitMode.SUBWAY),
+    BIKE(transitMode = TransitMode.BIKE),
+    WALK(transitMode = TransitMode.WALK),
     ;
 
-    fun matches(type: RouteOptionTransportType): Boolean =
-        transportType == null || transportType == type
+    fun matches(option: RouteOption): Boolean = when (this) {
+        ALL -> true
+        BUS -> TransitMode.BUS in option.transportTypes || TransitMode.TROLLEYBUS in option.transportTypes
+        SUBWAY -> TransitMode.SUBWAY in option.transportTypes ||
+            TransitMode.MONORAIL in option.transportTypes ||
+            TransitMode.RAIL in option.transportTypes ||
+            TransitMode.TRAM in option.transportTypes
+        BIKE -> TransitMode.BIKE in option.transportTypes
+        WALK -> option.transportTypes.isEmpty() || option.transportTypes.all { it == TransitMode.WALK }
+    }
 }
 
 /**
@@ -66,5 +72,12 @@ data class RoutePlannerContainerUiState(
      * Danh sách phương án di chuyển đã áp dụng [selectedRouteFilter].
      */
     val filteredRouteOptions: List<RouteOption>
-        get() = routeOptions.filter { selectedRouteFilter.matches(it.transportType) }
+        get() = routeOptions.filter { selectedRouteFilter.matches(it) }
+
+    /**
+     * Phương án di chuyển đang được chọn trong danh sách hiện tại (dùng để đồng bộ polyline trên bản đồ).
+     */
+    val selectedRouteOption: RouteOption?
+        get() = filteredRouteOptions.firstOrNull { it.id == selectedRouteOptionId }
+            ?: filteredRouteOptions.firstOrNull()
 }

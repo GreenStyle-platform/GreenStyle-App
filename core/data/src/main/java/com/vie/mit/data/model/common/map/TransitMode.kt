@@ -31,7 +31,38 @@ enum class TransitMode {
     MONORAIL,
 
     @SerialName("Trolleybus")
-    TROLLEYBUS
+    TROLLEYBUS,
+
+    @SerialName("Bike")
+    BIKE,
+
+    @SerialName("Walk")
+    WALK;
+
+    val isTransit: Boolean
+        get() = this != WALK && this != BIKE
+
+    companion object {
+        /**
+         * Parses an OpenTripPlanner 2 leg mode string (e.g. "WALK", "BUS", "SUBWAY", "BICYCLE",
+         * "RAIL", "TRAM", "FERRY", "CABLE_CAR", "GONDOLA", "MONORAIL", "TROLLEYBUS", "COACH")
+         * into a [TransitMode].
+         */
+        fun fromOtpMode(rawMode: String?): TransitMode = when (rawMode?.trim()?.uppercase()) {
+            "WALK" -> WALK
+            "BICYCLE", "BIKE", "BICYCLE_RENT", "SCOOTER", "SCOOTER_RENTAL" -> BIKE
+            "SUBWAY", "METRO" -> SUBWAY
+            "RAIL", "TRAIN", "FUNICULAR" -> RAIL
+            "TRAM" -> TRAM
+            "FERRY" -> FERRY
+            "CABLE_CAR", "CABLE_TRAM", "CABLETRAM" -> CABLE_TRAM
+            "GONDOLA", "AERIAL_LIFT", "AERIALLIFT" -> AERIAL_LIFT
+            "MONORAIL" -> MONORAIL
+            "TROLLEYBUS" -> TROLLEYBUS
+            "BUS", "COACH", "FLEX" -> BUS
+            else -> WALK
+        }
+    }
 }
 
 /**

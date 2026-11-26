@@ -75,6 +75,7 @@ class RoutePlannerContainerViewModel internal constructor(
     private val searchParamsFlow = MutableStateFlow<SearchParams?>(null)
     private var searchJob: Job? = null
     private var reverseGeocodeJob: Job? = null
+    private var flingSettleJob: Job? = null
     private var routeOptionsJob: Job? = null
     private var isUserDraggingMap: Boolean = false
     private var startTypedQuery: String? = null
@@ -291,6 +292,7 @@ class RoutePlannerContainerViewModel internal constructor(
     ) {
         cancelActiveSearch()
         cancelMapDragAndReverseGeocode()
+        routeOptionsJob?.cancel()
         startTypedQuery = null
         _uiState.update { state ->
             state.copy(
@@ -304,6 +306,10 @@ class RoutePlannerContainerViewModel internal constructor(
                 },
                 suggestions = emptyList(),
                 isLoadingSuggestions = false,
+                routeOptions = emptyList(),
+                isLoadingRoutes = false,
+                routeOptionsError = null,
+                selectedRouteOptionId = null,
             )
         }
         if (moveCamera) {
@@ -321,6 +327,7 @@ class RoutePlannerContainerViewModel internal constructor(
     ) {
         cancelActiveSearch()
         cancelMapDragAndReverseGeocode()
+        routeOptionsJob?.cancel()
         endTypedQuery = null
         _uiState.update { state ->
             state.copy(
@@ -329,6 +336,10 @@ class RoutePlannerContainerViewModel internal constructor(
                 endQuery = address,
                 suggestions = emptyList(),
                 isLoadingSuggestions = false,
+                routeOptions = emptyList(),
+                isLoadingRoutes = false,
+                routeOptionsError = null,
+                selectedRouteOptionId = null,
             )
         }
         if (moveCamera) {
@@ -398,6 +409,7 @@ class RoutePlannerContainerViewModel internal constructor(
     fun swapLocations() {
         cancelActiveSearch()
         cancelMapDragAndReverseGeocode()
+        routeOptionsJob?.cancel()
         val previousStartTypedQuery = startTypedQuery
         startTypedQuery = endTypedQuery
         endTypedQuery = previousStartTypedQuery
@@ -411,6 +423,10 @@ class RoutePlannerContainerViewModel internal constructor(
                 endQuery = state.startQuery,
                 suggestions = emptyList(),
                 isLoadingSuggestions = false,
+                routeOptions = emptyList(),
+                isLoadingRoutes = false,
+                routeOptionsError = null,
+                selectedRouteOptionId = null,
             )
         }
     }
@@ -425,12 +441,15 @@ class RoutePlannerContainerViewModel internal constructor(
         _uiState.update { it.copy(focusedField = field) }
     }
 
-    // ── Route Options (Backend / Mock) ─────────────────────────────
+    // ── Route Options (OTP2 Backend) ───────────────────────────────
 
     /**
      * Tải danh sách phương án di chuyển giữa điểm xuất phát và điểm đích từ repository.
      */
-    fun loadRouteOptions() {
+    fun loadRouteOptions(
+        departureTimeMillis: Long? = null,
+        maxItineraries: Int = RoutePlannerRepository.DEFAULT_MAX_ITINERARIES,
+    ) {
         val start = _uiState.value.startPoint
         val end = _uiState.value.endPoint
         if (start == null || end == null) {
@@ -451,6 +470,7 @@ class RoutePlannerContainerViewModel internal constructor(
                 it.copy(
                     isLoadingRoutes = true,
                     routeOptionsError = null,
+                    selectedRouteFilter = RouteOptionFilter.ALL,
                 )
             }
 
@@ -459,13 +479,16 @@ class RoutePlannerContainerViewModel internal constructor(
                 startLng = start.longitude,
                 endLat = end.latitude,
                 endLng = end.longitude,
+                departureTimeMillis = departureTimeMillis,
+                maxItineraries = maxItineraries,
             ).onSuccess { options ->
-                _uiState.update {
-                    it.copy(
+                _uiState.update { state ->
+                    val filtered = options.filter { state.selectedRouteFilter.matches(it) }
+                    state.copy(
                         routeOptions = options,
                         isLoadingRoutes = false,
                         routeOptionsError = null,
-                        selectedRouteOptionId = options.firstOrNull()?.id,
+                        selectedRouteOptionId = filtered.firstOrNull()?.id ?: options.firstOrNull()?.id,
                     )
                 }
             }.onFailure { error ->
@@ -483,10 +506,21 @@ class RoutePlannerContainerViewModel internal constructor(
     }
 
     /**
-     * Cập nhật bộ lọc phương tiện trong RouteOptionsSheet.
+     * Cập nhật bộ lọc phương tiện trong RouteOptionsSheet và giữ đồng bộ phương án đang chọn.
      */
     fun onSelectRouteFilter(filter: RouteOptionFilter) {
-        _uiState.update { it.copy(selectedRouteFilter = filter) }
+        _uiState.update { state ->
+            val filtered = state.routeOptions.filter { filter.matches(it) }
+            val nextSelectedId = if (filtered.any { it.id == state.selectedRouteOptionId }) {
+                state.selectedRouteOptionId
+            } else {
+                filtered.firstOrNull()?.id
+            }
+            state.copy(
+                selectedRouteFilter = filter,
+                selectedRouteOptionId = nextSelectedId,
+            )
+        }
     }
 
     /**
@@ -500,32 +534,32 @@ class RoutePlannerContainerViewModel internal constructor(
 
     /**
      * Cập nhật toạ độ tâm bản đồ nền khi người dùng kéo/pan Mapbox.
-     * Nếu thao tác đến từ gesture kéo map của người dùng ([isUserDraggingMap]),
-     * tự động cập nhật toạ độ & text tạm vào trường đang focus (Start hoặc End).
+     * - Khi người dùng đang giữ tay kéo (`isMapMoving == true`): chỉ cập nhật `mapCenter`,
+     *   giữ nguyên `startPoint`/`endPoint` để chấm tròn trên map bám cố định theo vị trí cũ.
+     * - Khi đã thả tay nhưng camera vẫn trôi theo quán tính fling (`!isMapMoving && isUserDraggingMap`):
+     *   không đẩy chấm tròn theo từng frame mà lên lịch chốt điểm cuối sau khi dừng.
      */
     fun onMapCameraMoved(latitude: Double, longitude: Double) {
         val newCenter = LocationData(latitude = latitude, longitude = longitude)
         _uiState.update { it.copy(mapCenter = newCenter) }
 
-        if (isUserDraggingMap) {
-            val isStillMoving = _uiState.value.isMapMoving
-            applyDraggedMapCenter(
-                point = newCenter,
-                triggerReverseGeocode = !isStillMoving,
-                immediate = false,
-            )
+        if (isUserDraggingMap && !_uiState.value.isMapMoving) {
+            scheduleFlingSettle(newCenter)
         }
     }
 
     /**
      * Cập nhật trạng thái đang kéo bản đồ từ gesture của người dùng.
-     * Khi thả tay (`isMoving == false`), lên lịch reverse geocode sau một khoảng debounce ngắn
-     * để bắt trọn cả quán tính fling nếu có.
+     * - Khi đang kéo (`isMoving == true`): giữ nguyên vị trí chấm tròn Start/End cũ trên bản đồ.
+     * - Khi thả tay (`isMoving == false`): cập nhật chấm tròn theo tâm `CenterLocationMarker` hiện tại
+     *   và lên lịch reverse geocode sau một khoảng debounce ngắn để bắt trọn quán tính fling nếu có.
      */
     fun onMapMoveStateChanged(isMoving: Boolean) {
         if (isMoving) {
             isUserDraggingMap = true
             cancelActiveSearch()
+            flingSettleJob?.cancel()
+            flingSettleJob = null
             reverseGeocodeJob?.cancel()
             reverseGeocodeJob = null
         }
@@ -543,7 +577,8 @@ class RoutePlannerContainerViewModel internal constructor(
 
     /**
      * Được gọi khi camera Mapbox dừng hoàn toàn (hết drag & fling).
-     * Nếu trước đó người dùng vừa kéo map, chốt toạ độ cuối cùng và giải mã tên địa chỉ ngay.
+     * Nếu trước đó người dùng vừa kéo map, chốt toạ độ cuối cùng theo tâm `CenterLocationMarker`
+     * và giải mã tên địa chỉ ngay.
      */
     fun onMapCameraIdle(latitude: Double, longitude: Double) {
         val finalCenter = LocationData(latitude = latitude, longitude = longitude)
@@ -551,6 +586,8 @@ class RoutePlannerContainerViewModel internal constructor(
 
         if (isUserDraggingMap && !_uiState.value.isMapMoving) {
             isUserDraggingMap = false
+            flingSettleJob?.cancel()
+            flingSettleJob = null
             applyDraggedMapCenter(
                 point = finalCenter,
                 triggerReverseGeocode = true,
@@ -664,8 +701,29 @@ class RoutePlannerContainerViewModel internal constructor(
         }
     }
 
+    private fun scheduleFlingSettle(point: LocationData) {
+        reverseGeocodeJob?.cancel()
+        reverseGeocodeJob = null
+        flingSettleJob?.cancel()
+        flingSettleJob = scope.launch {
+            if (reverseGeocodeDebounceMs > 0L) {
+                delay(reverseGeocodeDebounceMs)
+            }
+            if (isUserDraggingMap && !_uiState.value.isMapMoving) {
+                isUserDraggingMap = false
+                applyDraggedMapCenter(
+                    point = point,
+                    triggerReverseGeocode = true,
+                    immediate = true,
+                )
+            }
+        }
+    }
+
     private fun cancelMapDragAndReverseGeocode() {
         isUserDraggingMap = false
+        flingSettleJob?.cancel()
+        flingSettleJob = null
         reverseGeocodeJob?.cancel()
         reverseGeocodeJob = null
     }

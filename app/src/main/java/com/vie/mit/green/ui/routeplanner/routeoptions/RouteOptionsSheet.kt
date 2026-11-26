@@ -6,6 +6,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -25,8 +27,12 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.DirectionsBike
 import androidx.compose.material.icons.automirrored.filled.DirectionsWalk
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.DirectionsBoat
 import androidx.compose.material.icons.filled.DirectionsBus
+import androidx.compose.material.icons.filled.DirectionsSubway
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Train
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -52,17 +58,20 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.vie.mit.common.theme.AppTheme
+import com.vie.mit.data.model.common.map.TransitMode
+import com.vie.mit.data.model.domain.map.RouteLeg
 import com.vie.mit.data.model.domain.map.RouteOption
-import com.vie.mit.data.model.domain.map.RouteOptionTransportType
 import com.vie.mit.green.ui.routeplanner.container.LocationPickerField
 import com.vie.mit.green.ui.routeplanner.container.RouteOptionFilter
 import com.vie.mit.green.ui.routeplanner.container.RoutePlannerContainerViewModel
 import com.vie.mit.mapbox.model.distanceTo
+import java.text.SimpleDateFormat
+import java.util.Date
 import java.util.Locale
 
 /**
  * RouteOptionsSheet: Nội dung Bottom Sheet thứ hai trong RoutePlanner.
- * Hiển thị danh sách các phương án di chuyển giữa điểm xuất phát và điểm đích từ ViewModel / Backend.
+ * Hiển thị danh sách các phương án di chuyển giữa điểm xuất phát và điểm đích từ OTP2 Backend.
  */
 @Composable
 fun RouteOptionsSheet(
@@ -76,7 +85,12 @@ fun RouteOptionsSheet(
 
     // Đảm bảo dữ liệu được tải nếu chưa có khi mở trực tiếp sheet
     LaunchedEffect(uiState.startPoint, uiState.endPoint) {
-        if (uiState.hasValidRoute && uiState.routeOptions.isEmpty() && !uiState.isLoadingRoutes) {
+        if (
+            uiState.hasValidRoute &&
+            uiState.routeOptions.isEmpty() &&
+            !uiState.isLoadingRoutes &&
+            uiState.routeOptionsError == null
+        ) {
             containerViewModel.loadRouteOptions()
         }
     }
@@ -285,7 +299,7 @@ fun RouteOptionsSheet(
                     )
                     Spacer(modifier = Modifier.height(12.dp))
                     Button(
-                        onClick = containerViewModel::loadRouteOptions,
+                        onClick = { containerViewModel.loadRouteOptions() },
                         colors = ButtonDefaults.buttonColors(containerColor = Color.White),
                     ) {
                         Text(
@@ -304,8 +318,13 @@ fun RouteOptionsSheet(
                         .weight(1f),
                     contentAlignment = Alignment.Center,
                 ) {
+                    val emptyMessage = if (uiState.routeOptions.isEmpty()) {
+                        "Không tìm thấy tuyến giao thông công cộng phù hợp."
+                    } else {
+                        "Không có phương án phù hợp với bộ lọc đã chọn."
+                    }
                     Text(
-                        text = "Không có phương án di chuyển phù hợp.",
+                        text = emptyMessage,
                         style = AppTheme.typography.bodyMedium.copy(color = Color.White),
                     )
                 }
@@ -346,13 +365,30 @@ private fun RouteOptionFilter.toLabel(): String = when (this) {
     RouteOptionFilter.WALK -> "Đi bộ"
 }
 
-private fun RouteOptionTransportType.toIconAndColor(): Pair<ImageVector, Color> = when (this) {
-    RouteOptionTransportType.BUS -> Icons.Default.DirectionsBus to Color(0xFF10B981)
-    RouteOptionTransportType.SUBWAY -> Icons.Default.Train to Color(0xFF3B82F6)
-    RouteOptionTransportType.BIKE -> Icons.AutoMirrored.Filled.DirectionsBike to Color(0xFFF59E0B)
-    RouteOptionTransportType.WALK -> Icons.AutoMirrored.Filled.DirectionsWalk to Color(0xFF6B7280)
+private fun TransitMode.toIconAndColor(): Pair<ImageVector, Color> = when (this) {
+    TransitMode.BUS, TransitMode.TROLLEYBUS -> Icons.Default.DirectionsBus to Color(0xFF10B981)
+    TransitMode.SUBWAY, TransitMode.MONORAIL -> Icons.Default.DirectionsSubway to Color(0xFF3B82F6)
+    TransitMode.RAIL, TransitMode.TRAM, TransitMode.CABLE_TRAM, TransitMode.AERIAL_LIFT ->
+        Icons.Default.Train to Color(0xFF8B5CF6)
+    TransitMode.FERRY -> Icons.Default.DirectionsBoat to Color(0xFF06B6D4)
+    TransitMode.BIKE -> Icons.AutoMirrored.Filled.DirectionsBike to Color(0xFFF59E0B)
+    TransitMode.WALK -> Icons.AutoMirrored.Filled.DirectionsWalk to Color(0xFF6B7280)
 }
 
+private fun formatDurationLabel(durationMinutes: Int): String {
+    if (durationMinutes < 60) return "$durationMinutes phút"
+    val hours = durationMinutes / 60
+    val minutes = durationMinutes % 60
+    return if (minutes == 0) "${hours}g" else "${hours}g ${minutes}p"
+}
+
+private fun formatTimeRange(startMillis: Long?, endMillis: Long?): String? {
+    if (startMillis == null || endMillis == null) return null
+    val formatter = SimpleDateFormat("HH:mm", Locale.getDefault())
+    return "${formatter.format(Date(startMillis))} – ${formatter.format(Date(endMillis))}"
+}
+
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun RouteOptionCard(
     option: RouteOption,
@@ -362,6 +398,12 @@ private fun RouteOptionCard(
 ) {
     val (icon, iconColor) = remember(option.transportType) {
         option.transportType.toIconAndColor()
+    }
+    val timeRangeText = remember(option.startTimeMillis, option.endTimeMillis) {
+        formatTimeRange(option.startTimeMillis, option.endTimeMillis)
+    }
+    val firstTransitLeg = remember(option.legs) {
+        option.legs.firstOrNull { it.mode.isTransit }
     }
 
     Card(
@@ -378,71 +420,149 @@ private fun RouteOptionCard(
                 .fillMaxWidth()
                 .padding(14.dp),
         ) {
+            // Hàng 1: Chuỗi các chặng đa phương thức + Tổng thời lượng
             Row(
-                verticalAlignment = Alignment.CenterVertically,
+                verticalAlignment = Alignment.Top,
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                Box(
-                    modifier = Modifier
-                        .size(40.dp)
-                        .background(iconColor.copy(alpha = 0.12f), CircleShape),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(
-                        imageVector = icon,
-                        contentDescription = null,
-                        tint = iconColor,
-                        modifier = Modifier.size(24.dp),
-                    )
+                if (option.legs.isNotEmpty()) {
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp),
+                        modifier = Modifier.weight(1f),
+                    ) {
+                        option.legs.forEachIndexed { index, leg ->
+                            RouteLegBadge(leg = leg)
+                            if (index < option.legs.lastIndex) {
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                                    contentDescription = null,
+                                    tint = Color(0xFF9CA3AF),
+                                    modifier = Modifier
+                                        .size(16.dp)
+                                        .align(Alignment.CenterVertically),
+                                )
+                            }
+                        }
+                    }
+                } else {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.weight(1f),
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .background(iconColor.copy(alpha = 0.12f), CircleShape),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Icon(
+                                imageVector = icon,
+                                contentDescription = null,
+                                tint = iconColor,
+                                modifier = Modifier.size(20.dp),
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Text(
+                            text = option.title,
+                            style = AppTheme.typography.titleMedium.copy(
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFF1F2937),
+                                fontSize = 15.sp,
+                            ),
+                        )
+                    }
                 }
 
-                Spacer(modifier = Modifier.width(12.dp))
+                Spacer(modifier = Modifier.width(10.dp))
 
-                Column(modifier = Modifier.weight(1f)) {
+                Column(horizontalAlignment = Alignment.End) {
                     Text(
-                        text = option.title,
+                        text = formatDurationLabel(option.durationMinutes),
                         style = AppTheme.typography.titleMedium.copy(
                             fontWeight = FontWeight.Bold,
                             color = Color(0xFF1F2937),
                             fontSize = 16.sp,
                         ),
                     )
-                    Spacer(modifier = Modifier.height(2.dp))
-                    Text(
-                        text = option.description,
-                        style = AppTheme.typography.bodySmall.copy(color = Color(0xFF6B7280)),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-
-                Column(horizontalAlignment = Alignment.End) {
-                    Text(
-                        text = "${option.durationMinutes} phút",
-                        style = AppTheme.typography.titleMedium.copy(
-                            fontWeight = FontWeight.Bold,
-                            color = Color(0xFF1F2937),
-                        ),
-                    )
-                    if (option.costVnd > 0) {
+                    val cost = option.costVnd
+                    if (cost != null && cost > 0) {
                         Text(
-                            text = "${String.format(Locale.US, "%,d", option.costVnd)} đ",
+                            text = "${String.format(Locale.US, "%,d", cost)} đ",
                             style = AppTheme.typography.bodySmall.copy(
                                 color = Color(0xFF10B981),
                                 fontWeight = FontWeight.SemiBold,
-                            ),
-                        )
-                    } else {
-                        Text(
-                            text = "Miễn phí",
-                            style = AppTheme.typography.bodySmall.copy(
-                                color = Color(0xFF6B7280),
                             ),
                         )
                     }
                 }
             }
 
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Hàng 2: Khung giờ khởi hành – đến nơi & mô tả chuyển tuyến / đi bộ
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                if (timeRangeText != null) {
+                    Icon(
+                        imageVector = Icons.Default.Schedule,
+                        contentDescription = null,
+                        tint = AppTheme.colors.navyBlue,
+                        modifier = Modifier.size(14.dp),
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = timeRangeText,
+                        style = AppTheme.typography.bodySmall.copy(
+                            color = Color(0xFF1F2937),
+                            fontWeight = FontWeight.SemiBold,
+                        ),
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "•",
+                        style = AppTheme.typography.bodySmall.copy(color = Color(0xFF9CA3AF)),
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                }
+                Text(
+                    text = option.description,
+                    style = AppTheme.typography.bodySmall.copy(color = Color(0xFF6B7280)),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
+            }
+
+            // Hàng 3: Gợi ý điểm đón / hướng tuyến đầu tiên (nếu có)
+            val boardingSummary = remember(firstTransitLeg) {
+                val leg = firstTransitLeg ?: return@remember null
+                val stopName = leg.from?.name?.takeIf { it.isNotBlank() && it != "Origin" }
+                val headsign = leg.headsign?.takeIf { it.isNotBlank() }
+                when {
+                    stopName != null && headsign != null -> "Đón tại $stopName • Hướng $headsign"
+                    stopName != null -> "Đón tại $stopName"
+                    headsign != null -> "Hướng $headsign"
+                    else -> null
+                }
+            }
+            if (boardingSummary != null) {
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = boardingSummary,
+                    style = AppTheme.typography.bodySmall.copy(
+                        color = Color(0xFF4B5563),
+                        fontSize = 12.sp,
+                    ),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+
+            // Hàng 4: Nhãn tóm tắt (Nhanh nhất, Đi thẳng, Ít đi bộ nhất)
             if (option.tags.isNotEmpty()) {
                 Spacer(modifier = Modifier.height(8.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -463,5 +583,44 @@ private fun RouteOptionCard(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun RouteLegBadge(
+    leg: RouteLeg,
+    modifier: Modifier = Modifier,
+) {
+    val (icon, color) = remember(leg.mode) { leg.mode.toIconAndColor() }
+    val isTransit = leg.mode.isTransit
+    val label = if (isTransit) {
+        leg.routeShortName?.takeIf { it.isNotBlank() } ?: "${leg.durationMinutes}p"
+    } else {
+        "${leg.durationMinutes}p"
+    }
+
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = modifier
+            .background(
+                color = if (isTransit) color else Color(0xFFF3F4F6),
+                shape = RoundedCornerShape(8.dp),
+            )
+            .padding(horizontal = 7.dp, vertical = 4.dp),
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = if (isTransit) Color.White else color,
+            modifier = Modifier.size(14.dp),
+        )
+        Spacer(modifier = Modifier.width(3.dp))
+        Text(
+            text = label,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Bold,
+            color = if (isTransit) Color.White else Color(0xFF4B5563),
+            maxLines = 1,
+        )
     }
 }

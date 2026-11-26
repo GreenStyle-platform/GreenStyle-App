@@ -1,9 +1,14 @@
 package com.vie.mit.data.model.mapper
 
+import com.vie.mit.data.model.common.map.TransitMode
 import com.vie.mit.data.model.domain.map.AutosuggestPlace
 import com.vie.mit.data.model.domain.map.BusRoute
 import com.vie.mit.data.model.domain.map.Location
 import com.vie.mit.data.model.domain.map.PublicTransportSuggestion
+import com.vie.mit.data.model.domain.map.RouteCoordinate
+import com.vie.mit.data.model.domain.map.RouteLeg
+import com.vie.mit.data.model.domain.map.RouteLegPlace
+import com.vie.mit.data.model.domain.map.RouteOption
 import com.vie.mit.data.model.domain.map.RouteTrip
 import com.vie.mit.data.model.domain.map.ShapePoint
 import com.vie.mit.data.model.domain.map.StopArrival
@@ -19,9 +24,14 @@ import com.vie.mit.data.model.remote.response.map.RouteArrivalResponse
 import com.vie.mit.data.model.remote.response.map.RouteTripResponse
 import com.vie.mit.data.model.remote.response.map.ShapePointResponse
 import com.vie.mit.data.model.remote.response.map.StopTimeResponse
+import com.vie.mit.data.model.remote.response.map.TransitItineraryResponse
+import com.vie.mit.data.model.remote.response.map.TransitLegResponse
+import com.vie.mit.data.model.remote.response.map.TransitPlaceResponse
+import com.vie.mit.data.model.remote.response.map.TransitRouteSearchResponse
 import com.vie.mit.data.model.remote.response.map.TransitStopDetailResponse
 import com.vie.mit.data.model.remote.response.map.TransitStopMarkerResponse
 import com.vie.mit.data.model.remote.response.map.TripStopResponse
+import com.vie.mit.data.util.PolylineDecoder
 import java.time.LocalTime
 import java.util.Locale
 
@@ -205,5 +215,149 @@ fun HereAutocompleteItemResponse.toDomain(): AutosuggestPlace {
         distance = distance,
         highlights = highlightRanges,
     )
+}
+
+fun TransitRouteSearchResponse.toDomain(): List<RouteOption> {
+    if (itineraries.isEmpty()) return emptyList()
+    val minDurationSeconds = itineraries.minOf { it.durationSeconds }
+    val minWalkSeconds = itineraries.minOf { it.walkSeconds }
+    val maxWalkSeconds = itineraries.maxOf { it.walkSeconds }
+    val fastestIndex = itineraries.indexOfFirst { it.durationSeconds == minDurationSeconds }
+    val leastWalkIndex = if (itineraries.size > 1 && minWalkSeconds < maxWalkSeconds) {
+        itineraries.indexOfFirst { it.walkSeconds == minWalkSeconds }
+    } else {
+        -1
+    }
+
+    return itineraries.mapIndexed { index, itinerary ->
+        itinerary.toDomain(
+            index = index,
+            isFastest = index == fastestIndex,
+            isLeastWalk = index == leastWalkIndex,
+        )
+    }
+}
+
+fun TransitItineraryResponse.toDomain(
+    index: Int = 0,
+    isFastest: Boolean = false,
+    isLeastWalk: Boolean = false,
+): RouteOption {
+    val domainLegs = legs.map { it.toDomain() }
+    val transitLegs = domainLegs.filter { it.mode.isTransit }
+    val distinctModes = domainLegs.map { it.mode }.toSet().ifEmpty { setOf(TransitMode.WALK) }
+    val primaryMode = when {
+        transitLegs.isNotEmpty() -> transitLegs.first().mode
+        TransitMode.BIKE in distinctModes -> TransitMode.BIKE
+        else -> TransitMode.WALK
+    }
+    val resolvedTitle = if (transitLegs.isNotEmpty()) {
+        transitLegs.joinToString(separator = " → ") { leg ->
+            val shortName = leg.routeShortName?.trim().orEmpty()
+            val modeLabel = leg.mode.toVietnameseLabel()
+            when {
+                shortName.isNotEmpty() -> "$modeLabel $shortName"
+                !leg.routeLongName.isNullOrBlank() -> leg.routeLongName.trim()
+                else -> modeLabel
+            }
+        }
+    } else {
+        primaryMode.toVietnameseLabel()
+    }
+    val totalDurationMinutes = if (durationSeconds <= 0) {
+        0
+    } else {
+        ((durationSeconds + 30) / 60).coerceAtLeast(1)
+    }
+    val walkMinutes = if (walkSeconds <= 0) {
+        0
+    } else {
+        ((walkSeconds + 30) / 60).coerceAtLeast(1)
+    }
+    val descriptionParts = mutableListOf<String>()
+    if (transitLegs.isNotEmpty()) {
+        if (transfers <= 0) {
+            descriptionParts.add("Đi thẳng")
+        } else {
+            descriptionParts.add("$transfers lần chuyển tuyến")
+        }
+    }
+    if (walkMinutes > 0) {
+        descriptionParts.add("Đi bộ $walkMinutes phút")
+    }
+    val resolvedDescription =
+        descriptionParts.joinToString(separator = " • ").ifBlank { primaryMode.toVietnameseLabel() }
+    val tags = mutableListOf<String>()
+    if (isFastest) {
+        tags.add("Nhanh nhất")
+    }
+    if (transitLegs.isNotEmpty() && transfers == 0) {
+        tags.add("Đi thẳng")
+    }
+    if (isLeastWalk) {
+        tags.add("Ít đi bộ nhất")
+    }
+
+    return RouteOption(
+        id = id.ifBlank { "itinerary-$index" },
+        title = resolvedTitle,
+        description = resolvedDescription,
+        durationSeconds = durationSeconds,
+        durationMinutes = totalDurationMinutes,
+        walkSeconds = walkSeconds,
+        transfers = transfers,
+        startTimeMillis = startTime?.toLongOrNull(),
+        endTimeMillis = endTime?.toLongOrNull(),
+        costVnd = null,
+        transportType = primaryMode,
+        transportTypes = distinctModes,
+        legs = domainLegs,
+        tags = tags,
+    )
+}
+
+fun TransitLegResponse.toDomain(): RouteLeg {
+    val fromPlace = from?.toDomain()
+    val toPlace = to?.toDomain()
+    val decodedPoints = PolylineDecoder.decode(geometry).ifEmpty {
+        buildList {
+            if (fromPlace != null) add(RouteCoordinate(fromPlace.latitude, fromPlace.longitude))
+            if (toPlace != null) add(RouteCoordinate(toPlace.latitude, toPlace.longitude))
+        }
+    }
+    return RouteLeg(
+        mode = TransitMode.fromOtpMode(mode),
+        durationSeconds = durationSeconds,
+        startTimeMillis = startTime?.toLongOrNull(),
+        endTimeMillis = endTime?.toLongOrNull(),
+        from = fromPlace,
+        to = toPlace,
+        encodedGeometry = geometry,
+        points = decodedPoints,
+        headsign = headsign,
+        routeId = routeId,
+        routeShortName = routeShortName,
+        routeLongName = routeLongName,
+    )
+}
+
+fun TransitPlaceResponse.toDomain(): RouteLegPlace = RouteLegPlace(
+    id = id,
+    name = name.orEmpty(),
+    latitude = latitude,
+    longitude = longitude,
+    arrivalTimeMillis = arrivalTime?.toLongOrNull(),
+    departureTimeMillis = departureTime?.toLongOrNull(),
+)
+
+private fun TransitMode.toVietnameseLabel(): String = when (this) {
+    TransitMode.BUS, TransitMode.TROLLEYBUS -> "Xe buýt"
+    TransitMode.SUBWAY, TransitMode.MONORAIL -> "Metro"
+    TransitMode.RAIL -> "Tàu hỏa"
+    TransitMode.TRAM, TransitMode.CABLE_TRAM -> "Tàu điện"
+    TransitMode.FERRY -> "Phà"
+    TransitMode.AERIAL_LIFT -> "Cáp treo"
+    TransitMode.BIKE -> "Xe đạp"
+    TransitMode.WALK -> "Đi bộ"
 }
 

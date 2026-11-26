@@ -102,6 +102,7 @@ class TransitStopRepository @Inject constructor(
             TransitMode.SUBWAY, TransitMode.MONORAIL -> "subway"
             TransitMode.RAIL, TransitMode.TRAM, TransitMode.CABLE_TRAM, TransitMode.AERIAL_LIFT -> "rail"
             TransitMode.FERRY -> "ferry"
+            TransitMode.BIKE, TransitMode.WALK -> "bus"
         }
 
         try {

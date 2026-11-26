@@ -3,11 +3,22 @@ package com.vie.mit.data.repository.routeplanner
 import com.vie.mit.data.model.domain.map.Location
 import com.vie.mit.data.model.domain.map.PublicTransportSuggestion
 import com.vie.mit.data.model.domain.map.RouteOption
-import com.vie.mit.data.model.domain.map.RouteOptionTransportType
 import com.vie.mit.data.model.mapper.toDomain
 import com.vie.mit.data.model.mapper.toLocationRequest
+import com.vie.mit.data.model.remote.request.map.TransitRouteSearchRequest
 import com.vie.mit.data.network.api.routeplanner.RoutePlannerApi
 import com.vie.mit.data.network.util.handleApiCall
+import com.vie.mit.data.repository.routeplanner.RoutePlannerRepository.Companion.DEFAULT_DEPART_NOW_BUFFER_MS
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import retrofit2.HttpException
+import timber.log.Timber
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+import java.util.TimeZone
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -15,6 +26,46 @@ import javax.inject.Singleton
 class RoutePlannerRepository @Inject constructor(
     private val routePlannerApi: RoutePlannerApi,
 ) {
+    companion object {
+        const val DEFAULT_MAX_ITINERARIES = 5
+
+        /**
+         * Forward buffer applied when searching "depart now" to absorb network latency
+         * and minor device/emulator clock drift relative to backend UTC time.
+         */
+        const val DEFAULT_DEPART_NOW_BUFFER_MS = 60_000L
+
+        /**
+         * Forward buffer applied on a single retry synced to the server timestamp.
+         */
+        const val RETRY_DEPART_NOW_BUFFER_MS = 30_000L
+
+        private val ISO_UTC_REGEX =
+            Regex("""^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})(?:\.(\d+))?(?:Z|\+00:00)$""")
+
+        fun formatUtcIsoTimestamp(epochMillis: Long): String {
+            val formatter = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US).apply {
+                timeZone = TimeZone.getTimeZone("UTC")
+            }
+            return formatter.format(Date(epochMillis))
+        }
+
+        internal fun parseUtcIsoTimestampMillis(isoString: String?): Long? {
+            val raw = isoString?.trim().orEmpty()
+            if (raw.isEmpty()) return null
+            val match = ISO_UTC_REGEX.matchEntire(raw) ?: return null
+            val baseDateTime = match.groupValues[1]
+            val fracDigits = match.groupValues[2]
+            val millisStr = fracDigits.padEnd(3, '0').take(3)
+            val normalized = "$baseDateTime.${millisStr}Z"
+            val formatter = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US).apply {
+                timeZone = TimeZone.getTimeZone("UTC")
+                isLenient = false
+            }
+            return runCatching { formatter.parse(normalized)?.time }.getOrNull()
+        }
+    }
+
     suspend fun getPublicTransportSuggestions(
         location: Location,
     ): Result<List<PublicTransportSuggestion>> = handleApiCall {
@@ -23,85 +74,75 @@ class RoutePlannerRepository @Inject constructor(
     }
 
     /**
-     * Fetches multimodal route options between Start and End coordinates.
+     * Searches multimodal transit route options between Start and End coordinates
+     * using the OpenTripPlanner 2 backend API (`POST transit-routes/search`).
      *
-     * TODO: Replace mock implementation with real backend route-planning API when available.
+     * When [departureTimeMillis] is `null` ("depart now"), a small forward buffer
+     * ([DEFAULT_DEPART_NOW_BUFFER_MS]) is applied to avoid rejecting requests due to network
+     * latency or device clock lag. If the server still rejects the timestamp with HTTP 400/422
+     * because the device clock is further behind server UTC time, the call syncs to the server
+     * timestamp and retries once automatically.
      */
     suspend fun getRouteOptions(
         startLat: Double,
         startLng: Double,
         endLat: Double,
         endLng: Double,
-    ): Result<List<RouteOption>> {
-        val distanceKm = estimateDistanceKm(startLat, startLng, endLat, endLng)
-        val busMinutes = (distanceKm * 4.2 + 8).toInt().coerceIn(10, 120)
-        val metroMinutes = (distanceKm * 2.5 + 6).toInt().coerceIn(8, 90)
-        val bikeMinutes = (distanceKm * 4.0 + 4).toInt().coerceIn(6, 120)
-        val walkMinutes = (distanceKm * 12.0).toInt().coerceIn(5, 180)
-        val walkMeters = (distanceKm * 1000).toInt().coerceAtLeast(150)
+        departureTimeMillis: Long? = null,
+        maxItineraries: Int = DEFAULT_MAX_ITINERARIES,
+    ): Result<List<RouteOption>> = handleApiCall {
+        val isDepartNow = departureTimeMillis == null
+        val requestedDepartureMillis = departureTimeMillis
+            ?: (System.currentTimeMillis() + DEFAULT_DEPART_NOW_BUFFER_MS)
 
-        return Result.success(
-            listOf(
-                RouteOption(
-                    id = "opt_bus_fast",
-                    title = "Xe buýt tuyến 01",
-                    description = "Đi bộ 250m • Chuyến kế tiếp trong 5 phút",
-                    durationMinutes = busMinutes,
-                    costVnd = 7000,
-                    walkDistanceMeters = 250,
-                    transportType = RouteOptionTransportType.BUS,
-                    tags = listOf("Nhanh nhất", "Tiết kiệm"),
-                ),
-                RouteOption(
-                    id = "opt_metro_1",
-                    title = "Tàu điện Metro Tuyến 1",
-                    description = "Chuyển tuyến 1 lần • Giãn cách 8 phút",
-                    durationMinutes = metroMinutes,
-                    costVnd = 12000,
-                    walkDistanceMeters = 400,
-                    transportType = RouteOptionTransportType.SUBWAY,
-                    tags = listOf("Đúng giờ", "Tránh kẹt xe"),
-                ),
-                RouteOption(
-                    id = "opt_bike",
-                    title = "Xe đạp công cộng TNGo",
-                    description = "Thuê tại trạm gần nhất • Tuyến đường thoáng",
-                    durationMinutes = bikeMinutes,
-                    costVnd = 10000,
-                    walkDistanceMeters = 100,
-                    transportType = RouteOptionTransportType.BIKE,
-                    tags = listOf("Thân thiện môi trường"),
-                ),
-                RouteOption(
-                    id = "opt_walk",
-                    title = "Đi bộ",
-                    description = "Tuyến đường đi bộ an toàn có vỉa hè",
-                    durationMinutes = walkMinutes,
-                    costVnd = 0,
-                    walkDistanceMeters = walkMeters,
-                    transportType = RouteOptionTransportType.WALK,
-                    tags = listOf("Tập luyện"),
-                ),
-            ),
+        val request = TransitRouteSearchRequest(
+            originLatitude = startLat,
+            originLongitude = startLng,
+            destinationLatitude = endLat,
+            destinationLongitude = endLng,
+            departureTime = formatUtcIsoTimestamp(requestedDepartureMillis),
+            maxItineraries = maxItineraries,
         )
+
+        try {
+            routePlannerApi.searchTransitRoutes(request).toDomain()
+        } catch (e: HttpException) {
+            if (!isDepartNow || (e.code() != 400 && e.code() != 422)) throw e
+
+            val serverTimeMillis = extractServerTimestampMillis(e) ?: throw e
+            if (serverTimeMillis < requestedDepartureMillis) throw e
+
+            val syncedDepartureMillis = serverTimeMillis + RETRY_DEPART_NOW_BUFFER_MS
+            Timber.w(
+                "Device clock lagged behind server UTC by %d ms; retrying transit search with synced departureTime=%s",
+                serverTimeMillis - requestedDepartureMillis,
+                formatUtcIsoTimestamp(syncedDepartureMillis),
+            )
+            val retryRequest = request.copy(
+                departureTime = formatUtcIsoTimestamp(syncedDepartureMillis),
+            )
+            routePlannerApi.searchTransitRoutes(retryRequest).toDomain()
+        }
     }
 
-    private fun estimateDistanceKm(
-        lat1: Double,
-        lng1: Double,
-        lat2: Double,
-        lng2: Double,
-    ): Double {
-        val earthRadiusKm = 6371.0
-        val dLat = Math.toRadians(lat2 - lat1)
-        val dLng = Math.toRadians(lng2 - lng1)
-        val sinLat = kotlin.math.sin(dLat / 2)
-        val sinLng = kotlin.math.sin(dLng / 2)
-        val a = sinLat * sinLat +
-            kotlin.math.cos(Math.toRadians(lat1)) *
-            kotlin.math.cos(Math.toRadians(lat2)) *
-            sinLng * sinLng
-        val c = 2 * kotlin.math.atan2(kotlin.math.sqrt(a), kotlin.math.sqrt(1 - a))
-        return (earthRadiusKm * c).coerceAtLeast(0.5)
+    private fun extractServerTimestampMillis(exception: HttpException): Long? {
+        val response = exception.response() ?: return null
+
+        // Non-destructively peek errorBody so downstream error handlers can still read it if needed
+        val peekedBody = runCatching {
+            val source = response.errorBody()?.source() ?: return@runCatching null
+            source.request(Long.MAX_VALUE)
+            source.buffer.clone().readUtf8()
+        }.getOrNull()
+
+        val bodyTimestamp = peekedBody?.let { rawBody ->
+            runCatching {
+                val jsonObject = Json.parseToJsonElement(rawBody).jsonObject
+                parseUtcIsoTimestampMillis(jsonObject["timestamp"]?.jsonPrimitive?.contentOrNull)
+            }.getOrNull()
+        }
+        if (bodyTimestamp != null) return bodyTimestamp
+
+        return runCatching { response.headers().getDate("Date")?.time }.getOrNull()
     }
 }

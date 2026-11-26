@@ -35,6 +35,7 @@ import com.mapbox.maps.extension.compose.MapboxMap
 import com.mapbox.maps.extension.compose.animation.viewport.MapViewportState
 import com.mapbox.maps.extension.compose.animation.viewport.rememberMapViewportState
 import com.mapbox.maps.extension.style.expressions.dsl.generated.match
+import com.mapbox.maps.extension.style.expressions.generated.Expression
 import com.mapbox.maps.extension.style.layers.addLayer
 import com.mapbox.maps.extension.style.layers.generated.circleLayer
 import com.mapbox.maps.extension.style.layers.generated.lineLayer
@@ -54,6 +55,8 @@ import com.mapbox.maps.plugin.locationcomponent.OnIndicatorPositionChangedListen
 import com.mapbox.maps.plugin.locationcomponent.location
 import com.vie.mit.common.theme.AppTheme
 import com.vie.mit.mapbox.model.LocationData
+import com.vie.mit.mapbox.model.RouteMapSegment
+import com.vie.mit.mapbox.model.RouteMapStopPoint
 import com.vie.mit.mapbox.permission.MapPermissionHandler
 import com.vie.mit.mapbox.util.MapPlaceholderBackgroundColor
 import com.vie.mit.mapbox.util.createZoomScaled2DPuck
@@ -64,6 +67,12 @@ import kotlin.math.roundToInt
 
 private const val PICKER_LINE_SOURCE_ID = "source_route_picker_dashed_line"
 private const val PICKER_LINE_LAYER_ID = "layer_route_picker_dashed_line"
+private const val ROUTE_WALK_SEGMENTS_SOURCE_ID = "source_route_picker_walk_segments"
+private const val ROUTE_WALK_SEGMENTS_LAYER_ID = "layer_route_picker_walk_segments"
+private const val ROUTE_TRANSIT_SEGMENTS_SOURCE_ID = "source_route_picker_transit_segments"
+private const val ROUTE_TRANSIT_SEGMENTS_LAYER_ID = "layer_route_picker_transit_segments"
+private const val ROUTE_TRANSFER_STOPS_SOURCE_ID = "source_route_picker_transfer_stops"
+private const val ROUTE_TRANSFER_STOPS_LAYER_ID = "layer_route_picker_transfer_stops"
 private const val PICKER_POINTS_SOURCE_ID = "source_route_picker_points"
 private const val PICKER_POINTS_OUTER_LAYER_ID = "layer_route_picker_points_outer"
 private const val PICKER_POINTS_INNER_LAYER_ID = "layer_route_picker_points_inner"
@@ -82,6 +91,8 @@ fun RoutePickerMap(
     endPoint: LocationData?,
     onCameraCenterChanged: (latitude: Double, longitude: Double) -> Unit,
     modifier: Modifier = Modifier,
+    routeSegments: List<RouteMapSegment> = emptyList(),
+    transferStops: List<RouteMapStopPoint> = emptyList(),
     cameraBottomPadding: Float = 0f,
     showUserLocation: Boolean = true,
     fitRouteBounds: Boolean = false,
@@ -227,9 +238,9 @@ fun RoutePickerMap(
                     override fun onMove(detector: MoveGestureDetector): Boolean = false
 
                     override fun onMoveEnd(detector: MoveGestureDetector) {
-                        currentOnMapMoveStateChanged?.invoke(false)
                         val center = mapboxMap.cameraState.center
                         currentOnCameraCenterChanged(center.latitude(), center.longitude())
+                        currentOnMapMoveStateChanged?.invoke(false)
                     }
                 }
                 mapView.gestures.addOnMoveListener(moveListener)
@@ -244,12 +255,15 @@ fun RoutePickerMap(
                 }
             }
 
-            // 4. Vẽ đường nét đứt (Dashed Polyline) và 2 Marker cố định tại Start và End
-            MapEffect(startPoint, endPoint) { mapView ->
+            // 4. Vẽ lộ trình thực tế (walk/transit polylines + transfer stops) hoặc đường nét đứt Start-End + 2 Marker cố định
+            MapEffect(startPoint, endPoint, routeSegments, transferStops) { mapView ->
                 val mapboxMap = mapView.mapboxMap
                 mapboxMap.getStyle { style ->
+                    val hasDecodedRoute = routeSegments.any { it.points.size >= 2 }
                     val hasBothPoints = startPoint != null && endPoint != null
-                    val lineGeoJson = if (hasBothPoints) {
+
+                    // 4a. Đường thẳng nét đứt mặc định Start -> End (chỉ hiện khi chưa có polyline tuyến thực tế)
+                    val lineGeoJson = if (hasBothPoints && !hasDecodedRoute) {
                         val coordinates = listOf(
                             Point.fromLngLat(startPoint.longitude, startPoint.latitude),
                             Point.fromLngLat(endPoint.longitude, endPoint.latitude),
@@ -264,10 +278,7 @@ fun RoutePickerMap(
                     if (existingSource != null) {
                         existingSource.data(lineGeoJson)
                     } else {
-                        val source = geoJsonSource(PICKER_LINE_SOURCE_ID) {
-                            data(lineGeoJson)
-                        }
-                        style.addSource(source)
+                        style.addSource(geoJsonSource(PICKER_LINE_SOURCE_ID) { data(lineGeoJson) })
                     }
 
                     if (!style.styleLayerExists(PICKER_LINE_LAYER_ID)) {
@@ -281,6 +292,84 @@ fun RoutePickerMap(
                         style.addLayer(layer)
                     }
 
+                    // 4b. Các chặng đi bộ (dashed line)
+                    val walkFeatures = routeSegments
+                        .filter { it.isDashed && it.points.size >= 2 }
+                        .map { segment ->
+                            val coords = segment.points.map { Point.fromLngLat(it.longitude, it.latitude) }
+                            Feature.fromGeometry(LineString.fromLngLats(coords)).apply {
+                                addStringProperty("color", segment.colorHex)
+                            }
+                        }
+                    val walkGeoJson = FeatureCollection.fromFeatures(walkFeatures).toJson()
+                    val existingWalkSource = style.getSourceAs<GeoJsonSource>(ROUTE_WALK_SEGMENTS_SOURCE_ID)
+                    if (existingWalkSource != null) {
+                        existingWalkSource.data(walkGeoJson)
+                    } else {
+                        style.addSource(geoJsonSource(ROUTE_WALK_SEGMENTS_SOURCE_ID) { data(walkGeoJson) })
+                    }
+                    if (!style.styleLayerExists(ROUTE_WALK_SEGMENTS_LAYER_ID)) {
+                        val walkLayer = lineLayer(ROUTE_WALK_SEGMENTS_LAYER_ID, ROUTE_WALK_SEGMENTS_SOURCE_ID) {
+                            lineColor(Expression.get("color"))
+                            lineWidth(4.5)
+                            lineCap(LineCap.ROUND)
+                            lineJoin(LineJoin.ROUND)
+                            lineDasharray(listOf(1.5, 1.8))
+                        }
+                        style.addLayer(walkLayer)
+                    }
+
+                    // 4c. Các chặng giao thông công cộng (solid line theo màu phương tiện)
+                    val transitFeatures = routeSegments
+                        .filter { !it.isDashed && it.points.size >= 2 }
+                        .map { segment ->
+                            val coords = segment.points.map { Point.fromLngLat(it.longitude, it.latitude) }
+                            Feature.fromGeometry(LineString.fromLngLats(coords)).apply {
+                                addStringProperty("color", segment.colorHex)
+                            }
+                        }
+                    val transitGeoJson = FeatureCollection.fromFeatures(transitFeatures).toJson()
+                    val existingTransitSource = style.getSourceAs<GeoJsonSource>(ROUTE_TRANSIT_SEGMENTS_SOURCE_ID)
+                    if (existingTransitSource != null) {
+                        existingTransitSource.data(transitGeoJson)
+                    } else {
+                        style.addSource(geoJsonSource(ROUTE_TRANSIT_SEGMENTS_SOURCE_ID) { data(transitGeoJson) })
+                    }
+                    if (!style.styleLayerExists(ROUTE_TRANSIT_SEGMENTS_LAYER_ID)) {
+                        val transitLayer = lineLayer(ROUTE_TRANSIT_SEGMENTS_LAYER_ID, ROUTE_TRANSIT_SEGMENTS_SOURCE_ID) {
+                            lineColor(Expression.get("color"))
+                            lineWidth(5.5)
+                            lineCap(LineCap.ROUND)
+                            lineJoin(LineJoin.ROUND)
+                        }
+                        style.addLayer(transitLayer)
+                    }
+
+                    // 4d. Các điểm lên/xuống chuyển tuyến
+                    val transferFeatures = transferStops.map { stop ->
+                        Feature.fromGeometry(Point.fromLngLat(stop.location.longitude, stop.location.latitude)).apply {
+                            addStringProperty("name", stop.name)
+                            addStringProperty("color", stop.colorHex)
+                        }
+                    }
+                    val transferGeoJson = FeatureCollection.fromFeatures(transferFeatures).toJson()
+                    val existingTransferSource = style.getSourceAs<GeoJsonSource>(ROUTE_TRANSFER_STOPS_SOURCE_ID)
+                    if (existingTransferSource != null) {
+                        existingTransferSource.data(transferGeoJson)
+                    } else {
+                        style.addSource(geoJsonSource(ROUTE_TRANSFER_STOPS_SOURCE_ID) { data(transferGeoJson) })
+                    }
+                    if (!style.styleLayerExists(ROUTE_TRANSFER_STOPS_LAYER_ID)) {
+                        val transferLayer = circleLayer(ROUTE_TRANSFER_STOPS_LAYER_ID, ROUTE_TRANSFER_STOPS_SOURCE_ID) {
+                            circleRadius(5.5)
+                            circleColor("#FFFFFF")
+                            circleStrokeWidth(2.5)
+                            circleStrokeColor(Expression.get("color"))
+                        }
+                        style.addLayer(transferLayer)
+                    }
+
+                    // 4e. 2 Marker cố định tại Start và End (luôn vẽ trên cùng)
                     val pointFeatures = mutableListOf<Feature>()
                     if (startPoint != null) {
                         val feat = Feature.fromGeometry(
@@ -341,14 +430,19 @@ fun RoutePickerMap(
                 }
             }
 
-            // 5. Khi ở chế độ xem phương án di chuyển (fitRouteBounds), tự động zoom bao trọn Start & End an toàn
-            MapEffect(startPoint, endPoint, fitRouteBounds) { mapView ->
+            // 5. Khi ở chế độ xem phương án di chuyển (fitRouteBounds), tự động zoom bao trọn toàn bộ lộ trình đang chọn
+            MapEffect(startPoint, endPoint, routeSegments, fitRouteBounds) { mapView ->
                 if (!fitRouteBounds || startPoint == null || endPoint == null) return@MapEffect
                 val mapboxMap = mapView.mapboxMap
-                val points = listOf(
+                val segmentPoints = routeSegments
+                    .flatMap { it.points }
+                    .map { Point.fromLngLat(it.longitude, it.latitude) }
+                val endpointPoints = listOf(
                     Point.fromLngLat(startPoint.longitude, startPoint.latitude),
                     Point.fromLngLat(endPoint.longitude, endPoint.latitude),
                 )
+                val points = if (segmentPoints.isNotEmpty()) segmentPoints + endpointPoints else endpointPoints
+
                 val mapHeight = mapView.height.toDouble()
                 val safeTop = 140.0
                 val maxSafeBottom = if (mapHeight > 320.0) {

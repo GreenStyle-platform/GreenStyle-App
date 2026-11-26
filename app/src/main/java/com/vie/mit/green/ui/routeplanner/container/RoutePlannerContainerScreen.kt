@@ -30,7 +30,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
@@ -50,10 +49,14 @@ import com.vie.mit.common.screenbottomsheet.CustomBottomSheetValue
 import com.vie.mit.common.screenbottomsheet.rememberCustomBottomSheetState
 import com.vie.mit.common.theme.AppTheme
 import com.vie.mit.common.ui.button.FloatingBackButton
+import com.vie.mit.data.model.common.map.TransitMode
 import com.vie.mit.green.R
 import com.vie.mit.green.navigation.main_graph.RouteLocationPickerSheetRoute
 import com.vie.mit.green.navigation.main_graph.RouteOptionsRouteSheet
 import com.vie.mit.mapbox.composable.RoutePickerMap
+import com.vie.mit.mapbox.model.LocationData
+import com.vie.mit.mapbox.model.RouteMapSegment
+import com.vie.mit.mapbox.model.RouteMapStopPoint
 import com.vie.mit.mapbox.util.focusUserLocationBoundingBox
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
@@ -253,6 +256,32 @@ fun RoutePlannerContainerScreen(
         }
     }
 
+    val selectedRouteOption = if (!isLocationPickerActive) uiState.selectedRouteOption else null
+    val routeMapSegments = remember(selectedRouteOption) {
+        selectedRouteOption?.legs.orEmpty().mapNotNull { leg ->
+            if (leg.points.size < 2) return@mapNotNull null
+            RouteMapSegment(
+                points = leg.points.map { LocationData(latitude = it.latitude, longitude = it.longitude) },
+                colorHex = leg.mode.toMapLineColorHex(),
+                isDashed = leg.mode == TransitMode.WALK,
+            )
+        }
+    }
+    val transferStops = remember(selectedRouteOption) {
+        selectedRouteOption?.legs.orEmpty()
+            .filter { it.mode.isTransit }
+            .flatMap { leg ->
+                val colorHex = leg.mode.toMapLineColorHex()
+                listOfNotNull(leg.from, leg.to).map { place ->
+                    RouteMapStopPoint(
+                        name = place.name,
+                        location = LocationData(latitude = place.latitude, longitude = place.longitude),
+                        colorHex = colorHex,
+                    )
+                }
+            }
+    }
+
     CommonScreenBottomSheet(
         initState = bottomSheetState,
         config = sheetConfig,
@@ -262,7 +291,13 @@ fun RoutePlannerContainerScreen(
                 RoutePickerMap(
                     startPoint = uiState.startPoint,
                     endPoint = uiState.endPoint,
-                    onCameraCenterChanged = containerViewModel::onMapCameraMoved,
+                    routeSegments = routeMapSegments,
+                    transferStops = transferStops,
+                    onCameraCenterChanged = { lat, lng ->
+                        if (isLocationPickerActive) {
+                            containerViewModel.onMapCameraMoved(lat, lng)
+                        }
+                    },
                     cameraBottomPadding = cameraBottomPadding,
                     fitRouteBounds = !isLocationPickerActive,
                     mapViewportState = mapViewportState,
@@ -391,7 +426,9 @@ private val CenterMarkerSize = 32.dp
  * Center Marker nằm chính giữa viewport bản đồ:
  * - Hiển thị Icon Start (Xanh lá) khi đang focus ô Start.
  * - Hiển thị Icon End (Đỏ) khi đang focus ô End.
- * - Dịch icon lên nửa chiều cao theo trục Y để mũi nhọn đáy pin chỉ chính xác toạ độ tâm bản đồ.
+ * - Dùng bottom padding bằng chính [CenterMarkerSize] thay vì negative offset để giữ toàn bộ icon
+ *   nằm trong layout bounds (tránh bị offscreen buffer của `graphicsLayer { alpha }` cắt mất nửa trên
+ *   khi 0f < alpha < 1f), đồng thời vẫn đặt mũi nhọn đáy pin đúng tại tâm bản đồ.
  */
 @Composable
 private fun CenterLocationMarker(
@@ -401,10 +438,19 @@ private fun CenterLocationMarker(
 ) {
     Image(
         painter = painterResource(if (isStart) R.drawable.ic_start_location else R.drawable.ic_end_location),
-        modifier = modifier
-            .offset(y = -(CenterMarkerSize / 2))
-            .size(CenterMarkerSize)
-            .alpha(if (isMapMoving) 0.6f else 1f),
         contentDescription = "pickLocation",
+        alpha = if (isMapMoving) 0.6f else 1f,
+        modifier = modifier
+            .padding(bottom = CenterMarkerSize)
+            .size(CenterMarkerSize),
     )
+}
+
+private fun TransitMode.toMapLineColorHex(): String = when (this) {
+    TransitMode.BUS, TransitMode.TROLLEYBUS -> "#10B981"
+    TransitMode.SUBWAY, TransitMode.MONORAIL -> "#3B82F6"
+    TransitMode.RAIL, TransitMode.TRAM, TransitMode.CABLE_TRAM, TransitMode.AERIAL_LIFT -> "#8B5CF6"
+    TransitMode.FERRY -> "#06B6D4"
+    TransitMode.BIKE -> "#F59E0B"
+    TransitMode.WALK -> "#64748B"
 }
