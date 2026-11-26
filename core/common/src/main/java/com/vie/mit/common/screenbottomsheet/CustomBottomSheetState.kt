@@ -161,7 +161,15 @@ class CustomBottomSheetState(
             CustomBottomSheetValue.PartiallyExpanded at totalHeightPx * (1f - config.partiallyExpandedRatio)
             CustomBottomSheetValue.Expanded at totalHeightPx * (1f - config.expandedRatio)
         }
-        anchoredState.updateAnchors(newAnchors)
+        val currentTarget = anchoredState.targetValue
+        val preservedTarget = if (!newAnchors.positionOf(currentTarget).isNaN()) {
+            currentTarget
+        } else if (!anchoredState.offset.isNaN()) {
+            newAnchors.closestAnchor(anchoredState.offset) ?: currentTarget
+        } else {
+            currentTarget
+        }
+        anchoredState.updateAnchors(newAnchors, preservedTarget)
     }
 
     suspend fun expand() {

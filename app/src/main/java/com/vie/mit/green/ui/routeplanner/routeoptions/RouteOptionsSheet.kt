@@ -24,7 +24,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.DirectionsBike
 import androidx.compose.material.icons.automirrored.filled.DirectionsWalk
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
@@ -131,21 +130,12 @@ fun RouteOptionsSheet(
                 .background(Color.White.copy(alpha = 0.45f), RoundedCornerShape(2.dp)),
         )
 
-        // Header: Nút Back + Tiêu đề + Khoảng cách ước tính
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier
+            modifier = Modifier.padding(bottom = 8.dp)
                 .fillMaxWidth()
                 .padding(vertical = 2.dp),
         ) {
-            IconButton(onClick = { onBackToPicker(null) }) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = "Quay lại chỉnh sửa điểm",
-                    tint = Color.White,
-                )
-            }
-            Spacer(modifier = Modifier.width(4.dp))
             Text(
                 text = "Phương án di chuyển",
                 style = AppTheme.typography.titleMedium.copy(

@@ -105,7 +105,7 @@ fun RoutePlannerContainerScreen(
         when {
             currentDestination?.hasRoute<RouteOptionsRouteSheet>() == true -> BottomSheetConfig(
                 peekedRatio = 0.25f,
-                partiallyExpandedRatio = 0.60f,
+                partiallyExpandedRatio = 0.72f,
                 expandedRatio = 1.0f,
             )
             currentDestination?.hasRoute<RouteLocationPickerSheetRoute>() == true -> BottomSheetConfig(
@@ -128,27 +128,31 @@ fun RoutePlannerContainerScreen(
     LaunchedEffect(currentBackStackEntry) {
         val entry = currentBackStackEntry ?: return@LaunchedEffect
         val currentRouteKey = entry.id
-
         val prevRoute = previousRouteKey
-        if (prevRoute != null && prevRoute != currentRouteKey) {
-            savedSheetStates[prevRoute] = bottomSheetState.currentValue
-        }
         previousRouteKey = currentRouteKey
 
-        if (prevRoute == null) return@LaunchedEffect
-
-        if (entry.destination.hasRoute<RouteOptionsRouteSheet>()) {
-            keyboardController?.hide()
-            focusManager.clearFocus(force = true)
-            bottomSheetState.partialExpand()
-        } else {
-            val savedValue = savedSheetStates[currentRouteKey]
-            if (savedValue != null) {
-                bottomSheetState.animateTo(savedValue)
-            } else {
+        if (prevRoute != null && prevRoute != currentRouteKey) {
+            if (entry.destination.hasRoute<RouteOptionsRouteSheet>()) {
+                keyboardController?.hide()
+                focusManager.clearFocus(force = true)
                 bottomSheetState.partialExpand()
+            } else {
+                val savedValue = savedSheetStates[currentRouteKey]
+                if (savedValue != null) {
+                    bottomSheetState.animateTo(savedValue)
+                } else {
+                    bottomSheetState.partialExpand()
+                }
             }
         }
+
+        // Sau khi đồng bộ xong trạng thái cho route hiện tại, liên tục ghi nhận trạng thái của route này
+        // để tránh đọc nhầm currentValue sau khi route/sheetConfig đã thay đổi.
+        snapshotFlow { bottomSheetState.currentValue }
+            .distinctUntilChanged()
+            .collect { value ->
+                savedSheetStates[currentRouteKey] = value
+            }
     }
 
     // Đồng bộ Bàn phím (IME) -> BottomSheet:
